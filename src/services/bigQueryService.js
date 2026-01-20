@@ -154,6 +154,14 @@ class BigQueryService {
         scenario
     `;
 
+    // Log the query and parameters
+    console.log('\n📊 BigQuery P&L Query:');
+    console.log('Query:', query);
+    console.log('Parameters:', {
+      ...queryParams,
+      date: date
+    });
+
     try {
       const [rows] = await this.bigquery.query({
         query: query,
@@ -165,6 +173,12 @@ class BigQueryService {
       });
 
       console.log(`✅ Retrieved ${rows.length} rows from BigQuery for ${hierarchy}`);
+      
+      // Log sample rows
+      if (rows.length > 0) {
+        console.log('Sample row:', JSON.stringify(rows[0], null, 2));
+      }
+      
       return rows;
     } catch (error) {
       console.error('Error fetching P&L data:', error);

@@ -315,7 +315,8 @@ function createApiRoutes(storageService, bigQueryService) {
         selectedId,
         date,
         rowCount: plData.length,
-        data: plData
+        data: plData,
+        queryParams: queryParams // Include query params for debugging
       });
     } catch (error) {
       console.error('Error fetching P&L data:', error);

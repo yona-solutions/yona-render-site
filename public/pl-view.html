@@ -542,9 +542,32 @@
     }
 
     .results-info {
-      margin-bottom: 12px;
+      margin-bottom: 8px;
       font-size: 13px;
       color: #4a5568;
+    }
+
+    .query-info {
+      background: #f7fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 4px;
+      padding: 12px;
+      margin-bottom: 12px;
+      font-size: 12px;
+      font-family: 'Courier New', monospace;
+      color: #2d3748;
+      max-height: 150px;
+      overflow-y: auto;
+    }
+
+    .query-info strong {
+      color: #2c5282;
+    }
+
+    .query-info pre {
+      margin: 4px 0;
+      white-space: pre-wrap;
+      word-break: break-all;
     }
 
     .results-table-container {
@@ -661,6 +684,9 @@
       </div>
       <div class="results-info">
         <span id="resultsMetadata"></span>
+      </div>
+      <div class="query-info" id="queryInfo">
+        <!-- Query parameters displayed here -->
       </div>
       <div class="results-table-container">
         <table id="resultsTable" class="results-table">
@@ -1234,20 +1260,30 @@
      * Fetches data based on current hierarchy, selected item, and date
      */
     async function refreshData() {
-      console.log('Refresh Data clicked');
+      console.log('\n🔄 ===== REFRESH DATA CLICKED =====');
       
       // Get current selections
       const hierarchy = currentHierarchy;
       const selectedId = districtSelect.getValue();
       const selectedDate = monthSelect.getValue();
+      const selectedLabel = districtSelect.selectedLabel;
+      
+      console.log('Current selections:', {
+        hierarchy,
+        selectedId,
+        selectedLabel,
+        selectedDate
+      });
       
       // Validate selections
       if (!selectedId) {
+        console.warn(`⚠️ No ${hierarchy} selected`);
         alert(`Please select a ${hierarchy} first`);
         return;
       }
       
       if (!selectedDate) {
+        console.warn('⚠️ No date selected');
         alert('Please select a month first');
         return;
       }
@@ -1257,30 +1293,36 @@
         const resultsSection = document.getElementById('bigqueryResults');
         resultsSection.style.display = 'flex';
         document.getElementById('resultsMetadata').textContent = 'Loading...';
+        document.getElementById('queryInfo').innerHTML = '<em>Fetching data...</em>';
         document.getElementById('resultsTableBody').innerHTML = '<tr><td colspan="6" style="text-align: center;">Loading data...</td></tr>';
         
         // Fetch data from API
         const url = `/api/pl/data?hierarchy=${hierarchy}&selectedId=${encodeURIComponent(selectedId)}&date=${selectedDate}`;
-        console.log(`📡 Fetching: ${url}`);
+        console.log(`📡 API Request: ${url}`);
         
         const response = await fetch(url);
         
+        console.log(`📥 Response status: ${response.status} ${response.statusText}`);
+        
         if (!response.ok) {
           const errorData = await response.json();
+          console.error('❌ API Error:', errorData);
           throw new Error(errorData.error || 'Failed to fetch data');
         }
         
         const result = await response.json();
         
+        console.log(`✅ Received ${result.rowCount} rows`);
+        
         // Display results
         displayBigQueryResults(result);
         
-        console.log(`✅ Received ${result.rowCount} rows`);
       } catch (error) {
-        console.error('Error fetching P&L data:', error);
+        console.error('❌ Error fetching P&L data:', error);
         document.getElementById('resultsMetadata').textContent = 'Error loading data';
+        document.getElementById('queryInfo').innerHTML = `<strong style="color: #e53e3e;">Error:</strong> ${error.message}`;
         document.getElementById('resultsTableBody').innerHTML = 
-          `<tr><td colspan="6" style="text-align: center; color: #e53e3e;">Error: ${error.message}</td></tr>`;
+          `<tr><td colspan="6" style="text-align: center; color: #e53e3e; padding: 20px;">Error: ${error.message}<br><small>Check browser console for details</small></td></tr>`;
         alert(`Failed to load data: ${error.message}`);
       }
     }
@@ -1291,19 +1333,44 @@
      * @param {Object} result - Result object from API
      */
     function displayBigQueryResults(result) {
-      const { hierarchy, selectedId, date, rowCount, data } = result;
+      const { hierarchy, selectedId, date, rowCount, data, queryParams } = result;
+      
+      // Log full result to console
+      console.log('📊 BigQuery Result:', result);
       
       // Update metadata
       document.getElementById('resultsMetadata').textContent = 
         `Hierarchy: ${hierarchy} | Selected: ${selectedId} | Date: ${date} | Rows: ${rowCount}`;
       
+      // Display query parameters
+      const queryInfo = document.getElementById('queryInfo');
+      let queryParamsHtml = '<strong>Query Parameters:</strong><br>';
+      
+      if (queryParams.customerIds) {
+        queryParamsHtml += `<strong>Customer IDs:</strong> [${queryParams.customerIds.join(', ')}]<br>`;
+        queryParamsHtml += `<strong>Count:</strong> ${queryParams.customerIds.length} customers<br>`;
+      }
+      if (queryParams.regionId) {
+        queryParamsHtml += `<strong>Region Internal ID:</strong> ${queryParams.regionId}<br>`;
+      }
+      if (queryParams.subsidiaryId) {
+        queryParamsHtml += `<strong>Subsidiary Internal ID:</strong> ${queryParams.subsidiaryId}<br>`;
+      }
+      queryParamsHtml += `<strong>Date:</strong> ${date}<br>`;
+      queryParamsHtml += `<strong>Hierarchy:</strong> ${hierarchy}`;
+      
+      queryInfo.innerHTML = queryParamsHtml;
+      
       // Populate table
       const tbody = document.getElementById('resultsTableBody');
       
       if (rowCount === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center;">No data found for selected criteria</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px;">No data found for selected criteria. Check console for query parameters.</td></tr>';
         return;
       }
+      
+      // Log first few rows to console
+      console.log('Sample rows (first 5):', data.slice(0, 5));
       
       tbody.innerHTML = data.map(row => `
         <tr>
