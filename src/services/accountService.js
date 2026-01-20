@@ -112,13 +112,28 @@ function computeRollups(rawTotals, accountConfig, childrenMap, isOperational = f
     }
   }
   
+  /**
+   * Recursively compute rollup totals for an account and its descendants
+   * 
+   * CRITICAL: This function computes the ACTUAL VALUE that should appear in reports.
+   * It includes ALL children in the rollup, even if displayExcluded = true.
+   * 
+   * Reasoning:
+   * - displayExcluded means "don't show this account as its own row"
+   * - It does NOT mean "don't include this account's value in parent totals"
+   * - Example: "40000 Revenue" has displayExcluded=true, but its value MUST
+   *   roll up into "Income" for accurate reporting
+   * 
+   * @param {string} acctLabel - Account label to compute
+   * @returns {number} Rolled-up total for this account
+   */
   function compute(acctLabel) {
-    // Already computed
+    // Already computed (memoization for performance)
     if (totals[acctLabel] != null) {
       return totals[acctLabel];
     }
     
-    // Start with this account's direct value
+    // Start with this account's direct value from raw data
     let total = rawTotals[acctLabel] || 0;
     
     // Add children's rolled-up values
@@ -129,6 +144,9 @@ function computeRollups(rawTotals, accountConfig, childrenMap, isOperational = f
       const childConfig = labelToConfig[childLabel] || {};
       
       // Only exclude from rollup if operationalExcluded (in Operational mode)
+      // operationalExcluded is different from displayExcluded:
+      // - operationalExcluded: completely exclude from operational P&L calculations
+      // - displayExcluded: hide from display but include in calculations
       const shouldExclude = isOperational && childConfig.operationalExcluded;
       
       if (!shouldExclude) {

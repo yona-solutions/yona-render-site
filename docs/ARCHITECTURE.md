@@ -26,7 +26,9 @@ yona_render_site/
 │   │   └── views.js              # HTML view routes
 │   ├── services/                 # Business logic layer
 │   │   ├── storageService.js     # GCP Storage operations
-│   │   └── bigQueryService.js    # GCP BigQuery operations
+│   │   ├── bigQueryService.js    # GCP BigQuery operations
+│   │   ├── accountService.js     # Account hierarchy & rollup logic
+│   │   └── pnlRenderService.js   # P&L HTML rendering
 │   ├── middleware/               # Custom middleware (future)
 │   └── utils/                    # Utility functions (future)
 ├── public/                       # Static files (HTML, CSS, JS)
@@ -69,23 +71,38 @@ yona_render_site/
   - File download with streaming
   - Bucket operations
   - Hierarchy configuration parsing (districts, regions, departments)
+  - Customer ID mapping for districts/tags
+  - Internal ID lookups (region_internal_id, subsidiary_internal_id)
 - **bigQueryService.js**: Business logic for BigQuery
   - Date range queries for P&L filters
+  - P&L data queries (Month + YTD)
+  - Parameterized queries by hierarchy (district/region/subsidiary)
+  - Data transformation for P&L rendering
+- **accountService.js**: Account hierarchy management
+  - Parse account_config.json
+  - Build parent-child relationships
+  - Compute rollups (CRITICAL: includes displayExcluded accounts in totals)
+  - Section configuration (Revenue, COGS, Expenses)
+- **pnlRenderService.js**: P&L HTML generation
+  - Format numbers and percentages
+  - Render account rows with proper indentation
+  - Generate headers for different entity types (District, Region, Subsidiary, Facility)
+  - Handle multi-level reports (district summary + individual facilities)
 
 ### 5. Routes Layer (`src/routes/`)
 - **api.js**: REST API endpoints
-  - `/api/health` - Health check
-  - `/api/info` - Application info
-  - `/api/storage/list` - List files in bucket
-  - `/api/storage/download/:filename` - Download file
-  - `/api/storage/districts` - Get district hierarchy
-  - `/api/storage/regions` - Get region hierarchy
-  - `/api/storage/departments` - Get department hierarchy
-  - `/api/pl/dates` - Get available dates
-  - `/api/pl/data` - P&L data (future)
+  - `/api/health` - Health check with service status
+  - `/api/info` - Application metadata
+  - `/api/storage/list` - List files in Cloud Storage bucket
+  - `/api/storage/download/:filename` - Download file from Cloud Storage
+  - `/api/storage/districts` - Get district hierarchy (districts + tags)
+  - `/api/storage/regions` - Get region hierarchy (regions + tags)
+  - `/api/storage/departments` - Get subsidiary hierarchy (departments + tags)
+  - `/api/pl/dates` - Get available dates for P&L reporting
+  - `/api/pl/data` - Get P&L HTML (Month + YTD, multi-level for districts)
 - **views.js**: HTML page routes
-  - `/` - P&L View dashboard
-  - `/storage-browser` - File browser
+  - `/` - P&L View dashboard (home page)
+  - `/storage-browser` - File browser for Cloud Storage
 
 ### 6. Presentation Layer (`public/`)
 - Static HTML files with embedded CSS/JS
@@ -209,6 +226,29 @@ See [HIERARCHY_SYSTEM.md](./HIERARCHY_SYSTEM.md) for detailed documentation.
 ### 5. Graceful Shutdown
 - **Why**: Proper cleanup, avoid data loss, handle SIGTERM from Render
 - **How**: Process signal handlers in server.js
+
+### 6. Account Rollup Logic (CRITICAL)
+- **Why**: Accurate financial reporting requires proper parent-child aggregation
+- **How**: `accountService.computeRollups()` recursively sums account values
+- **Key Insight**: `displayExcluded` accounts MUST be included in rollups
+  - Example: "40000 Revenue" has `displayExcluded=true` but its value must roll into "Income"
+  - `displayExcluded` only affects rendering (hide from display), not calculations
+  - Without this, parent accounts would show incorrect totals (e.g., Income = $0 despite having revenue)
+
+### 7. YTD (Year-to-Date) Reporting
+- **Why**: Financial analysis requires both month and year-to-date comparisons
+- **How**: Two BigQuery queries per request:
+  - Month: `WHERE time_date = @date`
+  - YTD: `WHERE time_date <= @date AND time_date >= DATE_TRUNC(@date, YEAR)`
+- **Display**: Side-by-side columns (Month Actual/Budget | YTD Actual/Budget)
+
+### 8. Multi-Level District Rendering
+- **Why**: Districts need both aggregate view and individual facility breakdowns
+- **How**: 
+  - Generate district summary P&L (sum of all facilities)
+  - Iterate through each facility and generate individual P&Ls
+  - Only include facilities with revenue (Income > 0)
+  - All HTML concatenated into single response
 
 ## Security Considerations
 

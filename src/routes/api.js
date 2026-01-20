@@ -336,7 +336,19 @@ function createApiRoutes(storageService, bigQueryService) {
         console.log(`   Using subsidiary_internal_id=${subsidiaryId}`);
       }
 
-      // Generate multi-level P&L for districts (district + facilities)
+      // ============================================
+      // Multi-Level P&L Rendering
+      // ============================================
+      // 
+      // For DISTRICTS: Generate summary + individual facility reports
+      // - District summary: Aggregate of all customers (facilities) in the district
+      // - Facility reports: Individual P&L for each customer with revenue
+      // 
+      // For REGIONS/SUBSIDIARIES: Single-level P&L (no children)
+      // 
+      // Each report includes both Month and YTD columns
+      // ============================================
+      
       let htmlParts = [];
       let totalNoRevenue = false;
       

@@ -128,9 +128,11 @@ class BigQueryService {
     }
 
     // Build date filter based on YTD flag
+    // YTD (Year-to-Date): Sum all transactions from Jan 1 through the selected month
+    // Month: Only transactions for the selected month
     const dateFilter = ytd 
-      ? 'time_date <= @date AND time_date >= DATE_TRUNC(@date, YEAR)'
-      : 'time_date = @date';
+      ? 'time_date <= @date AND time_date >= DATE_TRUNC(@date, YEAR)'  // e.g., 2025-01-01 through 2025-08-01
+      : 'time_date = @date';  // e.g., only 2025-08-01
 
     const query = `
       SELECT
