@@ -37,6 +37,15 @@ function createViewRoutes() {
     res.sendFile(path.join(publicPath, 'storage-browser.html'));
   });
 
+  /**
+   * Dimension Configuration page
+   * 
+   * GET /dimension-config
+   */
+  router.get('/dimension-config', (req, res) => {
+    res.sendFile(path.join(publicPath, 'dimension-config.html'));
+  });
+
   // Future routes can be added here:
   // router.get('/reports', ...) 
   // router.get('/settings', ...)

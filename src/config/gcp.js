@@ -9,6 +9,43 @@
 
 const { Storage } = require('@google-cloud/storage');
 const { BigQuery } = require('@google-cloud/bigquery');
+const path = require('path');
+const fs = require('fs');
+
+/**
+ * Load service account credentials
+ * 
+ * Tries to load from:
+ * 1. GCP_SERVICE_ACCOUNT_KEY environment variable (JSON string)
+ * 2. gcp-service-account-key.json file in project root
+ * 
+ * @returns {object|null} Service account credentials or null if not found
+ */
+function loadServiceAccountKey() {
+  // Try environment variable first
+  if (process.env.GCP_SERVICE_ACCOUNT_KEY) {
+    try {
+      return JSON.parse(process.env.GCP_SERVICE_ACCOUNT_KEY);
+    } catch (error) {
+      console.error('❌ Failed to parse GCP_SERVICE_ACCOUNT_KEY:', error.message);
+    }
+  }
+  
+  // Try local file
+  const keyPath = path.join(__dirname, '../../gcp-service-account-key.json');
+  if (fs.existsSync(keyPath)) {
+    try {
+      const keyContent = fs.readFileSync(keyPath, 'utf8');
+      console.log('📄 Using local GCP service account key file');
+      return JSON.parse(keyContent);
+    } catch (error) {
+      console.error('❌ Failed to read local service account key:', error.message);
+    }
+  }
+  
+  console.warn('⚠️  No GCP credentials found (tried env var and local file)');
+  return null;
+}
 
 /**
  * Initialize GCP Storage client
@@ -17,12 +54,11 @@ const { BigQuery } = require('@google-cloud/bigquery');
  */
 function initializeStorage() {
   try {
-    if (!process.env.GCP_SERVICE_ACCOUNT_KEY) {
-      console.warn('⚠️  GCP_SERVICE_ACCOUNT_KEY not found in environment variables');
+    const serviceAccountKey = loadServiceAccountKey();
+    
+    if (!serviceAccountKey) {
       return null;
     }
-
-    const serviceAccountKey = JSON.parse(process.env.GCP_SERVICE_ACCOUNT_KEY);
     
     const storage = new Storage({
       credentials: serviceAccountKey,
@@ -46,12 +82,11 @@ function initializeStorage() {
  */
 function initializeBigQuery() {
   try {
-    if (!process.env.GCP_SERVICE_ACCOUNT_KEY) {
-      console.warn('⚠️  GCP_SERVICE_ACCOUNT_KEY not found in environment variables');
+    const serviceAccountKey = loadServiceAccountKey();
+    
+    if (!serviceAccountKey) {
       return null;
     }
-
-    const serviceAccountKey = JSON.parse(process.env.GCP_SERVICE_ACCOUNT_KEY);
     
     const bigquery = new BigQuery({
       credentials: serviceAccountKey,

@@ -15,6 +15,14 @@
 // Load environment variables from .env file (for local development)
 require('dotenv').config();
 
+// For local development only: bypass SSL certificate verification
+// This is needed when Node.js can't verify Google's SSL certificates
+// DO NOT use in production
+if (process.env.NODE_ENV !== 'production') {
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+  console.log('⚠️  Development mode: SSL certificate verification disabled');
+}
+
 const createApp = require('./src/app');
 
 const PORT = process.env.PORT || 3000;

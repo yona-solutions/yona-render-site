@@ -1,0 +1,187 @@
+═══════════════════════════════════════════════════════════════════
+  YONA P&L REPORTING SYSTEM - FINAL DEPLOYMENT SUMMARY
+═══════════════════════════════════════════════════════════════════
+
+🎉 DEPLOYMENT STATUS: LIVE & VERIFIED
+
+URL: https://yona-render-site.onrender.com
+Deployment ID: dep-d5nfql14tr6s73d6sp2g
+Commit: 782633d (Final code review: Enhanced documentation and comments)
+Deployed: January 20, 2026
+
+═══════════════════════════════════════════════════════════════════
+  FEATURES IMPLEMENTED
+═══════════════════════════════════════════════════════════════════
+
+✅ P&L Dashboard
+   - Interactive hierarchy navigation (District, Region, Subsidiary)
+   - Searchable/filterable dropdowns
+   - Real-time BigQuery integration
+   
+✅ Multi-Level District Rendering
+   - District summary + individual facility P&Ls
+   - Revenue-based filtering (only facilities with Income > 0)
+   - Works for both districts and district tags
+   
+✅ YTD (Year-to-Date) Reporting
+   - Side-by-side Month and YTD columns
+   - Actuals vs Budget for both periods
+   - Percentage of Income calculations
+   
+✅ Account Rollup Logic (CRITICAL FIX)
+   - displayExcluded accounts correctly included in parent totals
+   - Facilities now show accurate Income values
+   - Fixed: Income was showing $0 despite having revenue
+   
+✅ Cloud Storage Integration
+   - Browse files in dimension_configurations bucket
+   - Download configuration files
+   - Parse hierarchy configs dynamically
+   
+✅ RESTful API for Workflow Automation
+   - /api/pl/data - Generate P&L HTML
+   - Ready for Zapier, email workflows, scripts
+   - Stateless design for easy integration
+
+═══════════════════════════════════════════════════════════════════
+  CODE ORGANIZATION & DOCUMENTATION
+═══════════════════════════════════════════════════════════════════
+
+📁 Project Structure:
+   src/
+   ├── config/           - GCP & Express configuration
+   ├── services/         - Business logic layer
+   │   ├── storageService.js      - Cloud Storage ops
+   │   ├── bigQueryService.js     - BigQuery queries
+   │   ├── accountService.js      - Rollup calculations
+   │   └── pnlRenderService.js    - HTML generation
+   ├── routes/           - API & view endpoints
+   └── app.js            - Application orchestration
+
+📚 Documentation:
+   ✅ README.md                  - Project overview
+   ✅ LOCAL_DEVELOPMENT.md       - Setup & dev workflow
+   ✅ docs/ARCHITECTURE.md       - System architecture
+   ✅ docs/HIERARCHY_SYSTEM.md   - Hierarchy implementation
+   ✅ docs/DEVELOPER_GUIDE.md    - Quick reference
+   ✅ docs/CRITICAL_CONCEPTS.md  - Key technical concepts (NEW!)
+   
+🔐 Configuration:
+   ✅ .env file with GCP_SERVICE_ACCOUNT_KEY & RENDER_API_KEY
+   ✅ .gitignore protects sensitive files
+   ✅ deploy.sh script for easy deployments
+
+═══════════════════════════════════════════════════════════════════
+  API ENDPOINTS
+═══════════════════════════════════════════════════════════════════
+
+Core APIs:
+  GET  /api/health               - Health check
+  GET  /api/pl/dates             - Available dates
+  GET  /api/pl/data              - P&L HTML (Month + YTD)
+  
+Hierarchy APIs:
+  GET  /api/storage/districts    - District hierarchy
+  GET  /api/storage/regions      - Region hierarchy
+  GET  /api/storage/departments  - Department hierarchy
+  
+Storage APIs:
+  GET  /api/storage/list         - List Cloud Storage files
+  GET  /api/storage/download/:f  - Download file
+
+═══════════════════════════════════════════════════════════════════
+  CRITICAL TECHNICAL CONCEPTS
+═══════════════════════════════════════════════════════════════════
+
+1. Account Rollups
+   - displayExcluded = hide from display, NOT from calculations
+   - ALWAYS include child values in parent totals
+   - Example: "40000 Revenue" rolls into "Income" even if hidden
+
+2. YTD Queries
+   - Month: WHERE time_date = @date
+   - YTD: WHERE time_date BETWEEN start_of_year AND @date
+   - Both queries run for every request
+
+3. Multi-Level Districts
+   - 1 summary query (all facilities)
+   - N individual queries (one per facility)
+   - Filter: Only include if Income > 0
+
+4. Hierarchy Mapping
+   - District → customer_internal_id (multiple)
+   - Region → region_internal_id (single)
+   - Subsidiary → subsidiary_internal_id (single)
+
+═══════════════════════════════════════════════════════════════════
+  DEPLOYMENT COMMANDS
+═══════════════════════════════════════════════════════════════════
+
+Local Development:
+  npm install              # Install dependencies
+  npm start                # Start server (http://localhost:3000)
+  ./restart.sh             # Kill & restart server
+
+Deployment:
+  git add -A               # Stage changes
+  git commit -m "..."      # Commit changes
+  git push origin main     # Push to GitHub (auto-deploys)
+  ./deploy.sh              # Manual deployment with monitoring
+
+═══════════════════════════════════════════════════════════════════
+  VERIFICATION RESULTS
+═══════════════════════════════════════════════════════════════════
+
+✅ Health Check: healthy
+✅ Storage Service: Available
+✅ BigQuery Service: Available
+✅ P&L API Response: 361,447 chars
+✅ YTD Columns: Present (22 headers = 11 reports × 2)
+✅ Multi-Level: District + 10 facilities
+✅ Rollup Logic: Working (facilities show correct Income)
+
+═══════════════════════════════════════════════════════════════════
+  NEXT STEPS FOR WORKFLOW AUTOMATION
+═══════════════════════════════════════════════════════════════════
+
+The API is ready for workflow integration!
+
+Example Workflow (Python):
+  import requests
+  
+  response = requests.get(
+      'https://yona-render-site.onrender.com/api/pl/data',
+      params={
+          'hierarchy': 'district',
+          'selectedId': '1971',
+          'date': '2025-08-01'
+      }
+  )
+  
+  html_content = response.json()['html']
+  
+  # Use HTML in email, PDF, etc.
+  send_email(to='user@company.com', html_body=html_content)
+
+Parameters:
+  - hierarchy: "district" | "region" | "subsidiary"
+  - selectedId: ID from hierarchy dropdowns
+  - date: "YYYY-MM-01" format (first day of month)
+
+═══════════════════════════════════════════════════════════════════
+  REPOSITORY INFORMATION
+═══════════════════════════════════════════════════════════════════
+
+GitHub: https://github.com/yona-solutions/yona-render-site
+Render Dashboard: https://dashboard.render.com/web/srv-d5ndl4pr0fns73fh5b4g
+
+Latest Commits:
+  782633d - Final code review: Enhanced documentation
+  4a2851b - Add Render API key to .env
+  edda53e - Implement YTD data
+  263939e - Fix rollup logic for displayExcluded accounts
+  8bd6449 - Implement multi-level P&L rendering
+
+═══════════════════════════════════════════════════════════════════
+  END OF SUMMARY
+═══════════════════════════════════════════════════════════════════

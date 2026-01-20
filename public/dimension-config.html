@@ -1,0 +1,1372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SPHERE - Dimension Configuration</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+      display: flex;
+      height: 100vh;
+      background: #f8f9fa;
+      overflow: hidden;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      width: 195px;
+      background: #ffffff;
+      border-right: 1px solid #dfe3e8;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 1px 0 0 rgba(0,0,0,0.02);
+    }
+
+    .logo {
+      padding: 18px 20px;
+      border-bottom: 1px solid #dfe3e8;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 19px;
+      font-weight: 600;
+      color: #1a202c;
+      letter-spacing: -0.3px;
+    }
+
+    .logo-icon {
+      width: 28px;
+      height: 28px;
+      background: linear-gradient(135deg, #3b5998 0%, #2d4373 100%);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 14px;
+      font-weight: bold;
+    }
+
+    .nav-menu {
+      flex: 1;
+      padding: 8px 0;
+    }
+
+    .nav-item {
+      padding: 11px 20px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      color: #4a5568;
+      font-size: 13.5px;
+      font-weight: 400;
+      border-left: 3px solid transparent;
+    }
+
+    .nav-item:hover:not(.disabled) {
+      background: #f7fafc;
+      color: #2d3748;
+    }
+
+    .nav-item.active {
+      background: #e6f0f8;
+      color: #2d4a68;
+      font-weight: 500;
+      border-left-color: #4a7c9e;
+    }
+
+    .nav-item.disabled {
+      color: #cbd5e0;
+      cursor: not-allowed;
+    }
+
+    /* Main Content */
+    .main-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: #ffffff;
+    }
+
+    /* Header Tabs */
+    .header-tabs {
+      background: #f8f9fa;
+      padding: 12px 20px;
+      display: flex;
+      gap: 8px;
+      border-bottom: 1px solid #e0e0e0;
+    }
+
+    .tab {
+      padding: 8px 20px;
+      background: #e8ecef;
+      border: none;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 500;
+      color: #555;
+      transition: all 0.2s;
+      border-radius: 4px 4px 0 0;
+    }
+
+    .tab:hover:not(.active) {
+      background: #dce1e5;
+    }
+
+    .tab.active {
+      background: #ffffff;
+      color: #2d3748;
+      font-weight: 600;
+    }
+
+    /* Controls */
+    .controls {
+      background: white;
+      padding: 12px 20px;
+      border-bottom: 1px solid #e0e0e0;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .search-box {
+      flex: 1;
+      max-width: 300px;
+    }
+
+    .search-box input {
+      width: 100%;
+      padding: 6px 10px;
+      border: 1px solid #ccc;
+      border-radius: 3px;
+      font-size: 12px;
+    }
+
+    .search-box input:focus {
+      outline: none;
+      border-color: #2196F3;
+    }
+
+    .btn {
+      padding: 6px 14px;
+      border: 1px solid #ccc;
+      border-radius: 3px;
+      background: #f5f5f5;
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 500;
+      transition: all 0.15s;
+    }
+
+    .btn:hover {
+      background: #e0e0e0;
+    }
+
+    .stats {
+      margin-left: auto;
+      font-size: 11px;
+      color: #666;
+      display: flex;
+      gap: 12px;
+    }
+
+    /* Tree Content */
+    .tree-content {
+      flex: 1;
+      overflow-y: auto;
+      background: #ffffff;
+    }
+
+    .loading-state, .error-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: #666;
+      font-size: 13px;
+    }
+
+    .error-state {
+      color: #d32f2f;
+    }
+
+    /* Tree Node - Compact Retool Styling */
+    .tree-node {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    .node-item {
+      display: flex;
+      align-items: center;
+      padding: 4px 6px;
+      border-bottom: 1px solid #f0f0f0;
+      background-color: white;
+      transition: background-color 0.1s ease;
+      min-height: 30px;
+      position: relative;
+    }
+
+    .node-item:hover {
+      background-color: #f9f9f9;
+    }
+
+    .node-actions {
+      display: none;
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      gap: 4px;
+    }
+
+    .node-item:hover .node-actions {
+      display: flex;
+    }
+
+    .btn-edit {
+      width: 20px;
+      height: 20px;
+      border-radius: 3px;
+      border: none;
+      background: #2196F3;
+      color: white;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      transition: background 0.15s;
+    }
+
+    .btn-edit:hover {
+      background: #1976D2;
+    }
+
+    .node-icon-container {
+      width: 16px;
+      display: flex;
+      justify-content: center;
+      margin-right: 4px;
+      color: #333;
+    }
+
+    .node-chevron {
+      width: 8px;
+      height: 8px;
+      display: block;
+    }
+
+    .node-label {
+      font-size: 12px;
+      color: #333;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* Inline icons and tags */
+    .inline-icon {
+      width: 12px;
+      height: 12px;
+      display: inline-block;
+      flex-shrink: 0;
+    }
+
+    .tag {
+      font-size: 10px;
+      padding: 1px 5px;
+      border-radius: 8px;
+      white-space: nowrap;
+    }
+
+    .tag-district {
+      background-color: #ede7f6;
+      color: #4527a0;
+    }
+
+    .tag-customer {
+      background-color: #e8f5e9;
+      color: #1b5e20;
+    }
+
+    .tag-generic {
+      background-color: #e0e0e0;
+      color: #555;
+    }
+
+    .node-children {
+      list-style: none;
+      display: none;
+    }
+
+    .node-children.expanded {
+      display: block;
+    }
+
+    /* Empty state */
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: #999;
+    }
+
+    /* Edit Sidebar */
+    .edit-sidebar {
+      position: fixed;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      width: 340px;
+      background: linear-gradient(to bottom, #f8f9fa 0%, #ffffff 120px);
+      border-left: 1px solid #cbd5e0;
+      box-shadow: -4px 0 16px rgba(0,0,0,0.12);
+      padding: 0;
+      overflow-y: auto;
+      z-index: 100;
+      display: none;
+    }
+
+    .edit-sidebar.open {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .edit-sidebar-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 20px;
+      background: linear-gradient(135deg, #4a7c9e 0%, #3d6a8a 100%);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      margin-bottom: 0;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .edit-sidebar-header h3 {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 600;
+      color: white;
+    }
+
+    .edit-sidebar-content {
+      padding: 20px;
+    }
+
+    .field-group {
+      margin-bottom: 20px;
+      padding: 16px;
+      background: white;
+      border-radius: 6px;
+      border: 1px solid #e2e8f0;
+    }
+
+    .field-label {
+      display: block;
+      font-size: 11px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: #4a7c9e;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .field-input {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #cbd5e0;
+      border-radius: 4px;
+      font-size: 13px;
+      background: #f8f9fa;
+      transition: all 0.15s;
+    }
+
+    .field-input:focus {
+      outline: none;
+      border-color: #4a7c9e;
+      background: white;
+      box-shadow: 0 0 0 3px rgba(74, 124, 158, 0.1);
+    }
+
+    /* Custom Select Dropdown */
+    .custom-select-wrapper {
+      position: relative;
+      width: 100%;
+    }
+
+    .custom-select-input {
+      width: 100%;
+      padding: 9px 40px 9px 12px;
+      border: 1px solid #cbd5e0;
+      border-radius: 4px;
+      font-size: 13px;
+      background: white;
+      color: #2d3748;
+      cursor: pointer;
+      background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234a5568' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+      background-repeat: no-repeat;
+      background-position: right 10px center;
+      background-size: 14px;
+      font-weight: 400;
+    }
+
+    .custom-select-input:focus {
+      outline: none;
+      border-color: #2196F3;
+      box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.1);
+    }
+
+    .custom-select-dropdown {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: white;
+      border: 1px solid #cbd5e0;
+      border-top: none;
+      border-radius: 0 0 4px 4px;
+      max-height: 250px;
+      overflow-y: auto;
+      z-index: 1000;
+      display: none;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      margin-top: -1px;
+    }
+
+    .custom-select-dropdown.show {
+      display: block;
+    }
+
+    .custom-select-option {
+      padding: 10px 12px;
+      cursor: pointer;
+      font-size: 13px;
+      color: #2d3748;
+      transition: background 0.15s;
+    }
+
+    .custom-select-option:hover {
+      background: #f7fafc;
+    }
+
+    .custom-select-option.selected {
+      background: #e6f0f8;
+      color: #2d4a68;
+      font-weight: 500;
+    }
+
+    .field-select {
+      width: 100%;
+      font-size: 12px;
+    }
+
+    .field-checkbox {
+      display: flex;
+      align-items: center;
+      font-size: 12px;
+      color: #555;
+      margin-bottom: 12px;
+      padding: 8px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .field-checkbox:hover {
+      background: #f5f5f5;
+    }
+
+    .field-checkbox input {
+      margin-right: 10px;
+      cursor: pointer;
+      width: 16px;
+      height: 16px;
+    }
+
+    .field-checkbox label {
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .btn-close {
+      padding: 6px 8px;
+      border: none;
+      border-radius: 4px;
+      background: rgba(255,255,255,0.15);
+      cursor: pointer;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s;
+      color: white;
+      width: 32px;
+      height: 32px;
+    }
+
+    .btn-close:hover {
+      background: rgba(255,255,255,0.25);
+    }
+
+    .sidebar-actions {
+      margin-top: 20px;
+      display: flex;
+      gap: 10px;
+      padding-top: 20px;
+    }
+
+    .btn-cancel {
+      flex: 1;
+      padding: 12px 20px;
+      border-radius: 6px;
+      border: 1px solid #cbd5e0;
+      background: white;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      transition: all 0.15s;
+      color: #4a5568;
+    }
+
+    .btn-cancel:hover {
+      background: #f7fafc;
+      border-color: #4a7c9e;
+      color: #4a7c9e;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .field-hint {
+      margin-top: 6px;
+      font-size: 11px;
+      color: #4a7c9e;
+      font-style: italic;
+      background: #e6f0f8;
+      padding: 6px 10px;
+      border-radius: 4px;
+      border-left: 3px solid #4a7c9e;
+    }
+
+    .checkbox-group label {
+      display: flex;
+      align-items: center;
+      margin-bottom: 10px;
+      cursor: pointer;
+      color: #2d3748;
+      font-size: 13px;
+      font-weight: 400;
+    }
+
+    .checkbox-group input[type="checkbox"] {
+      margin-right: 8px;
+      width: 16px;
+      height: 16px;
+      cursor: pointer;
+      accent-color: #4a7c9e;
+    }
+  </style>
+</head>
+<body>
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="logo">
+      <div class="logo-icon">◈</div>
+      <span>SPHERE</span>
+    </div>
+    <nav class="nav-menu">
+      <div class="nav-item">P&L View</div>
+      <div class="nav-item active">Dimension Configuration</div>
+      <div class="nav-item disabled">Email Configuration (not ready)</div>
+    </nav>
+  </div>
+
+  <!-- Main Content -->
+  <div class="main-content">
+    <!-- Header Tabs -->
+    <div class="header-tabs">
+      <button class="tab active" data-dimension="account">Accounts</button>
+      <button class="tab" data-dimension="customer">Customers</button>
+      <button class="tab" data-dimension="department">Departments</button>
+      <button class="tab" data-dimension="region">Regions</button>
+      <button class="tab" data-dimension="vendor">Vendors</button>
+    </div>
+
+    <!-- Controls -->
+    <div class="controls">
+      <div class="search-box">
+        <input 
+          type="text" 
+          id="searchInput" 
+          placeholder="Search..."
+        />
+      </div>
+
+      <button class="btn" onclick="expandAll()">Expand All</button>
+      <button class="btn" onclick="collapseAll()">Collapse All</button>
+      <button class="btn" onclick="refreshDimensions()">Refresh</button>
+
+      <div class="stats">
+        <span>Total: <strong id="totalCount">0</strong></span>
+        <span>Visible: <strong id="visibleCount">0</strong></span>
+      </div>
+    </div>
+
+    <!-- Tree Content -->
+    <div class="tree-content">
+      <div id="loadingState" class="loading-state">Loading dimensions...</div>
+      <div id="errorState" class="error-state" style="display: none;"></div>
+      <ul id="treeRoot" class="tree-node" style="display: none;"></ul>
+    </div>
+  </div>
+
+  <!-- Edit Sidebar -->
+  <div id="editSidebar" class="edit-sidebar">
+    <div class="edit-sidebar-header">
+      <h3>Edit Item</h3>
+      <button class="btn-close" onclick="closeEditSidebar()">✕</button>
+    </div>
+
+    <div class="edit-sidebar-content">
+      <div class="field-group">
+        <label class="field-label">Name</label>
+        <input type="text" id="editName" class="field-input" placeholder="Enter name...">
+      </div>
+
+    <div id="accountMappingSection" class="field-group" style="display: none;">
+      <label class="field-label">Map to Account</label>
+      <div class="custom-select-wrapper">
+        <input 
+          type="text" 
+          id="editAccountMapping" 
+          class="custom-select-input" 
+          placeholder="(No account mapped)"
+          readonly
+        />
+        <div class="custom-select-dropdown" id="editAccountMappingDropdown"></div>
+      </div>
+      <div id="accountMappingHint" class="field-hint" style="display: none;"></div>
+    </div>
+
+      <div id="accountCheckboxesSection" class="field-group checkbox-group" style="display: none;">
+        <label>
+          <input type="checkbox" id="editDisplayExcluded">
+          <span>Display Excluded</span>
+        </label>
+
+        <label>
+          <input type="checkbox" id="editDoubleLines">
+          <span>Double Lines</span>
+        </label>
+
+        <label>
+          <input type="checkbox" id="editOperationalExcluded">
+          <span>Operational Excluded</span>
+        </label>
+      </div>
+
+      <div class="field-group">
+        <label class="field-label">Parent</label>
+        <div class="custom-select-wrapper">
+          <input 
+            type="text" 
+            id="editParent" 
+            class="custom-select-input" 
+            placeholder="(Root Level)"
+            readonly
+          />
+          <div class="custom-select-dropdown" id="editParentDropdown"></div>
+        </div>
+      </div>
+
+      <div class="sidebar-actions">
+        <button class="btn-cancel" onclick="closeEditSidebar()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // State Management
+    const AppState = {
+      currentDimension: 'account',
+      dimensions: {},
+      expandedNodes: new Set(),
+      searchQuery: '',
+      trees: {},
+      editingNode: null
+    };
+
+    // API Functions
+    async function loadDimension(dimensionType) {
+      const response = await fetch(`/api/config/${dimensionType}`);
+      if (!response.ok) throw new Error(`Failed to load ${dimensionType}`);
+      const data = await response.json();
+      AppState.dimensions[dimensionType] = data;
+      return data;
+    }
+
+    // Tree Building (using order field like Retool component)
+    function buildTree(flatData) {
+      if (!flatData) return [];
+      
+      const nodeMap = new Map();
+      const childrenByParent = {};
+      const roots = [];
+      
+      // Initialize all nodes
+      for (const [id, data] of Object.entries(flatData)) {
+        nodeMap.set(id, { id, ...data, children: [] });
+      }
+      
+      // Collect children by parent, preserving order field
+      for (const [id, node] of nodeMap) {
+        const parentId = node.parent;
+        
+        // Determine order - use order field if available, otherwise use key-based order
+        let order = node.order;
+        if (order === undefined || order === null) {
+          // Fallback: try to parse ID as number, otherwise use string comparison
+          const numId = Number(id);
+          order = isNaN(numId) ? id : numId;
+        }
+        
+        if (parentId === null || parentId === undefined) {
+          roots.push({ node, order });
+        } else {
+          if (!childrenByParent[parentId]) {
+            childrenByParent[parentId] = [];
+          }
+          childrenByParent[parentId].push({ node, order });
+        }
+      }
+      
+      // Sort and assign children to parents
+      for (const [parentId, children] of Object.entries(childrenByParent)) {
+        children.sort((a, b) => {
+          // Sort by order field (numeric comparison)
+          if (typeof a.order === 'number' && typeof b.order === 'number') {
+            return a.order - b.order;
+          }
+          // Fallback to string comparison if not numeric
+          return String(a.order).localeCompare(String(b.order));
+        });
+        
+        const parentNode = nodeMap.get(parentId);
+        if (parentNode) {
+          parentNode.children = children.map(c => c.node);
+        }
+      }
+      
+      // Sort root nodes by order
+      roots.sort((a, b) => {
+        if (typeof a.order === 'number' && typeof b.order === 'number') {
+          return a.order - b.order;
+        }
+        return String(a.order).localeCompare(String(b.order));
+      });
+      
+      return roots.map(r => r.node);
+    }
+
+    // Rendering
+    function renderTree(tree, searchQuery = '') {
+      const container = document.getElementById('treeRoot');
+      container.innerHTML = '';
+      
+      if (!tree || tree.length === 0) {
+        container.innerHTML = '<div class="empty-state">No data available</div>';
+        container.style.display = 'block';
+        hideLoadingState();
+        return;
+      }
+      
+      let visibleCount = 0;
+      const totalCount = countNodes(tree);
+      
+      tree.forEach(node => {
+        const nodeElement = renderNode(node, searchQuery, 0);
+        if (nodeElement) {
+          container.appendChild(nodeElement);
+          visibleCount += countVisibleNodes(nodeElement);
+        }
+      });
+      
+      document.getElementById('totalCount').textContent = totalCount;
+      document.getElementById('visibleCount').textContent = visibleCount;
+      
+      container.style.display = 'block';
+      hideLoadingState();
+    }
+
+    function renderNode(node, searchQuery, level) {
+      const matchesSearch = !searchQuery || 
+        (node.label && node.label.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (node.id && node.id.toLowerCase().includes(searchQuery.toLowerCase()));
+      
+      const childrenMatchSearch = searchQuery && node.children && 
+        node.children.some(child => nodeMatchesSearchRecursive(child, searchQuery));
+      
+      if (searchQuery && !matchesSearch && !childrenMatchSearch) {
+        return null;
+      }
+      
+      const li = document.createElement('li');
+      
+      const div = document.createElement('div');
+      div.className = 'node-item';
+      div.style.paddingLeft = `${level * 12 + 6}px`;
+      
+      // Icon container
+      const iconContainer = document.createElement('div');
+      iconContainer.className = 'node-icon-container';
+      
+      const hasChildren = node.children && node.children.length > 0;
+      if (hasChildren) {
+        const isExpanded = AppState.expandedNodes.has(node.id) || searchQuery !== '';
+        iconContainer.innerHTML = isExpanded ? 
+          '<svg class="node-chevron" viewBox="0 0 24 24" fill="currentColor"><path d="M5 8h14l-7 11z" /></svg>' :
+          '<svg class="node-chevron" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>';
+        
+        iconContainer.onclick = (e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          toggleNode(node.id);
+        };
+        iconContainer.style.cursor = 'pointer';
+      }
+      
+      div.appendChild(iconContainer);
+      
+      // Label
+      const label = document.createElement('span');
+      label.className = 'node-label';
+      
+      // Add district icon
+      if (node.isDistrict) {
+        label.innerHTML += '🏢 ';
+      }
+      
+      // Add customer icon
+      if (node.customer_internal_id) {
+        label.innerHTML += '👤 ';
+      }
+      
+      // Label text
+      const labelText = document.createTextNode(node.label || node.id);
+      label.appendChild(labelText);
+      
+      // Add mapping indicator
+      if (node.account_internal_id || node.customer_internal_id || 
+          node.region_internal_id || node.subsidiary_internal_id || 
+          node.vendor_internal_id) {
+        const mappedIcon = document.createElement('span');
+        mappedIcon.innerHTML = '✓';
+        mappedIcon.style.color = '#2196F3';
+        mappedIcon.style.fontWeight = 'bold';
+        mappedIcon.title = 'Mapped';
+        label.appendChild(mappedIcon);
+      }
+      
+      // Add exclusion indicators
+      if (node.displayExcluded) {
+        const icon = document.createElement('span');
+        icon.className = 'inline-icon';
+        icon.innerHTML = '👁️';
+        icon.title = 'Display Excluded';
+        icon.style.opacity = '0.5';
+        label.appendChild(icon);
+      }
+      
+      if (node.doubleLines) {
+        const icon = document.createElement('span');
+        icon.className = 'inline-icon';
+        icon.innerHTML = '≡';
+        icon.title = 'Double Lines';
+        icon.style.color = '#9C27B0';
+        icon.style.fontWeight = 'bold';
+        icon.style.fontSize = '14px';
+        label.appendChild(icon);
+      }
+      
+      if (node.operationalExcluded) {
+        const icon = document.createElement('span');
+        icon.className = 'inline-icon';
+        icon.innerHTML = '⊘';
+        icon.title = 'Operational Excluded';
+        label.appendChild(icon);
+      }
+      
+      if (node.districtReportingExcluded) {
+        const icon = document.createElement('span');
+        icon.className = 'inline-icon';
+        icon.innerHTML = '🚫';
+        icon.title = 'District Reporting Excluded';
+        label.appendChild(icon);
+      }
+      
+      // Add tags
+      if (AppState.currentDimension === 'customer') {
+        if (node.districtTags && node.districtTags.length > 0) {
+          node.districtTags.forEach(tag => {
+            const tagSpan = document.createElement('span');
+            tagSpan.className = 'tag tag-district';
+            tagSpan.textContent = `D:${tag}`;
+            label.appendChild(tagSpan);
+          });
+        }
+        
+        const customerTags = node.customerTags || node.tags || [];
+        customerTags.forEach(tag => {
+          const tagSpan = document.createElement('span');
+          tagSpan.className = 'tag tag-customer';
+          tagSpan.textContent = `C:${tag}`;
+          label.appendChild(tagSpan);
+        });
+      } else if (node.tags && node.tags.length > 0) {
+        node.tags.forEach(tag => {
+          const tagSpan = document.createElement('span');
+          tagSpan.className = 'tag tag-generic';
+          tagSpan.textContent = tag;
+          label.appendChild(tagSpan);
+        });
+      }
+      
+      div.appendChild(label);
+      
+      // Add action buttons (edit button)
+      const actionsDiv = document.createElement('div');
+      actionsDiv.className = 'node-actions';
+      
+      const editBtn = document.createElement('button');
+      editBtn.className = 'btn-edit';
+      editBtn.innerHTML = '✏️';
+      editBtn.title = 'Edit';
+      editBtn.onclick = (e) => {
+        e.stopPropagation();
+        openEditSidebar(node);
+      };
+      
+      actionsDiv.appendChild(editBtn);
+      div.appendChild(actionsDiv);
+      
+      li.appendChild(div);
+      
+      // Children
+      if (hasChildren) {
+        const childrenContainer = document.createElement('ul');
+        childrenContainer.className = 'node-children';
+        
+        const isExpanded = AppState.expandedNodes.has(node.id) || searchQuery !== '';
+        if (isExpanded) {
+          childrenContainer.classList.add('expanded');
+        }
+        
+        node.children.forEach(child => {
+          const childElement = renderNode(child, searchQuery, level + 1);
+          if (childElement) {
+            childrenContainer.appendChild(childElement);
+          }
+        });
+        
+        li.appendChild(childrenContainer);
+      }
+      
+      return li;
+    }
+
+    function toggleNode(nodeId) {
+      if (AppState.expandedNodes.has(nodeId)) {
+        AppState.expandedNodes.delete(nodeId);
+      } else {
+        AppState.expandedNodes.add(nodeId);
+      }
+      renderCurrentDimension();
+    }
+
+    function expandAll() {
+      const currentData = AppState.dimensions[AppState.currentDimension];
+      if (!currentData) return;
+      
+      for (const id of Object.keys(currentData)) {
+        AppState.expandedNodes.add(id);
+      }
+      renderCurrentDimension();
+    }
+
+    function collapseAll() {
+      AppState.expandedNodes.clear();
+      renderCurrentDimension();
+    }
+
+    function nodeMatchesSearchRecursive(node, query) {
+      if ((node.label && node.label.toLowerCase().includes(query.toLowerCase())) ||
+          (node.id && node.id.toLowerCase().includes(query.toLowerCase()))) {
+        return true;
+      }
+      
+      if (node.children) {
+        return node.children.some(child => nodeMatchesSearchRecursive(child, query));
+      }
+      
+      return false;
+    }
+
+    function countNodes(tree) {
+      let count = 0;
+      
+      function countRecursive(nodes) {
+        nodes.forEach(node => {
+          count++;
+          if (node.children) {
+            countRecursive(node.children);
+          }
+        });
+      }
+      
+      countRecursive(tree);
+      return count;
+    }
+
+    function countVisibleNodes(element) {
+      let count = 1;
+      
+      const childrenContainer = element.querySelector('.node-children');
+      if (childrenContainer) {
+        const children = childrenContainer.querySelectorAll(':scope > li');
+        children.forEach(child => {
+          count += countVisibleNodes(child);
+        });
+      }
+      
+      return count;
+    }
+
+    function showLoadingState() {
+      document.getElementById('loadingState').style.display = 'block';
+      document.getElementById('errorState').style.display = 'none';
+      document.getElementById('treeRoot').style.display = 'none';
+    }
+
+    function hideLoadingState() {
+      document.getElementById('loadingState').style.display = 'none';
+    }
+
+    function showErrorState(message) {
+      const errorState = document.getElementById('errorState');
+      errorState.textContent = `Error: ${message}`;
+      errorState.style.display = 'block';
+      document.getElementById('loadingState').style.display = 'none';
+      document.getElementById('treeRoot').style.display = 'none';
+    }
+
+    async function switchDimension(dimensionType) {
+      AppState.currentDimension = dimensionType;
+      showLoadingState();
+      
+      try {
+        if (!AppState.dimensions[dimensionType]) {
+          await loadDimension(dimensionType);
+        }
+        
+        // Auto-expand all on initial load
+        if (!AppState.trees[dimensionType]) {
+          const data = AppState.dimensions[dimensionType];
+          if (data) {
+            for (const id of Object.keys(data)) {
+              AppState.expandedNodes.add(id);
+            }
+          }
+        }
+        
+        renderCurrentDimension();
+      } catch (error) {
+        showErrorState(error.message);
+      }
+    }
+
+    function renderCurrentDimension() {
+      const data = AppState.dimensions[AppState.currentDimension];
+      
+      if (!data) {
+        showErrorState('No data available');
+        return;
+      }
+      
+      if (!AppState.trees[AppState.currentDimension]) {
+        AppState.trees[AppState.currentDimension] = buildTree(data);
+      }
+      
+      const tree = AppState.trees[AppState.currentDimension];
+      renderTree(tree, AppState.searchQuery);
+    }
+
+    async function refreshDimensions() {
+      showLoadingState();
+      
+      try {
+        AppState.dimensions[AppState.currentDimension] = null;
+        AppState.trees[AppState.currentDimension] = null;
+        
+        await loadDimension(AppState.currentDimension);
+        renderCurrentDimension();
+      } catch (error) {
+        showErrorState(error.message);
+      }
+    }
+
+    // Event Listeners
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', function() {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        this.classList.add('active');
+        
+        const dimensionType = this.dataset.dimension;
+        switchDimension(dimensionType);
+      });
+    });
+
+    let searchTimeout;
+    document.getElementById('searchInput').addEventListener('input', function(e) {
+      clearTimeout(searchTimeout);
+      searchTimeout = setTimeout(() => {
+        AppState.searchQuery = e.target.value.trim();
+        
+        if (AppState.searchQuery) {
+          expandAll();
+        }
+        
+        renderCurrentDimension();
+      }, 300);
+    });
+
+    document.querySelectorAll('.nav-item:not(.disabled)').forEach(item => {
+      item.addEventListener('click', function() {
+        if (this.textContent === 'P&L View') {
+          window.location.href = '/';
+        }
+      });
+    });
+
+    // Edit Sidebar Functions
+    function openEditSidebar(node) {
+      AppState.editingNode = node;
+      
+      // Populate fields
+      document.getElementById('editName').value = node.label || '';
+      
+      // Show/hide sections based on dimension type
+      const isAccountTab = AppState.currentDimension === 'account';
+      document.getElementById('accountMappingSection').style.display = isAccountTab ? 'block' : 'none';
+      document.getElementById('accountCheckboxesSection').style.display = isAccountTab ? 'block' : 'none';
+      
+      if (isAccountTab) {
+        // Populate account mapping dropdown
+        populateAccountMappingDropdown(node);
+        
+        // Set checkboxes
+        document.getElementById('editDisplayExcluded').checked = node.displayExcluded || false;
+        document.getElementById('editDoubleLines').checked = node.doubleLines || false;
+        document.getElementById('editOperationalExcluded').checked = node.operationalExcluded || false;
+      }
+      
+      // Populate parent dropdown
+      populateParentDropdown(node);
+      
+      // Show sidebar
+      document.getElementById('editSidebar').classList.add('open');
+    }
+
+    function closeEditSidebar() {
+      AppState.editingNode = null;
+      document.getElementById('editSidebar').classList.remove('open');
+    }
+
+    function populateAccountMappingDropdown(node) {
+      const input = document.getElementById('editAccountMapping');
+      const dropdown = document.getElementById('editAccountMappingDropdown');
+      const hint = document.getElementById('accountMappingHint');
+      
+      // Clear existing options
+      dropdown.innerHTML = '';
+      
+      // Create "No account mapped" option
+      const noMapOption = document.createElement('div');
+      noMapOption.className = 'custom-select-option';
+      noMapOption.textContent = '(No account mapped)';
+      noMapOption.dataset.value = '';
+      dropdown.appendChild(noMapOption);
+      
+      // For now, just show if it's mapped
+      if (node.account_internal_id) {
+        const option = document.createElement('div');
+        option.className = 'custom-select-option selected';
+        option.textContent = `${node.display_name || 'Unknown'} (${node.account_internal_id})`;
+        option.dataset.value = node.account_internal_id;
+        dropdown.appendChild(option);
+        
+        input.value = `${node.display_name || 'Unknown'} (${node.account_internal_id})`;
+        hint.textContent = `Display: ${node.display_name || 'Unknown'}`;
+        hint.style.display = 'block';
+      } else {
+        input.value = '';
+        noMapOption.classList.add('selected');
+        hint.style.display = 'none';
+      }
+      
+      // Setup dropdown behavior
+      setupCustomDropdown(input, dropdown, (value, text) => {
+        input.value = text;
+        if (value) {
+          hint.textContent = `Display: ${text.split('(')[0].trim()}`;
+          hint.style.display = 'block';
+        } else {
+          hint.style.display = 'none';
+        }
+      });
+      
+      // TODO: Load actual account options from API when implementing save
+    }
+
+    function populateParentDropdown(node) {
+      const input = document.getElementById('editParent');
+      const dropdown = document.getElementById('editParentDropdown');
+      
+      // Clear existing options
+      dropdown.innerHTML = '';
+      
+      // Create "Root Level" option
+      const rootOption = document.createElement('div');
+      rootOption.className = 'custom-select-option';
+      rootOption.textContent = '(Root Level)';
+      rootOption.dataset.value = '';
+      dropdown.appendChild(rootOption);
+      
+      // Get all nodes and build parent options (excluding self and descendants)
+      const currentData = AppState.dimensions[AppState.currentDimension];
+      if (!currentData) return;
+      
+      let selectedText = '(Root Level)';
+      
+      // Recursively add all valid parent options
+      function addParentOptions(nodes, level = 0) {
+        for (const [id, data] of Object.entries(nodes)) {
+          // Skip the current node
+          if (id === node.id) continue;
+          
+          // Skip if this node is a descendant of the current node
+          if (isDescendant(id, node.id, currentData)) continue;
+          
+          const option = document.createElement('div');
+          option.className = 'custom-select-option';
+          const indent = '  '.repeat(level);
+          option.textContent = `${indent}${data.label || id}`;
+          option.dataset.value = id;
+          
+          if (node.parent === id) {
+            option.classList.add('selected');
+            selectedText = option.textContent;
+          }
+          
+          dropdown.appendChild(option);
+        }
+      }
+      
+      addParentOptions(currentData);
+      
+      // Set selected value
+      input.value = selectedText;
+      if (!node.parent) {
+        rootOption.classList.add('selected');
+      }
+      
+      // Setup dropdown behavior
+      setupCustomDropdown(input, dropdown);
+    }
+
+    function setupCustomDropdown(input, dropdown, onChange) {
+      // Toggle dropdown on input click
+      input.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isOpen = dropdown.classList.contains('show');
+        
+        // Close all other dropdowns
+        document.querySelectorAll('.custom-select-dropdown.show').forEach(d => {
+          if (d !== dropdown) d.classList.remove('show');
+        });
+        
+        // Toggle this dropdown
+        dropdown.classList.toggle('show');
+        
+        if (!isOpen) {
+          input.style.borderRadius = '4px 4px 0 0';
+        } else {
+          input.style.borderRadius = '4px';
+        }
+      });
+      
+      // Handle option clicks
+      dropdown.addEventListener('click', (e) => {
+        if (e.target.classList.contains('custom-select-option')) {
+          const value = e.target.dataset.value;
+          const text = e.target.textContent;
+          
+          // Update selected state
+          dropdown.querySelectorAll('.custom-select-option').forEach(opt => {
+            opt.classList.remove('selected');
+          });
+          e.target.classList.add('selected');
+          
+          // Update input
+          input.value = text;
+          
+          // Call onChange callback if provided
+          if (onChange) {
+            onChange(value, text);
+          }
+          
+          // Close dropdown
+          dropdown.classList.remove('show');
+          input.style.borderRadius = '4px';
+        }
+      });
+      
+      // Close on outside click
+      document.addEventListener('click', () => {
+        if (dropdown.classList.contains('show')) {
+          dropdown.classList.remove('show');
+          input.style.borderRadius = '4px';
+        }
+      });
+    }
+
+    function isDescendant(nodeId, ancestorId, flatData) {
+      let currentId = nodeId;
+      while (currentId) {
+        const nodeData = flatData[currentId];
+        if (!nodeData) break;
+        
+        if (nodeData.parent === ancestorId) {
+          return true;
+        }
+        
+        currentId = nodeData.parent;
+      }
+      return false;
+    }
+
+    // Initialize - load and expand all by default
+    document.addEventListener('DOMContentLoaded', () => {
+      switchDimension('account');
+    });
+  </script>
+</body>
+</html>

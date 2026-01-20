@@ -473,6 +473,110 @@ function createApiRoutes(storageService, bigQueryService) {
     }
   });
 
+  // ============================================
+  // Dimension Configuration API Endpoints
+  // ============================================
+
+  /**
+   * Get account configuration
+   * 
+   * GET /api/config/account
+   * 
+   * Response:
+   *   {
+   *     "node_id": {
+   *       "parent": "parent_id_or_null",
+   *       "label": "Account Name",
+   *       "account_internal_id": 123,
+   *       ...
+   *     }
+   *   }
+   */
+  router.get('/config/account', async (req, res) => {
+    try {
+      const config = await storageService.getFileAsJson('account_config.json');
+      res.json(config);
+    } catch (error) {
+      console.error('Error fetching account config:', error);
+      res.status(500).json({ 
+        error: error.message,
+        code: 'CONFIG_FETCH_ERROR'
+      });
+    }
+  });
+
+  /**
+   * Get customer configuration
+   * 
+   * GET /api/config/customer
+   */
+  router.get('/config/customer', async (req, res) => {
+    try {
+      const config = await storageService.getFileAsJson('customer_config.json');
+      res.json(config);
+    } catch (error) {
+      console.error('Error fetching customer config:', error);
+      res.status(500).json({ 
+        error: error.message,
+        code: 'CONFIG_FETCH_ERROR'
+      });
+    }
+  });
+
+  /**
+   * Get department configuration
+   * 
+   * GET /api/config/department
+   */
+  router.get('/config/department', async (req, res) => {
+    try {
+      const config = await storageService.getFileAsJson('department_config.json');
+      res.json(config);
+    } catch (error) {
+      console.error('Error fetching department config:', error);
+      res.status(500).json({ 
+        error: error.message,
+        code: 'CONFIG_FETCH_ERROR'
+      });
+    }
+  });
+
+  /**
+   * Get region configuration
+   * 
+   * GET /api/config/region
+   */
+  router.get('/config/region', async (req, res) => {
+    try {
+      const config = await storageService.getFileAsJson('region_config.json');
+      res.json(config);
+    } catch (error) {
+      console.error('Error fetching region config:', error);
+      res.status(500).json({ 
+        error: error.message,
+        code: 'CONFIG_FETCH_ERROR'
+      });
+    }
+  });
+
+  /**
+   * Get vendor configuration
+   * 
+   * GET /api/config/vendor
+   */
+  router.get('/config/vendor', async (req, res) => {
+    try {
+      const config = await storageService.getFileAsJson('vendor_config.json');
+      res.json(config);
+    } catch (error) {
+      console.error('Error fetching vendor config:', error);
+      res.status(500).json({ 
+        error: error.message,
+        code: 'CONFIG_FETCH_ERROR'
+      });
+    }
+  });
+
   return router;
 }
 
