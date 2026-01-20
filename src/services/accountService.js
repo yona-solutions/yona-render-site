@@ -122,14 +122,14 @@ function computeRollups(rawTotals, accountConfig, childrenMap, isOperational = f
     let total = rawTotals[acctLabel] || 0;
     
     // Add children's rolled-up values
+    // NOTE: We ALWAYS include children in parent rollups, regardless of displayExcluded
+    // displayExcluded only affects whether the account is RENDERED, not whether it's included in parent totals
     const children = childrenMap[acctLabel] || [];
     for (const childLabel of children) {
       const childConfig = labelToConfig[childLabel] || {};
       
-      // Determine if we should exclude this child from rollup
-      const shouldExclude = isOperational 
-        ? (childConfig.operationalExcluded || childConfig.displayExcluded)
-        : childConfig.displayExcluded;
+      // Only exclude from rollup if operationalExcluded (in Operational mode)
+      const shouldExclude = isOperational && childConfig.operationalExcluded;
       
       if (!shouldExclude) {
         total += compute(childLabel);
