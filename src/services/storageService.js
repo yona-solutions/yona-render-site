@@ -148,57 +148,49 @@ class StorageService {
   }
 
   /**
-   * Get districts from customer configuration file grouped by parent category
+   * Get districts and district tags from customer configuration file
    * 
-   * Parses customer_config.json and extracts all entries where isDistrict === true,
-   * excludes districts with districtReportingExcluded === true,
-   * and groups them by their parent category.
+   * Returns both individual districts and district tag groups.
+   * Individual districts with districtReportingExcluded are excluded,
+   * but district tag groups are included regardless of exclusion flag.
    * 
-   * @returns {Promise<Array<{group: string, districts: Array}>>} Array of grouped districts
+   * @returns {Promise<Array<{id: string, label: string, type: string}>>} Array of districts and tags
    * @throws {Error} If storage is not initialized or file cannot be parsed
    */
   async getDistricts() {
     const configData = await this.getFileAsJson('customer_config.json');
     
-    // First pass: collect all districts with their parent info
-    const districtsWithParents = [];
+    const items = [];
     
     for (const [id, config] of Object.entries(configData)) {
-      // Filter for districts and exclude those excluded from reporting
+      // Include individual districts (exclude if districtReportingExcluded or displayExcluded)
       if (config.isDistrict && !config.districtReportingExcluded && !config.displayExcluded) {
-        const parentId = config.parent;
-        const parentLabel = parentId && configData[parentId] 
-          ? configData[parentId].label 
-          : 'Other';
-        
-        districtsWithParents.push({
+        items.push({
           id: id,
           label: config.label,
-          tags: config.districtTags || [],
-          parent: parentLabel
+          type: 'district',
+          tags: config.tags || [],
+          districtTags: config.districtTags || []
+        });
+      }
+      
+      // Include district tag groups (entries with tags but not individual districts)
+      // Don't exclude these based on the exclusion flag
+      if (!config.isDistrict && config.tags && config.tags.length > 0) {
+        items.push({
+          id: id,
+          label: config.label,
+          type: 'district_tag',
+          tags: config.tags || [],
+          districtTags: config.districtTags || []
         });
       }
     }
     
-    // Group districts by parent
-    const grouped = {};
-    districtsWithParents.forEach(district => {
-      if (!grouped[district.parent]) {
-        grouped[district.parent] = [];
-      }
-      grouped[district.parent].push(district);
-    });
+    // Sort all items alphabetically by label
+    items.sort((a, b) => a.label.localeCompare(b.label));
     
-    // Convert to array format and sort
-    const result = Object.entries(grouped).map(([group, districts]) => ({
-      group: group,
-      districts: districts.sort((a, b) => a.label.localeCompare(b.label))
-    }));
-    
-    // Sort groups alphabetically
-    result.sort((a, b) => a.group.localeCompare(b.group));
-    
-    return result;
+    return items;
   }
 }
 
