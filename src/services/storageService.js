@@ -119,6 +119,64 @@ class StorageService {
   createReadStream(file) {
     return file.createReadStream();
   }
+
+  /**
+   * Get file contents as JSON
+   * 
+   * @param {string} fileName - Full path to the file in the bucket
+   * @returns {Promise<object>} Parsed JSON content
+   * @throws {Error} If file doesn't exist or isn't valid JSON
+   */
+  async getFileAsJson(fileName) {
+    if (!this.isAvailable()) {
+      throw new Error('GCP Storage not initialized');
+    }
+
+    const bucket = this.storage.bucket(this.bucketName);
+    const file = bucket.file(fileName);
+    
+    const [exists] = await file.exists();
+    if (!exists) {
+      throw new Error('File not found');
+    }
+    
+    // Download file contents
+    const [contents] = await file.download();
+    
+    // Parse as JSON
+    return JSON.parse(contents.toString('utf8'));
+  }
+
+  /**
+   * Get districts from customer configuration file
+   * 
+   * Parses customer_config.json and extracts all entries where isDistrict === true
+   * 
+   * @returns {Promise<Array<{id: string, label: string}>>} Array of districts
+   * @throws {Error} If storage is not initialized or file cannot be parsed
+   */
+  async getDistricts() {
+    const configData = await this.getFileAsJson('customer_config.json');
+    
+    const districts = [];
+    
+    // Iterate through all entries in the config
+    for (const [id, config] of Object.entries(configData)) {
+      // Filter for districts and exclude those excluded from reporting
+      if (config.isDistrict && !config.districtReportingExcluded && !config.displayExcluded) {
+        districts.push({
+          id: id,
+          label: config.label,
+          tags: config.districtTags || []
+        });
+      }
+    }
+    
+    // Sort by label for consistent ordering
+    districts.sort((a, b) => a.label.localeCompare(b.label));
+    
+    return districts;
+  }
 }
 
 module.exports = StorageService;

@@ -122,6 +122,31 @@ function createApiRoutes(storageService, bigQueryService) {
     }
   });
 
+  /**
+   * Get districts from customer configuration
+   * 
+   * GET /api/storage/districts
+   * 
+   * Response:
+   *   [
+   *     {id: "1829", label: "District 121 - Ben Riegle (D)", tags: [...]},
+   *     {id: "1830", label: "District 122 - John Smith", tags: []},
+   *     ...
+   *   ]
+   */
+  router.get('/storage/districts', async (req, res) => {
+    try {
+      const districts = await storageService.getDistricts();
+      res.json(districts);
+    } catch (error) {
+      console.error('Error fetching districts:', error);
+      res.status(500).json({ 
+        error: error.message,
+        code: 'DISTRICTS_FETCH_ERROR'
+      });
+    }
+  });
+
   // ============================================
   // P&L API Endpoints
   // ============================================

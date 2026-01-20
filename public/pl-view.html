@@ -938,20 +938,38 @@
     }
     
     /**
-     * Load available districts/regions/subsidiaries
-     * TODO: Implement API endpoint to fetch from BigQuery
+     * Load available districts from customer configuration file
      */
-    function loadHierarchyOptions() {
-      // Sample data for now
-      const sampleDistricts = [
-        { value: '101', label: 'District 101 - John Miller' },
-        { value: '102', label: 'District 102 - Jane Smith' },
-        { value: '103', label: 'District 103 - Bob Johnson' },
-        { value: '104', label: 'District 104 - Sarah Davis' },
-        { value: '105', label: 'District 105 - Mike Wilson' }
-      ];
-      
-      districtSelect.setOptions(sampleDistricts);
+    async function loadHierarchyOptions() {
+      try {
+        const response = await fetch('/api/storage/districts');
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch districts');
+        }
+        
+        const districts = await response.json();
+        
+        // Transform districts for searchable select
+        const options = districts.map(district => ({
+          value: district.id,
+          label: district.label
+        }));
+        
+        districtSelect.setOptions(options);
+        
+        console.log(`✅ Loaded ${districts.length} districts from customer_config.json`);
+      } catch (error) {
+        console.error('Error loading districts:', error);
+        
+        // Fallback to sample data
+        const fallbackDistricts = [
+          { value: '101', label: 'District 101 - Sample District' },
+          { value: '102', label: 'District 102 - Sample District' }
+        ];
+        districtSelect.setOptions(fallbackDistricts);
+        console.warn('Using sample districts as fallback');
+      }
     }
     
     // Initialize searchable selects and load data
