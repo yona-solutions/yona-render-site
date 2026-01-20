@@ -111,6 +111,12 @@ app.get('/api/info', (req, res) => {
 
 // GCP Storage Browser UI
 app.get('/storage-browser', (req, res) => {
+  res.sendFile(__dirname + '/public/storage-browser.html');
+});
+
+// Old inline HTML version (commented out for reference)
+/*
+app.get('/storage-browser-old', (req, res) => {
   res.send(`
     <!DOCTYPE html>
     <html lang="en">
@@ -360,6 +366,7 @@ app.get('/storage-browser', (req, res) => {
     </html>
   `);
 });
+*/
 
 // API: List files in the dimension_configurations bucket
 app.get('/api/storage/list', async (req, res) => {
