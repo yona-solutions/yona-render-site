@@ -150,9 +150,9 @@ class StorageService {
   /**
    * Get districts and district tags from customer configuration file
    * 
-   * Returns both individual districts and district tag groups.
-   * Individual districts with districtReportingExcluded are excluded,
-   * but district tag groups are included regardless of exclusion flag.
+   * Returns both individual districts and unique tag values.
+   * Individual districts with districtReportingExcluded are excluded.
+   * Tag values are extracted from the 'tags' field across all entries.
    * 
    * @returns {Promise<Array<{id: string, label: string, type: string}>>} Array of districts and tags
    * @throws {Error} If storage is not initialized or file cannot be parsed
@@ -161,31 +161,32 @@ class StorageService {
     const configData = await this.getFileAsJson('customer_config.json');
     
     const items = [];
+    const uniqueTags = new Set();
     
+    // First pass: collect individual districts and tag values
     for (const [id, config] of Object.entries(configData)) {
       // Include individual districts (exclude if districtReportingExcluded or displayExcluded)
       if (config.isDistrict && !config.districtReportingExcluded && !config.displayExcluded) {
         items.push({
           id: id,
           label: config.label,
-          type: 'district',
-          tags: config.tags || [],
-          districtTags: config.districtTags || []
+          type: 'district'
         });
       }
       
-      // Include district tag groups (entries with tags but not individual districts)
-      // Don't exclude these based on the exclusion flag
-      if (!config.isDistrict && config.tags && config.tags.length > 0) {
-        items.push({
-          id: id,
-          label: config.label,
-          type: 'district_tag',
-          tags: config.tags || [],
-          districtTags: config.districtTags || []
-        });
-      }
+      // Collect all unique tag values from the tags field
+      const tags = config.tags || [];
+      tags.forEach(tag => uniqueTags.add(tag));
     }
+    
+    // Add unique tag values as selectable items
+    uniqueTags.forEach(tag => {
+      items.push({
+        id: `tag_${tag}`, // Use a prefix to distinguish tags from district IDs
+        label: tag,
+        type: 'tag'
+      });
+    });
     
     // Sort all items alphabetically by label
     items.sort((a, b) => a.label.localeCompare(b.label));
