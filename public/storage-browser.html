@@ -151,7 +151,7 @@
 
     function updateBreadcrumb(prefix) {
       const breadcrumb = document.getElementById('breadcrumb');
-      let html = '<a href="#" onclick="loadFiles(\\'\\'); return false;">🏠 Home</a>';
+      let html = '<a href="#" onclick="loadFiles(\'\'); return false;">🏠 Home</a>';
       
       if (prefix) {
         const parts = prefix.split('/').filter(p => p);
