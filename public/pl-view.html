@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SPHERE - P&L View</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      display: flex;
+      height: 100vh;
+      background: #f5f6fa;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      width: 195px;
+      background: white;
+      border-right: 1px solid #e1e4e8;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .logo {
+      padding: 20px;
+      border-bottom: 1px solid #e1e4e8;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 20px;
+      font-weight: bold;
+      color: #1a1a1a;
+    }
+
+    .logo-icon {
+      width: 32px;
+      height: 32px;
+      background: linear-gradient(135deg, #4a7c9e 0%, #2d5f7d 100%);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 12px;
+    }
+
+    .nav-menu {
+      flex: 1;
+      padding: 10px 0;
+    }
+
+    .nav-item {
+      padding: 12px 20px;
+      cursor: pointer;
+      transition: background 0.2s;
+      color: #4a5568;
+      font-size: 14px;
+    }
+
+    .nav-item:hover {
+      background: #f7fafc;
+    }
+
+    .nav-item.active {
+      background: #dbe4f0;
+      color: #2d5f7d;
+      font-weight: 500;
+    }
+
+    .nav-item.disabled {
+      color: #a0aec0;
+      cursor: not-allowed;
+    }
+
+    /* Main Content */
+    .main-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Header Tabs */
+    .header-tabs {
+      background: white;
+      border-bottom: 1px solid #e1e4e8;
+      padding: 0 40px;
+      display: flex;
+      gap: 0;
+    }
+
+    .tab {
+      padding: 15px 80px;
+      background: #e8ebef;
+      border: none;
+      cursor: pointer;
+      font-size: 14px;
+      color: #4a5568;
+      transition: all 0.2s;
+      border-right: 1px solid #d1d5db;
+    }
+
+    .tab:first-child {
+      border-top-left-radius: 0;
+    }
+
+    .tab:hover {
+      background: #d8dce3;
+    }
+
+    .tab.active {
+      background: white;
+      color: #2d5f7d;
+      font-weight: 500;
+    }
+
+    /* Controls Section */
+    .controls {
+      background: white;
+      padding: 20px 40px;
+      border-bottom: 1px solid #e1e4e8;
+    }
+
+    .controls-row {
+      display: flex;
+      gap: 20px;
+      align-items: center;
+      margin-bottom: 15px;
+    }
+
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      flex: 1;
+    }
+
+    .control-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: #2d3748;
+    }
+
+    .toggle-group {
+      display: flex;
+      gap: 0;
+      border: 1px solid #d1d5db;
+      border-radius: 5px;
+      overflow: hidden;
+      width: fit-content;
+    }
+
+    .toggle-btn {
+      padding: 8px 30px;
+      background: white;
+      border: none;
+      cursor: pointer;
+      font-size: 14px;
+      color: #4a5568;
+      transition: all 0.2s;
+    }
+
+    .toggle-btn.active {
+      background: #f7f7f7;
+      color: #1a1a1a;
+      font-weight: 500;
+    }
+
+    .toggle-btn:hover:not(.active) {
+      background: #f9fafb;
+    }
+
+    select {
+      padding: 8px 35px 8px 12px;
+      border: 1px solid #d1d5db;
+      border-radius: 5px;
+      font-size: 14px;
+      background: white;
+      color: #2d3748;
+      cursor: pointer;
+      appearance: none;
+      background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+      background-repeat: no-repeat;
+      background-position: right 8px center;
+      background-size: 16px;
+    }
+
+    select:focus {
+      outline: none;
+      border-color: #4a7c9e;
+    }
+
+    .action-buttons {
+      display: flex;
+      gap: 10px;
+    }
+
+    .btn {
+      padding: 10px 24px;
+      border: none;
+      border-radius: 5px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-primary {
+      background: #4a7c9e;
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: #3d6a86;
+    }
+
+    .btn-secondary {
+      background: #5b7fc9;
+      color: white;
+    }
+
+    .btn-secondary:hover {
+      background: #4a6bb0;
+    }
+
+    /* Report Content */
+    .report-content {
+      flex: 1;
+      padding: 30px 40px;
+      overflow-y: auto;
+      background: #f5f6fa;
+    }
+
+    .report-card {
+      background: white;
+      border-radius: 8px;
+      padding: 30px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    .report-header {
+      text-align: center;
+      margin-bottom: 30px;
+      padding-bottom: 20px;
+      border-bottom: 2px solid #e1e4e8;
+    }
+
+    .report-header h2 {
+      font-size: 20px;
+      color: #1a1a1a;
+      margin-bottom: 5px;
+    }
+
+    .report-header .subtitle {
+      font-size: 14px;
+      color: #4a5568;
+      margin: 3px 0;
+    }
+
+    /* Table */
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    .data-table thead th {
+      background: #f7fafc;
+      padding: 12px 8px;
+      text-align: left;
+      font-weight: 600;
+      color: #2d3748;
+      border-bottom: 2px solid #e1e4e8;
+      font-size: 12px;
+      text-align: right;
+    }
+
+    .data-table thead th:first-child {
+      text-align: left;
+    }
+
+    .data-table tbody td {
+      padding: 10px 8px;
+      border-bottom: 1px solid #e1e4e8;
+      color: #2d3748;
+      text-align: right;
+    }
+
+    .data-table tbody td:first-child {
+      text-align: left;
+      font-weight: 500;
+    }
+
+    .data-table tbody tr:hover {
+      background: #f9fafb;
+    }
+
+    .row-header {
+      background: #f0f4f8;
+      font-weight: 600;
+      color: #1a1a1a;
+    }
+
+    .row-indent-1 {
+      padding-left: 30px !important;
+    }
+
+    .row-indent-2 {
+      padding-left: 50px !important;
+    }
+
+    .negative {
+      color: #c53030;
+    }
+
+    .section-total {
+      font-weight: 600;
+      background: #fafbfc;
+    }
+
+    .empty-cell {
+      color: #a0aec0;
+    }
+  </style>
+</head>
+<body>
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="logo">
+      <div class="logo-icon">⚡</div>
+      <span>SPHERE</span>
+    </div>
+    <nav class="nav-menu">
+      <div class="nav-item">Home</div>
+      <div class="nav-item active">P&L View</div>
+      <div class="nav-item">Dimension Configuration</div>
+      <div class="nav-item disabled">Email Configuration (not ready)</div>
+    </nav>
+  </div>
+
+  <!-- Main Content -->
+  <div class="main-content">
+    <!-- Header Tabs -->
+    <div class="header-tabs">
+      <button class="tab active">District</button>
+      <button class="tab">Region</button>
+      <button class="tab">Subsidiary</button>
+    </div>
+
+    <!-- Controls -->
+    <div class="controls">
+      <div class="controls-row">
+        <div class="control-group">
+          <label class="control-label">P&L Type</label>
+          <div class="toggle-group">
+            <button class="toggle-btn active">Standard</button>
+            <button class="toggle-btn">Operational</button>
+          </div>
+        </div>
+
+        <div class="control-group">
+          <label class="control-label">Month</label>
+          <select id="monthSelect">
+            <option value="2025-12-01">2025-12-01</option>
+            <option value="2025-11-01">2025-11-01</option>
+            <option value="2025-10-01">2025-10-01</option>
+            <option value="2025-09-01">2025-09-01</option>
+          </select>
+        </div>
+
+        <div class="control-group">
+          <label class="control-label">District</label>
+          <select id="districtSelect">
+            <option value="101">District 101 - John Miller</option>
+            <option value="102">District 102 - Jane Smith</option>
+            <option value="103">District 103 - Bob Johnson</option>
+          </select>
+        </div>
+
+        <div class="action-buttons">
+          <button class="btn btn-primary">Refresh Data</button>
+          <button class="btn btn-secondary">Download PDF</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Report Content -->
+    <div class="report-content">
+      <div class="report-card">
+        <div class="report-header">
+          <h2>District 101 - John Miller</h2>
+          <div class="subtitle">Yona Solutions</div>
+          <div class="subtitle">Dec - 2025</div>
+          <div class="subtitle">Facilities: 11</div>
+          <div class="subtitle">Type: District</div>
+        </div>
+
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th></th>
+              <th>Actual</th>
+              <th>%</th>
+              <th>Budget</th>
+              <th>%</th>
+              <th>Act v Bud</th>
+              <th>Actual</th>
+              <th>%</th>
+              <th>Budget</th>
+              <th>%</th>
+              <th>Act v Bud</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="row-header">
+              <td>REVENUE</td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+            </tr>
+            <tr>
+              <td class="row-indent-1">40100 Revenue - Housekeeping Wages</td>
+              <td>249,778</td>
+              <td>54.2%</td>
+              <td>227,773</td>
+              <td>54.8%</td>
+              <td>22,005</td>
+              <td>2,800,160</td>
+              <td>54.6%</td>
+              <td>2,733,281</td>
+              <td>54.8%</td>
+              <td>66,879</td>
+            </tr>
+            <tr>
+              <td class="row-indent-1">40300 Revenue - Laundry Wages</td>
+              <td>167,177</td>
+              <td>36.3%</td>
+              <td>150,338</td>
+              <td>36.2%</td>
+              <td>16,839</td>
+              <td>1,851,385</td>
+              <td>36.1%</td>
+              <td>1,804,052</td>
+              <td>36.2%</td>
+              <td>47,333</td>
+            </tr>
+            <tr>
+              <td class="row-indent-1">40375 Revenue - Administration</td>
+              <td>8,691</td>
+              <td>1.9%</td>
+              <td>7,851</td>
+              <td>1.9%</td>
+              <td>840</td>
+              <td>96,535</td>
+              <td>1.9%</td>
+              <td>94,212</td>
+              <td>1.9%</td>
+              <td>2,323</td>
+            </tr>
+            <tr>
+              <td class="row-indent-1">40200 Revenue - Housekeeping Supplies</td>
+              <td>12,609</td>
+              <td>2.7%</td>
+              <td>10,785</td>
+              <td>2.6%</td>
+              <td>1,824</td>
+              <td>133,072</td>
+              <td>2.6%</td>
+              <td>129,425</td>
+              <td>2.6%</td>
+              <td>3,647</td>
+            </tr>
+            <tr>
+              <td class="row-indent-1">40400 Revenue - Laundry Supplies</td>
+              <td>20,223</td>
+              <td>4.4%</td>
+              <td>18,931</td>
+              <td>4.6%</td>
+              <td>1,292</td>
+              <td>231,797</td>
+              <td>4.5%</td>
+              <td>227,167</td>
+              <td>4.6%</td>
+              <td>4,630</td>
+            </tr>
+            <tr>
+              <td class="row-indent-1">40500 Revenue - BCR Labor</td>
+              <td>2,617</td>
+              <td>0.6%</td>
+              <td class="empty-cell">-</td>
+              <td class="empty-cell">-</td>
+              <td>2,617</td>
+              <td>11,039</td>
+              <td>0.2%</td>
+              <td class="empty-cell">-</td>
+              <td class="empty-cell">-</td>
+              <td>11,039</td>
+            </tr>
+            <tr>
+              <td class="row-indent-1">40600 Revenue - BCR Supplies & Materials</td>
+              <td class="empty-cell">-</td>
+              <td class="empty-cell">-</td>
+              <td class="empty-cell">-</td>
+              <td class="empty-cell">-</td>
+              <td class="empty-cell">-</td>
+              <td>848</td>
+              <td>0.0%</td>
+              <td class="empty-cell">-</td>
+              <td class="empty-cell">-</td>
+              <td>848</td>
+            </tr>
+            <tr class="section-total">
+              <td>Income</td>
+              <td>461,095</td>
+              <td>100.0%</td>
+              <td>415,678</td>
+              <td>100.0%</td>
+              <td>45,417</td>
+              <td>5,124,837</td>
+              <td>100.0%</td>
+              <td>4,988,137</td>
+              <td>100.0%</td>
+              <td>136,700</td>
+            </tr>
+            <tr class="row-header">
+              <td>COST OF GOODS SOLD</td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+            </tr>
+            <tr>
+              <td class="row-indent-1">51100 Labor</td>
+              <td>108,486</td>
+              <td>23.5%</td>
+              <td>232,868</td>
+              <td>56.0%</td>
+              <td class="negative">(124,383)</td>
+              <td>2,503,706</td>
+              <td>48.9%</td>
+              <td>2,704,294</td>
+              <td>54.2%</td>
+              <td class="negative">(200,588)</td>
+            </tr>
+            <tr>
+              <td class="row-indent-1">51125 Labor Management</td>
+              <td>20,293</td>
+              <td>4.4%</td>
+              <td>48,870</td>
+              <td>11.8%</td>
+              <td class="negative">(28,577)</td>
+              <td>525,244</td>
+              <td>10.2%</td>
+              <td>575,406</td>
+              <td>11.5%</td>
+              <td class="negative">(50,161)</td>
+            </tr>
+            <tr>
+              <td class="row-indent-1">51150 Labor Overtime</td>
+              <td>16,132</td>
+              <td>3.5%</td>
+              <td class="empty-cell">-</td>
+              <td class="empty-cell">-</td>
+              <td>16,132</td>
+              <td>170,319</td>
+              <td>3.3%</td>
+              <td class="empty-cell">-</td>
+              <td class="empty-cell">-</td>
+              <td>170,319</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Toggle buttons
+    document.querySelectorAll('.toggle-btn').forEach(btn => {
+      btn.addEventListener('click', function() {
+        this.parentElement.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
+      });
+    });
+
+    // Tabs
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', function() {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        this.classList.add('active');
+      });
+    });
+
+    // Navigation
+    document.querySelectorAll('.nav-item:not(.disabled)').forEach(item => {
+      item.addEventListener('click', function() {
+        if (this.textContent === 'Home') {
+          window.location.href = '/';
+        } else if (this.textContent === 'Dimension Configuration') {
+          window.location.href = '/storage-browser';
+        }
+      });
+    });
+  </script>
+</body>
+</html>
+

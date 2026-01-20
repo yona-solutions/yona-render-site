@@ -77,6 +77,7 @@ app.get('/', (req, res) => {
         <p>Welcome to your Node.js web service deployed on Render.</p>
         <h2>Tools:</h2>
         <ul>
+          <li><a href="/pl-view">📊 P&L View</a> - Profit & Loss reporting dashboard</li>
           <li><a href="/storage-browser">📁 Cloud Storage Browser</a> - Browse dimension_configurations bucket</li>
         </ul>
         <h2>API Endpoints:</h2>
@@ -107,6 +108,11 @@ app.get('/api/info', (req, res) => {
     environment: process.env.NODE_ENV || 'development',
     node_version: process.version
   });
+});
+
+// P&L View page
+app.get('/pl-view', (req, res) => {
+  res.sendFile(__dirname + '/public/pl-view.html');
 });
 
 // GCP Storage Browser UI
