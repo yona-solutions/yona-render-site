@@ -12,69 +12,77 @@
     }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
       display: flex;
       height: 100vh;
-      background: #f5f6fa;
+      background: #f8f9fa;
+      overflow: hidden;
     }
 
     /* Sidebar */
     .sidebar {
       width: 195px;
-      background: white;
-      border-right: 1px solid #e1e4e8;
+      background: #ffffff;
+      border-right: 1px solid #dfe3e8;
       display: flex;
       flex-direction: column;
+      box-shadow: 1px 0 0 rgba(0,0,0,0.02);
     }
 
     .logo {
-      padding: 20px;
-      border-bottom: 1px solid #e1e4e8;
+      padding: 18px 20px;
+      border-bottom: 1px solid #dfe3e8;
       display: flex;
       align-items: center;
       gap: 10px;
-      font-size: 20px;
-      font-weight: bold;
-      color: #1a1a1a;
+      font-size: 19px;
+      font-weight: 600;
+      color: #1a202c;
+      letter-spacing: -0.3px;
     }
 
     .logo-icon {
-      width: 32px;
-      height: 32px;
-      background: linear-gradient(135deg, #4a7c9e 0%, #2d5f7d 100%);
-      border-radius: 50%;
+      width: 28px;
+      height: 28px;
+      background: linear-gradient(135deg, #3b5998 0%, #2d4373 100%);
+      border-radius: 6px;
       display: flex;
       align-items: center;
       justify-content: center;
       color: white;
-      font-size: 12px;
+      font-size: 14px;
+      font-weight: bold;
     }
 
     .nav-menu {
       flex: 1;
-      padding: 10px 0;
+      padding: 8px 0;
     }
 
     .nav-item {
-      padding: 12px 20px;
+      padding: 11px 20px;
       cursor: pointer;
-      transition: background 0.2s;
+      transition: all 0.15s ease;
       color: #4a5568;
-      font-size: 14px;
+      font-size: 13.5px;
+      font-weight: 400;
+      border-left: 3px solid transparent;
     }
 
-    .nav-item:hover {
+    .nav-item:hover:not(.disabled) {
       background: #f7fafc;
+      color: #2d3748;
     }
 
     .nav-item.active {
-      background: #dbe4f0;
-      color: #2d5f7d;
+      background: #e6f0f8;
+      color: #2d4a68;
       font-weight: 500;
+      border-left-color: #4a7c9e;
     }
 
     .nav-item.disabled {
-      color: #a0aec0;
+      color: #cbd5e0;
       cursor: not-allowed;
     }
 
@@ -84,131 +92,147 @@
       display: flex;
       flex-direction: column;
       overflow: hidden;
+      background: #f8f9fa;
     }
 
     /* Header Tabs */
     .header-tabs {
-      background: white;
-      border-bottom: 1px solid #e1e4e8;
-      padding: 0 40px;
+      background: #f8f9fa;
+      padding: 0 35px;
       display: flex;
       gap: 0;
+      border-bottom: 1px solid #dfe3e8;
     }
 
     .tab {
-      padding: 15px 80px;
-      background: #e8ebef;
+      padding: 13px 70px;
+      background: #e8ecef;
       border: none;
       cursor: pointer;
-      font-size: 14px;
+      font-size: 13.5px;
+      font-weight: 500;
       color: #4a5568;
       transition: all 0.2s;
-      border-right: 1px solid #d1d5db;
+      border-right: 1px solid #d4d9dd;
+      position: relative;
     }
 
     .tab:first-child {
       border-top-left-radius: 0;
     }
 
-    .tab:hover {
-      background: #d8dce3;
+    .tab:hover:not(.active) {
+      background: #dce1e5;
     }
 
     .tab.active {
-      background: white;
-      color: #2d5f7d;
+      background: #ffffff;
+      color: #2d3748;
       font-weight: 500;
+      border-bottom: 2px solid transparent;
     }
 
     /* Controls Section */
     .controls {
       background: white;
-      padding: 20px 40px;
-      border-bottom: 1px solid #e1e4e8;
+      padding: 18px 35px;
+      border-bottom: 1px solid #e2e8f0;
     }
 
     .controls-row {
       display: flex;
-      gap: 20px;
-      align-items: center;
-      margin-bottom: 15px;
+      gap: 18px;
+      align-items: flex-end;
     }
 
     .control-group {
       display: flex;
       flex-direction: column;
-      gap: 5px;
-      flex: 1;
+      gap: 6px;
+      flex: 0 1 auto;
     }
 
     .control-label {
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 600;
       color: #2d3748;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
     }
 
     .toggle-group {
       display: flex;
       gap: 0;
-      border: 1px solid #d1d5db;
-      border-radius: 5px;
+      border: 1px solid #cbd5e0;
+      border-radius: 4px;
       overflow: hidden;
-      width: fit-content;
+      background: white;
     }
 
     .toggle-btn {
-      padding: 8px 30px;
+      padding: 9px 32px;
       background: white;
       border: none;
       cursor: pointer;
-      font-size: 14px;
+      font-size: 13px;
       color: #4a5568;
-      transition: all 0.2s;
+      transition: all 0.15s;
+      font-weight: 400;
+      border-right: 1px solid #e2e8f0;
+    }
+
+    .toggle-btn:last-child {
+      border-right: none;
     }
 
     .toggle-btn.active {
-      background: #f7f7f7;
-      color: #1a1a1a;
+      background: #f7fafc;
+      color: #1a202c;
       font-weight: 500;
     }
 
     .toggle-btn:hover:not(.active) {
-      background: #f9fafb;
+      background: #fafbfc;
     }
 
     select {
-      padding: 8px 35px 8px 12px;
-      border: 1px solid #d1d5db;
-      border-radius: 5px;
-      font-size: 14px;
+      padding: 9px 40px 9px 12px;
+      border: 1px solid #cbd5e0;
+      border-radius: 4px;
+      font-size: 13px;
       background: white;
       color: #2d3748;
       cursor: pointer;
       appearance: none;
-      background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+      background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234a5568' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
       background-repeat: no-repeat;
-      background-position: right 8px center;
-      background-size: 16px;
+      background-position: right 10px center;
+      background-size: 14px;
+      font-weight: 400;
+      min-width: 200px;
     }
 
     select:focus {
       outline: none;
       border-color: #4a7c9e;
+      box-shadow: 0 0 0 3px rgba(74, 124, 158, 0.1);
     }
 
     .action-buttons {
       display: flex;
       gap: 10px;
+      margin-left: auto;
     }
 
     .btn {
-      padding: 10px 24px;
+      padding: 10px 22px;
       border: none;
-      border-radius: 5px;
-      font-size: 14px;
+      border-radius: 4px;
+      font-size: 13px;
       font-weight: 500;
       cursor: pointer;
       transition: all 0.2s;
+      white-space: nowrap;
     }
 
     .btn-primary {
@@ -218,67 +242,73 @@
 
     .btn-primary:hover {
       background: #3d6a86;
+      box-shadow: 0 2px 4px rgba(74, 124, 158, 0.2);
     }
 
     .btn-secondary {
-      background: #5b7fc9;
+      background: #5a6fd8;
       color: white;
     }
 
     .btn-secondary:hover {
-      background: #4a6bb0;
+      background: #4959c0;
+      box-shadow: 0 2px 4px rgba(90, 111, 216, 0.2);
     }
 
     /* Report Content */
     .report-content {
       flex: 1;
-      padding: 30px 40px;
+      padding: 25px 35px;
       overflow-y: auto;
-      background: #f5f6fa;
+      background: #f8f9fa;
     }
 
     .report-card {
       background: white;
-      border-radius: 8px;
-      padding: 30px;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      border-radius: 6px;
+      padding: 28px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+      border: 1px solid #e2e8f0;
     }
 
     .report-header {
       text-align: center;
-      margin-bottom: 30px;
-      padding-bottom: 20px;
-      border-bottom: 2px solid #e1e4e8;
+      margin-bottom: 25px;
+      padding-bottom: 18px;
+      border-bottom: 1px solid #e2e8f0;
     }
 
     .report-header h2 {
-      font-size: 20px;
-      color: #1a1a1a;
-      margin-bottom: 5px;
+      font-size: 18px;
+      color: #1a202c;
+      margin-bottom: 6px;
+      font-weight: 600;
     }
 
     .report-header .subtitle {
-      font-size: 14px;
+      font-size: 13px;
       color: #4a5568;
-      margin: 3px 0;
+      margin: 2px 0;
+      font-weight: 400;
     }
 
     /* Table */
     .data-table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 13px;
+      font-size: 12.5px;
     }
 
     .data-table thead th {
       background: #f7fafc;
-      padding: 12px 8px;
-      text-align: left;
+      padding: 10px 12px;
+      text-align: right;
       font-weight: 600;
       color: #2d3748;
-      border-bottom: 2px solid #e1e4e8;
-      font-size: 12px;
-      text-align: right;
+      border-bottom: 2px solid #e2e8f0;
+      font-size: 11.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
     }
 
     .data-table thead th:first-child {
@@ -286,33 +316,44 @@
     }
 
     .data-table tbody td {
-      padding: 10px 8px;
-      border-bottom: 1px solid #e1e4e8;
+      padding: 9px 12px;
+      border-bottom: 1px solid #edf2f7;
       color: #2d3748;
       text-align: right;
+      font-weight: 400;
     }
 
     .data-table tbody td:first-child {
       text-align: left;
-      font-weight: 500;
+      font-weight: 400;
+      color: #1a202c;
     }
 
     .data-table tbody tr:hover {
-      background: #f9fafb;
+      background: #f7fafc;
     }
 
     .row-header {
-      background: #f0f4f8;
+      background: #f7fafc !important;
       font-weight: 600;
-      color: #1a1a1a;
+      color: #1a202c !important;
+    }
+
+    .row-header td {
+      padding: 11px 12px !important;
+      font-size: 13px;
+      border-top: 2px solid #e2e8f0;
+      border-bottom: 1px solid #cbd5e0 !important;
     }
 
     .row-indent-1 {
-      padding-left: 30px !important;
+      padding-left: 35px !important;
+      font-size: 12.5px;
     }
 
     .row-indent-2 {
-      padding-left: 50px !important;
+      padding-left: 55px !important;
+      font-size: 12px;
     }
 
     .negative {
@@ -322,10 +363,35 @@
     .section-total {
       font-weight: 600;
       background: #fafbfc;
+      border-top: 1px solid #cbd5e0;
+    }
+
+    .section-total td {
+      padding: 11px 12px !important;
+      font-size: 13px;
+      color: #1a202c !important;
     }
 
     .empty-cell {
-      color: #a0aec0;
+      color: #cbd5e0;
+    }
+
+    /* Scrollbar styling */
+    .report-content::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .report-content::-webkit-scrollbar-track {
+      background: #f1f1f1;
+    }
+
+    .report-content::-webkit-scrollbar-thumb {
+      background: #cbd5e0;
+      border-radius: 4px;
+    }
+
+    .report-content::-webkit-scrollbar-thumb:hover {
+      background: #a0aec0;
     }
   </style>
 </head>
@@ -333,7 +399,7 @@
   <!-- Sidebar -->
   <div class="sidebar">
     <div class="logo">
-      <div class="logo-icon">⚡</div>
+      <div class="logo-icon">◈</div>
       <span>SPHERE</span>
     </div>
     <nav class="nav-menu">
@@ -358,15 +424,15 @@
         <div class="control-group">
           <label class="control-label">P&L Type</label>
           <div class="toggle-group">
-            <button class="toggle-btn active">Standard</button>
-            <button class="toggle-btn">Operational</button>
+            <button class="toggle-btn active" data-type="standard">Standard</button>
+            <button class="toggle-btn" data-type="operational">Operational</button>
           </div>
         </div>
 
         <div class="control-group">
           <label class="control-label">Month</label>
           <select id="monthSelect">
-            <option value="2025-12-01">2025-12-01</option>
+            <option value="2025-12-01" selected>2025-12-01</option>
             <option value="2025-11-01">2025-11-01</option>
             <option value="2025-10-01">2025-10-01</option>
             <option value="2025-09-01">2025-09-01</option>
@@ -376,15 +442,15 @@
         <div class="control-group">
           <label class="control-label">District</label>
           <select id="districtSelect">
-            <option value="101">District 101 - John Miller</option>
+            <option value="101" selected>District 101 - John Miller</option>
             <option value="102">District 102 - Jane Smith</option>
             <option value="103">District 103 - Bob Johnson</option>
           </select>
         </div>
 
         <div class="action-buttons">
-          <button class="btn btn-primary">Refresh Data</button>
-          <button class="btn btn-secondary">Download PDF</button>
+          <button class="btn btn-primary" onclick="refreshData()">Refresh Data</button>
+          <button class="btn btn-secondary" onclick="downloadPDF()">Download PDF</button>
         </div>
       </div>
     </div>
@@ -393,7 +459,7 @@
     <div class="report-content">
       <div class="report-card">
         <div class="report-header">
-          <h2>District 101 - John Miller</h2>
+          <h2>District 101 - John Miller111</h2>
           <div class="subtitle">Yona Solutions</div>
           <div class="subtitle">Dec - 2025</div>
           <div class="subtitle">Facilities: 11</div>
@@ -598,6 +664,7 @@
       btn.addEventListener('click', function() {
         this.parentElement.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active'));
         this.classList.add('active');
+        console.log('P&L Type changed to:', this.dataset.type);
       });
     });
 
@@ -606,6 +673,7 @@
       tab.addEventListener('click', function() {
         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
         this.classList.add('active');
+        console.log('Hierarchy changed to:', this.textContent);
       });
     });
 
@@ -619,7 +687,26 @@
         }
       });
     });
+
+    // Dropdown changes
+    document.getElementById('monthSelect').addEventListener('change', function() {
+      console.log('Month changed to:', this.value);
+    });
+
+    document.getElementById('districtSelect').addEventListener('change', function() {
+      console.log('District changed to:', this.value);
+    });
+
+    // Button functions
+    function refreshData() {
+      console.log('Refresh Data clicked');
+      alert('Refresh Data functionality will be implemented soon!');
+    }
+
+    function downloadPDF() {
+      console.log('Download PDF clicked');
+      alert('Download PDF functionality will be implemented soon!');
+    }
   </script>
 </body>
 </html>
-

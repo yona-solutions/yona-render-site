@@ -5,3 +5,9 @@ npm-debug.log
 *.log
 gcp-service-account-key.json
 
+# IDE
+.vscode/
+.idea/
+
+# OS
+Thumbs.db
