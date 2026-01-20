@@ -314,14 +314,6 @@ async function generatePNLReport(monthData, ytdData, meta, accountConfig, childr
   for (const section of Object.keys(sectionConfig)) {
     const accounts = sectionConfig[section].accounts || [];
     
-    console.log(`\n📋 Rendering section: ${section}`);
-    console.log(`   Section accounts: ${accounts.join(', ')}`);
-    console.log(`   Sample values for first account "${accounts[0]}":`);
-    console.log(`     - Month Actuals: ${valMonthAct[accounts[0]] || 0}`);
-    console.log(`     - Month Budget: ${valMonthBud[accounts[0]] || 0}`);
-    console.log(`     - Has children: ${(childrenMap[accounts[0]] || []).length > 0}`);
-    console.log(`     - Children: ${(childrenMap[accounts[0]] || []).slice(0, 3).join(', ')}`);
-    
     rowsHtml += `
       <tr>
         <td colspan="12" style="font-weight:700; text-decoration:underline; text-transform:uppercase; padding-top: 12px;">
@@ -331,12 +323,10 @@ async function generatePNLReport(monthData, ytdData, meta, accountConfig, childr
     `;
     
     accounts.forEach(acct => {
-      const accountRows = renderAccountRows(
+      rowsHtml += renderAccountRows(
         acct, 1, labelToConfig, childrenMap, valMonthAct, valMonthBud,
         valYtdAct, valYtdBud, incomeTotals, isOperational, sectionAccounts
       );
-      console.log(`   ${acct} generated ${accountRows.length} chars of HTML`);
-      rowsHtml += accountRows;
     });
   }
   
