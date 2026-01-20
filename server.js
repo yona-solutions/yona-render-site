@@ -28,70 +28,7 @@ app.use(express.static('public'));
 
 // Routes
 app.get('/', (req, res) => {
-  res.send(`
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Yona Render Site</title>
-      <style>
-        body {
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-          max-width: 800px;
-          margin: 50px auto;
-          padding: 20px;
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-          min-height: 100vh;
-        }
-        .container {
-          background: white;
-          padding: 40px;
-          border-radius: 10px;
-          box-shadow: 0 10px 40px rgba(0,0,0,0.1);
-        }
-        h1 {
-          color: #667eea;
-          margin-top: 0;
-        }
-        .status {
-          background: #10b981;
-          color: white;
-          padding: 10px 20px;
-          border-radius: 5px;
-          display: inline-block;
-          margin: 20px 0;
-        }
-        code {
-          background: #f3f4f6;
-          padding: 2px 6px;
-          border-radius: 3px;
-          font-family: monospace;
-        }
-      </style>
-    </head>
-    <body>
-      <div class="container">
-        <h1>🚀 Yona Render Site</h1>
-        <div class="status">✅ Service is running!</div>
-        <p>Welcome to your Node.js web service deployed on Render.</p>
-        <h2>Tools:</h2>
-        <ul>
-          <li><a href="/pl-view">📊 P&L View</a> - Profit & Loss reporting dashboard</li>
-          <li><a href="/storage-browser">📁 Cloud Storage Browser</a> - Browse dimension_configurations bucket</li>
-        </ul>
-        <h2>API Endpoints:</h2>
-        <ul>
-          <li><code>GET /</code> - This page</li>
-          <li><code>GET /api/health</code> - Health check endpoint</li>
-          <li><code>GET /api/info</code> - Service information</li>
-          <li><code>GET /api/storage/list?prefix=path</code> - List files in bucket</li>
-          <li><code>GET /api/storage/download/:filename</code> - Download a file</li>
-        </ul>
-      </div>
-    </body>
-    </html>
-  `);
+  res.sendFile(__dirname + '/public/pl-view.html');
 });
 
 app.get('/api/health', (req, res) => {
@@ -110,12 +47,7 @@ app.get('/api/info', (req, res) => {
   });
 });
 
-// P&L View page
-app.get('/pl-view', (req, res) => {
-  res.sendFile(__dirname + '/public/pl-view.html');
-});
-
-// GCP Storage Browser UI
+// GCP Storage Browser UI (hidden, but still accessible)
 app.get('/storage-browser', (req, res) => {
   res.sendFile(__dirname + '/public/storage-browser.html');
 });

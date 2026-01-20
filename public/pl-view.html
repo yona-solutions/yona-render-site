@@ -337,7 +337,6 @@
       <span>SPHERE</span>
     </div>
     <nav class="nav-menu">
-      <div class="nav-item">Home</div>
       <div class="nav-item active">P&L View</div>
       <div class="nav-item">Dimension Configuration</div>
       <div class="nav-item disabled">Email Configuration (not ready)</div>
@@ -613,7 +612,7 @@
     // Navigation
     document.querySelectorAll('.nav-item:not(.disabled)').forEach(item => {
       item.addEventListener('click', function() {
-        if (this.textContent === 'Home') {
+        if (this.textContent === 'P&L View') {
           window.location.href = '/';
         } else if (this.textContent === 'Dimension Configuration') {
           window.location.href = '/storage-browser';
