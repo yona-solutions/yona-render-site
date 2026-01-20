@@ -270,6 +270,24 @@
       display: none;
     }
 
+    .searchable-select-group {
+      padding: 8px 12px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #4a5568;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      background: #f7fafc;
+      border-bottom: 1px solid #e2e8f0;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+
+    .searchable-select-option.grouped {
+      padding-left: 24px;
+    }
+
     .searchable-select-no-results {
       padding: 10px 12px;
       font-size: 13px;
@@ -794,9 +812,21 @@
         this.renderOptions();
         
         // Select first option by default
-        if (options.length > 0) {
-          this.selectOption(options[0].value, options[0].label);
+        const firstOption = this.getFirstOption();
+        if (firstOption) {
+          this.selectOption(firstOption.value, firstOption.label);
         }
+      }
+      
+      getFirstOption() {
+        if (this.options.length === 0) return null;
+        
+        // Check if options are grouped
+        if (this.options[0].districts) {
+          return this.options[0].districts[0];
+        }
+        
+        return this.options[0];
       }
       
       renderOptions() {
@@ -807,38 +837,93 @@
           return;
         }
         
-        this.options.forEach(option => {
-          const optionEl = document.createElement('div');
-          optionEl.className = 'searchable-select-option';
-          optionEl.textContent = option.label;
-          optionEl.dataset.value = option.value;
-          
-          if (option.value === this.selectedValue) {
-            optionEl.classList.add('selected');
-          }
-          
-          optionEl.addEventListener('click', () => {
-            this.selectOption(option.value, option.label);
-            this.closeDropdown();
+        // Check if options are grouped
+        const isGrouped = this.options[0] && this.options[0].districts;
+        
+        if (isGrouped) {
+          // Render grouped options
+          this.options.forEach(group => {
+            // Add group header
+            const groupEl = document.createElement('div');
+            groupEl.className = 'searchable-select-group';
+            groupEl.textContent = group.group;
+            this.dropdown.appendChild(groupEl);
+            
+            // Add options in this group
+            group.districts.forEach(option => {
+              const optionEl = document.createElement('div');
+              optionEl.className = 'searchable-select-option grouped';
+              optionEl.textContent = option.label;
+              optionEl.dataset.value = option.value || option.id;
+              optionEl.dataset.group = group.group;
+              
+              if ((option.value || option.id) === this.selectedValue) {
+                optionEl.classList.add('selected');
+              }
+              
+              optionEl.addEventListener('click', () => {
+                this.selectOption(option.value || option.id, option.label);
+                this.closeDropdown();
+              });
+              
+              this.dropdown.appendChild(optionEl);
+            });
           });
-          
-          this.dropdown.appendChild(optionEl);
-        });
+        } else {
+          // Render flat options
+          this.options.forEach(option => {
+            const optionEl = document.createElement('div');
+            optionEl.className = 'searchable-select-option';
+            optionEl.textContent = option.label;
+            optionEl.dataset.value = option.value;
+            
+            if (option.value === this.selectedValue) {
+              optionEl.classList.add('selected');
+            }
+            
+            optionEl.addEventListener('click', () => {
+              this.selectOption(option.value, option.label);
+              this.closeDropdown();
+            });
+            
+            this.dropdown.appendChild(optionEl);
+          });
+        }
       }
       
       filterOptions(searchTerm) {
         const options = this.dropdown.querySelectorAll('.searchable-select-option');
+        const groups = this.dropdown.querySelectorAll('.searchable-select-group');
         let visibleCount = 0;
+        
+        const searchLower = searchTerm.toLowerCase();
+        
+        // Track which groups have visible options
+        const groupVisibility = {};
         
         options.forEach(option => {
           const text = option.textContent.toLowerCase();
-          const matches = text.includes(searchTerm.toLowerCase());
+          const matches = text.includes(searchLower);
+          const groupName = option.dataset.group;
           
           if (matches) {
             option.classList.remove('hidden');
             visibleCount++;
+            if (groupName) {
+              groupVisibility[groupName] = true;
+            }
           } else {
             option.classList.add('hidden');
+          }
+        });
+        
+        // Hide/show group headers based on whether they have visible options
+        groups.forEach(group => {
+          const groupName = group.textContent;
+          if (searchTerm && !groupVisibility[groupName]) {
+            group.style.display = 'none';
+          } else {
+            group.style.display = 'block';
           }
         });
         
@@ -939,6 +1024,7 @@
     
     /**
      * Load available districts from customer configuration file
+     * Districts are grouped by parent category (Dietary, EVS, etc.)
      */
     async function loadHierarchyOptions() {
       try {
@@ -948,21 +1034,21 @@
           throw new Error('Failed to fetch districts');
         }
         
-        const districts = await response.json();
+        const groupedDistricts = await response.json();
         
-        // Transform districts for searchable select
-        const options = districts.map(district => ({
-          value: district.id,
-          label: district.label
-        }));
+        // Data is already grouped and formatted correctly
+        districtSelect.setOptions(groupedDistricts);
         
-        districtSelect.setOptions(options);
-        
-        console.log(`✅ Loaded ${districts.length} districts from customer_config.json`);
+        // Count total districts
+        const totalDistricts = groupedDistricts.reduce((sum, group) => sum + group.districts.length, 0);
+        console.log(`✅ Loaded ${totalDistricts} districts in ${groupedDistricts.length} groups from customer_config.json`);
+        groupedDistricts.forEach(group => {
+          console.log(`   - ${group.group}: ${group.districts.length} districts`);
+        });
       } catch (error) {
         console.error('Error loading districts:', error);
         
-        // Fallback to sample data
+        // Fallback to sample data (flat structure)
         const fallbackDistricts = [
           { value: '101', label: 'District 101 - Sample District' },
           { value: '102', label: 'District 102 - Sample District' }

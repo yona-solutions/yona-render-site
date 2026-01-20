@@ -148,34 +148,57 @@ class StorageService {
   }
 
   /**
-   * Get districts from customer configuration file
+   * Get districts from customer configuration file grouped by parent category
    * 
-   * Parses customer_config.json and extracts all entries where isDistrict === true
+   * Parses customer_config.json and extracts all entries where isDistrict === true,
+   * excludes districts with districtReportingExcluded === true,
+   * and groups them by their parent category.
    * 
-   * @returns {Promise<Array<{id: string, label: string}>>} Array of districts
+   * @returns {Promise<Array<{group: string, districts: Array}>>} Array of grouped districts
    * @throws {Error} If storage is not initialized or file cannot be parsed
    */
   async getDistricts() {
     const configData = await this.getFileAsJson('customer_config.json');
     
-    const districts = [];
+    // First pass: collect all districts with their parent info
+    const districtsWithParents = [];
     
-    // Iterate through all entries in the config
     for (const [id, config] of Object.entries(configData)) {
       // Filter for districts and exclude those excluded from reporting
       if (config.isDistrict && !config.districtReportingExcluded && !config.displayExcluded) {
-        districts.push({
+        const parentId = config.parent;
+        const parentLabel = parentId && configData[parentId] 
+          ? configData[parentId].label 
+          : 'Other';
+        
+        districtsWithParents.push({
           id: id,
           label: config.label,
-          tags: config.districtTags || []
+          tags: config.districtTags || [],
+          parent: parentLabel
         });
       }
     }
     
-    // Sort by label for consistent ordering
-    districts.sort((a, b) => a.label.localeCompare(b.label));
+    // Group districts by parent
+    const grouped = {};
+    districtsWithParents.forEach(district => {
+      if (!grouped[district.parent]) {
+        grouped[district.parent] = [];
+      }
+      grouped[district.parent].push(district);
+    });
     
-    return districts;
+    // Convert to array format and sort
+    const result = Object.entries(grouped).map(([group, districts]) => ({
+      group: group,
+      districts: districts.sort((a, b) => a.label.localeCompare(b.label))
+    }));
+    
+    // Sort groups alphabetically
+    result.sort((a, b) => a.group.localeCompare(b.group));
+    
+    return result;
   }
 }
 
