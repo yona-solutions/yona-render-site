@@ -331,24 +331,24 @@ async function generatePNLReport(monthData, ytdData, meta, accountConfig, childr
   }
   
   const html = `
-    <div class="pnl-report-container">
+    <div class="pnl-report-container page-break">
       ${headerHtml}
       <hr class="pnl-divider">
       <table class="pnl-report-table">
         <thead>
-          <tr style="font-weight:700; border-bottom: 2px solid #333;">
-            <th style="text-align:left;"></th>
-            <th style="text-align:right;">Actual</th>
-            <th style="text-align:right;">%</th>
-            <th style="text-align:right;">Budget</th>
-            <th style="text-align:right;">%</th>
-            <th style="text-align:right;">Act v Bud</th>
+          <tr>
             <th></th>
-            <th style="text-align:right;">Actual</th>
-            <th style="text-align:right;">%</th>
-            <th style="text-align:right;">Budget</th>
-            <th style="text-align:right;">%</th>
-            <th style="text-align:right;">Act v Bud</th>
+            <th>Actual</th>
+            <th>%</th>
+            <th>Budget</th>
+            <th>%</th>
+            <th>Act v Bud</th>
+            <th></th>
+            <th>Actual</th>
+            <th>%</th>
+            <th>Budget</th>
+            <th>%</th>
+            <th>Act v Bud</th>
           </tr>
         </thead>
         <tbody>${rowsHtml}</tbody>
