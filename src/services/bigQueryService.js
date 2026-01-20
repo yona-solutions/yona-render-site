@@ -99,6 +99,7 @@ class BigQueryService {
    * @param {number} params.subsidiaryId - Subsidiary internal ID (for subsidiary hierarchy)
    * @param {string} params.date - Date in YYYY-MM-DD format
    * @param {Object} params.accountConfig - Account configuration for label mapping
+   * @param {boolean} params.ytd - If true, query YTD (from start of year to date), otherwise just the month
    * @returns {Promise<Object>} P&L data in array format
    * @throws {Error} If BigQuery is not initialized or query fails
    */
@@ -107,7 +108,7 @@ class BigQueryService {
       throw new Error('BigQuery not initialized');
     }
 
-    const { hierarchy, customerIds, regionId, subsidiaryId, date, accountConfig } = params;
+    const { hierarchy, customerIds, regionId, subsidiaryId, date, accountConfig, ytd = false } = params;
 
     // Build the WHERE clause based on hierarchy type
     let whereClause = '';
@@ -126,6 +127,11 @@ class BigQueryService {
       throw new Error(`Invalid hierarchy parameters: ${hierarchy}`);
     }
 
+    // Build date filter based on YTD flag
+    const dateFilter = ytd 
+      ? 'time_date <= @date AND time_date >= DATE_TRUNC(@date, YEAR)'
+      : 'time_date = @date';
+
     const query = `
       SELECT
         account_internal_id,
@@ -135,7 +141,7 @@ class BigQueryService {
         scenario,
         SUM(value) AS value
       FROM \`${this.dataset}.fct_transactions_summary\`
-      WHERE time_date = @date
+      WHERE ${dateFilter}
         AND ${whereClause}
       GROUP BY
         account_internal_id,
@@ -149,11 +155,12 @@ class BigQueryService {
     `;
 
     // Log the query and parameters
-    console.log('\n📊 BigQuery P&L Query:');
+    console.log(`\n📊 BigQuery P&L Query (${ytd ? 'YTD' : 'Month'}):`);
     console.log('Query:', query);
     console.log('Parameters:', {
       ...queryParams,
-      date: date
+      date: date,
+      ytd: ytd
     });
 
     try {
@@ -166,12 +173,12 @@ class BigQueryService {
         }
       });
 
-      console.log(`✅ Retrieved ${rows.length} rows from BigQuery for ${hierarchy}`);
+      console.log(`✅ Retrieved ${rows.length} rows from BigQuery for ${hierarchy} (${ytd ? 'YTD' : 'Month'})`);
       
       // Transform to array format with account labels
       const result = this.transformToArrayFormat(rows, accountConfig);
       
-      console.log(`✅ Transformed to array format: ${result.Account.length} entries`);
+      console.log(`✅ Transformed to array format (${ytd ? 'YTD' : 'Month'}): ${result.Account.length} entries`);
       if (result.Account.length > 0) {
         console.log('Sample entry:', {
           Account: result.Account[0],

@@ -342,9 +342,9 @@ function createApiRoutes(storageService, bigQueryService) {
       
       if (hierarchy === 'district') {
         // 1. Generate district summary P&L (aggregate of all customers)
-        console.log('   Querying BigQuery for district summary...');
-        const districtData = await bigQueryService.getPLData(queryParams);
-        const ytdData = null;
+        console.log('   Querying BigQuery for district summary (Month + YTD)...');
+        const districtData = await bigQueryService.getPLData({ ...queryParams, ytd: false });
+        const districtYtdData = await bigQueryService.getPLData({ ...queryParams, ytd: true });
         
         const districtMeta = {
           typeLabel: 'District',
@@ -357,7 +357,7 @@ function createApiRoutes(storageService, bigQueryService) {
         console.log('   Generating district summary P&L...');
         const districtResult = await pnlRenderService.generatePNLReport(
           districtData,
-          ytdData,
+          districtYtdData,
           districtMeta,
           accountConfig,
           childrenMap,
@@ -370,7 +370,7 @@ function createApiRoutes(storageService, bigQueryService) {
         // 2. Generate facility P&L for each customer
         console.log(`   Generating ${queryParams.customers.length} facility P&Ls...`);
         for (const customer of queryParams.customers) {
-          // Query for just this customer
+          // Query for just this customer (Month + YTD)
           const facilityQueryParams = {
             hierarchy: 'district',
             customerIds: [customer.customer_internal_id],
@@ -378,7 +378,8 @@ function createApiRoutes(storageService, bigQueryService) {
             accountConfig
           };
           
-          const facilityData = await bigQueryService.getPLData(facilityQueryParams);
+          const facilityData = await bigQueryService.getPLData({ ...facilityQueryParams, ytd: false });
+          const facilityYtdData = await bigQueryService.getPLData({ ...facilityQueryParams, ytd: true });
           
           const facilityMeta = {
             typeLabel: 'Facility',
@@ -390,7 +391,7 @@ function createApiRoutes(storageService, bigQueryService) {
           
           const facilityResult = await pnlRenderService.generatePNLReport(
             facilityData,
-            null,
+            facilityYtdData,
             facilityMeta,
             accountConfig,
             childrenMap,
@@ -417,9 +418,9 @@ function createApiRoutes(storageService, bigQueryService) {
         });
       } else {
         // For region and subsidiary, keep single-level for now
-        console.log('   Querying BigQuery...');
-        const monthData = await bigQueryService.getPLData(queryParams);
-        const ytdData = null;
+        console.log('   Querying BigQuery (Month + YTD)...');
+        const monthData = await bigQueryService.getPLData({ ...queryParams, ytd: false });
+        const ytdData = await bigQueryService.getPLData({ ...queryParams, ytd: true });
 
         const meta = {
           typeLabel: hierarchy === 'region' ? 'Region' : 'Subsidiary',
