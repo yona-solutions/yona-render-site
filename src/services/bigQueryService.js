@@ -89,13 +89,17 @@ class BigQueryService {
    * - Region: Filters by region_internal_id
    * - Subsidiary: Filters by subsidiary_internal_id
    * 
+   * Returns data in array format suitable for P&L rendering:
+   * { Account: [...], Scenario: [...], Value: [...], customer_internal_id: [...], ... }
+   * 
    * @param {Object} params - Query parameters
    * @param {string} params.hierarchy - Hierarchy level (district, region, subsidiary)
    * @param {Array<number>} params.customerIds - Customer IDs (for district hierarchy)
    * @param {number} params.regionId - Region internal ID (for region hierarchy)
    * @param {number} params.subsidiaryId - Subsidiary internal ID (for subsidiary hierarchy)
    * @param {string} params.date - Date in YYYY-MM-DD format
-   * @returns {Promise<Array>} P&L data rows
+   * @param {Object} params.accountConfig - Account configuration for label mapping
+   * @returns {Promise<Object>} P&L data in array format
    * @throws {Error} If BigQuery is not initialized or query fails
    */
   async getPLData(params) {
@@ -103,7 +107,7 @@ class BigQueryService {
       throw new Error('BigQuery not initialized');
     }
 
-    const { hierarchy, customerIds, regionId, subsidiaryId, date } = params;
+    const { hierarchy, customerIds, regionId, subsidiaryId, date, accountConfig } = params;
 
     // Build the WHERE clause based on hierarchy type
     let whereClause = '';
@@ -123,18 +127,6 @@ class BigQueryService {
     }
 
     const query = `
-      WITH base AS (
-        SELECT
-          account_internal_id,
-          customer_internal_id,
-          region_internal_id,
-          subsidiary_internal_id,
-          scenario,
-          value
-        FROM \`${this.dataset}.fct_transactions_summary\`
-        WHERE time_date = @date
-          AND ${whereClause}
-      )
       SELECT
         account_internal_id,
         customer_internal_id,
@@ -142,7 +134,9 @@ class BigQueryService {
         subsidiary_internal_id,
         scenario,
         SUM(value) AS value
-      FROM base
+      FROM \`${this.dataset}.fct_transactions_summary\`
+      WHERE time_date = @date
+        AND ${whereClause}
       GROUP BY
         account_internal_id,
         customer_internal_id,
@@ -174,16 +168,67 @@ class BigQueryService {
 
       console.log(`✅ Retrieved ${rows.length} rows from BigQuery for ${hierarchy}`);
       
-      // Log sample rows
-      if (rows.length > 0) {
-        console.log('Sample row:', JSON.stringify(rows[0], null, 2));
+      // Transform to array format with account labels
+      const result = this.transformToArrayFormat(rows, accountConfig);
+      
+      console.log(`✅ Transformed to array format: ${result.Account.length} entries`);
+      if (result.Account.length > 0) {
+        console.log('Sample entry:', {
+          Account: result.Account[0],
+          Scenario: result.Scenario[0],
+          Value: result.Value[0]
+        });
       }
       
-      return rows;
+      return result;
     } catch (error) {
       console.error('Error fetching P&L data:', error);
       throw new Error(`Failed to fetch P&L data from BigQuery: ${error.message}`);
     }
+  }
+
+  /**
+   * Transform BigQuery rows to array format for P&L rendering
+   * 
+   * Converts from array of objects to object of arrays, and maps
+   * account_internal_id to account labels using accountConfig
+   * 
+   * @param {Array} rows - BigQuery result rows
+   * @param {Object} accountConfig - Account configuration for label mapping
+   * @returns {Object} Data in array format
+   * @private
+   */
+  transformToArrayFormat(rows, accountConfig) {
+    // Build reverse mapping: account_internal_id -> label
+    const accountIdToLabel = {};
+    for (const label in accountConfig) {
+      const id = accountConfig[label]?.account_internal_id;
+      if (id != null) {
+        accountIdToLabel[id] = label;
+      }
+    }
+
+    const result = {
+      Account: [],
+      Scenario: [],
+      Value: [],
+      customer_internal_id: [],
+      region_internal_id: [],
+      subsidiary_internal_id: []
+    };
+
+    for (const row of rows) {
+      const accountLabel = accountIdToLabel[row.account_internal_id] || `Unknown Account ${row.account_internal_id}`;
+      
+      result.Account.push(accountLabel);
+      result.Scenario.push(row.scenario);
+      result.Value.push(row.value);
+      result.customer_internal_id.push(row.customer_internal_id);
+      result.region_internal_id.push(row.region_internal_id);
+      result.subsidiary_internal_id.push(row.subsidiary_internal_id);
+    }
+
+    return result;
   }
 }
 

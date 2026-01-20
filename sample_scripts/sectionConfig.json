@@ -1,0 +1,14 @@
+{
+    "REVENUE": {
+      "header": "REVENUE",
+      "accounts": ["Income"]
+    },
+    "COST OF GOODS SOLD": {
+      "header": "COST OF GOODS SOLD", 
+      "accounts": ["Cost of Sales", "Gross Profit"]
+    },
+    "EXPENSES": {
+      "header": "EXPENSES",
+      "accounts": ["Expense", "Net Ordinary Income", "Net Income", "Other Income and Expenses"]
+    }
+  }

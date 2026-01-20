@@ -570,6 +570,83 @@
       word-break: break-all;
     }
 
+    /* P&L Report Styles */
+    .pnl-content-container {
+      overflow: auto;
+      max-height: calc(100vh - 250px);
+      background: white;
+      border-radius: 4px;
+      padding: 20px;
+    }
+
+    .pnl-report-container {
+      margin-bottom: 30px;
+      padding-bottom: 20px;
+      border-bottom: 2px solid #e2e8f0;
+    }
+
+    .pnl-report-container:last-child {
+      border-bottom: none;
+    }
+
+    .pnl-report-header {
+      margin-bottom: 16px;
+    }
+
+    .pnl-title {
+      font-size: 24px;
+      font-weight: 700;
+      color: #1a202c;
+      margin-bottom: 8px;
+    }
+
+    .pnl-subtitle {
+      font-size: 16px;
+      font-weight: 600;
+      color: #4a5568;
+      margin-bottom: 4px;
+    }
+
+    .pnl-meta {
+      font-size: 13px;
+      color: #718096;
+      margin-bottom: 2px;
+    }
+
+    .pnl-divider {
+      border: none;
+      border-top: 1px solid #cbd5e0;
+      margin: 16px 0;
+    }
+
+    .pnl-report-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    .pnl-report-table thead th {
+      text-align: right;
+      padding: 8px 12px;
+      font-weight: 600;
+      color: #2d3748;
+      border-bottom: 2px solid #333;
+      font-size: 12px;
+    }
+
+    .pnl-report-table thead th:first-child {
+      text-align: left;
+    }
+
+    .pnl-report-table tbody td {
+      padding: 6px 12px;
+      color: #2d3748;
+    }
+
+    .pnl-report-table tbody tr:hover {
+      background: #f7fafc;
+    }
+
     .results-table-container {
       overflow: auto;
       flex: 1;
@@ -679,31 +756,17 @@
     <!-- BigQuery Results Section -->
     <div id="bigqueryResults" class="bigquery-results" style="display: none;">
       <div class="results-header">
-        <h3>BigQuery Data Results</h3>
+        <h3>P&L Report</h3>
         <button class="btn-close" onclick="closeBigQueryResults()">×</button>
       </div>
       <div class="results-info">
         <span id="resultsMetadata"></span>
       </div>
       <div class="query-info" id="queryInfo">
-        <!-- Query parameters displayed here -->
+        <!-- Report metadata displayed here -->
       </div>
-      <div class="results-table-container">
-        <table id="resultsTable" class="results-table">
-          <thead>
-            <tr>
-              <th>Account ID</th>
-              <th>Customer ID</th>
-              <th>Region ID</th>
-              <th>Subsidiary ID</th>
-              <th>Scenario</th>
-              <th>Value</th>
-            </tr>
-          </thead>
-          <tbody id="resultsTableBody">
-            <!-- Results populated via JavaScript -->
-          </tbody>
-        </table>
+      <div class="pnl-content-container" id="pnlContent">
+        <!-- P&L HTML rendered here -->
       </div>
     </div>
 
@@ -1292,9 +1355,9 @@
         // Show loading state
         const resultsSection = document.getElementById('bigqueryResults');
         resultsSection.style.display = 'flex';
-        document.getElementById('resultsMetadata').textContent = 'Loading...';
+        document.getElementById('resultsMetadata').textContent = 'Generating P&L Report...';
         document.getElementById('queryInfo').innerHTML = '<em>Fetching data...</em>';
-        document.getElementById('resultsTableBody').innerHTML = '<tr><td colspan="6" style="text-align: center;">Loading data...</td></tr>';
+        document.getElementById('pnlContent').innerHTML = '<div style="text-align: center; padding: 40px;">Loading P&L report...</div>';
         
         // Fetch data from API
         const url = `/api/pl/data?hierarchy=${hierarchy}&selectedId=${encodeURIComponent(selectedId)}&date=${selectedDate}`;
@@ -1312,76 +1375,67 @@
         
         const result = await response.json();
         
-        console.log(`✅ Received ${result.rowCount} rows`);
+        console.log(`✅ Received P&L HTML (noRevenue: ${result.noRevenue})`);
         
-        // Display results
-        displayBigQueryResults(result);
+        // Display P&L report
+        displayPNLReport(result);
         
       } catch (error) {
         console.error('❌ Error fetching P&L data:', error);
-        document.getElementById('resultsMetadata').textContent = 'Error loading data';
+        document.getElementById('resultsMetadata').textContent = 'Error generating P&L report';
         document.getElementById('queryInfo').innerHTML = `<strong style="color: #e53e3e;">Error:</strong> ${error.message}`;
-        document.getElementById('resultsTableBody').innerHTML = 
-          `<tr><td colspan="6" style="text-align: center; color: #e53e3e; padding: 20px;">Error: ${error.message}<br><small>Check browser console for details</small></td></tr>`;
-        alert(`Failed to load data: ${error.message}`);
+        document.getElementById('pnlContent').innerHTML = 
+          `<div style="text-align: center; color: #e53e3e; padding: 40px;">
+            <strong>Error: ${error.message}</strong><br>
+            <small>Check browser console for details</small>
+          </div>`;
+        alert(`Failed to load P&L report: ${error.message}`);
       }
     }
 
     /**
-     * Display BigQuery results in the table
+     * Display P&L report HTML
      * 
      * @param {Object} result - Result object from API
      */
-    function displayBigQueryResults(result) {
-      const { hierarchy, selectedId, date, rowCount, data, queryParams } = result;
+    function displayPNLReport(result) {
+      const { html, noRevenue, hierarchy, selectedLabel, date, meta } = result;
       
       // Log full result to console
-      console.log('📊 BigQuery Result:', result);
+      console.log('📊 P&L Report Result:', result);
       
       // Update metadata
       document.getElementById('resultsMetadata').textContent = 
-        `Hierarchy: ${hierarchy} | Selected: ${selectedId} | Date: ${date} | Rows: ${rowCount}`;
+        `${meta.typeLabel}: ${selectedLabel} | Date: ${date}`;
       
-      // Display query parameters
+      // Display meta information
       const queryInfo = document.getElementById('queryInfo');
-      let queryParamsHtml = '<strong>Query Parameters:</strong><br>';
+      let metaInfoHtml = '<strong>Report Information:</strong><br>';
+      metaInfoHtml += `<strong>Type:</strong> ${meta.typeLabel}<br>`;
+      metaInfoHtml += `<strong>Entity:</strong> ${selectedLabel}<br>`;
+      metaInfoHtml += `<strong>Period:</strong> ${date}<br>`;
       
-      if (queryParams.customerIds) {
-        queryParamsHtml += `<strong>Customer IDs:</strong> [${queryParams.customerIds.join(', ')}]<br>`;
-        queryParamsHtml += `<strong>Count:</strong> ${queryParams.customerIds.length} customers<br>`;
-      }
-      if (queryParams.regionId) {
-        queryParamsHtml += `<strong>Region Internal ID:</strong> ${queryParams.regionId}<br>`;
-      }
-      if (queryParams.subsidiaryId) {
-        queryParamsHtml += `<strong>Subsidiary Internal ID:</strong> ${queryParams.subsidiaryId}<br>`;
-      }
-      queryParamsHtml += `<strong>Date:</strong> ${date}<br>`;
-      queryParamsHtml += `<strong>Hierarchy:</strong> ${hierarchy}`;
-      
-      queryInfo.innerHTML = queryParamsHtml;
-      
-      // Populate table
-      const tbody = document.getElementById('resultsTableBody');
-      
-      if (rowCount === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px;">No data found for selected criteria. Check console for query parameters.</td></tr>';
-        return;
+      if (meta.facilityCount) {
+        metaInfoHtml += `<strong>Facilities:</strong> ${meta.facilityCount}<br>`;
       }
       
-      // Log first few rows to console
-      console.log('Sample rows (first 5):', data.slice(0, 5));
+      metaInfoHtml += `<strong>P&L Type:</strong> ${meta.plType || 'Standard'}`;
       
-      tbody.innerHTML = data.map(row => `
-        <tr>
-          <td class="number">${row.account_internal_id || '-'}</td>
-          <td class="number">${row.customer_internal_id || '-'}</td>
-          <td class="number">${row.region_internal_id || '-'}</td>
-          <td class="number">${row.subsidiary_internal_id || '-'}</td>
-          <td>${row.scenario || '-'}</td>
-          <td class="number">${formatNumber(row.value)}</td>
-        </tr>
-      `).join('');
+      queryInfo.innerHTML = metaInfoHtml;
+      
+      // Display P&L HTML or no revenue message
+      const pnlContent = document.getElementById('pnlContent');
+      
+      if (noRevenue) {
+        pnlContent.innerHTML = `
+          <div style="text-align: center; padding: 40px; color: #718096;">
+            <strong>No Revenue Data</strong><br>
+            <small>This ${meta.typeLabel.toLowerCase()} has no revenue for the selected period.</small>
+          </div>
+        `;
+      } else {
+        pnlContent.innerHTML = html;
+      }
     }
 
     /**

@@ -9,6 +9,8 @@
 
 const express = require('express');
 const router = express.Router();
+const accountService = require('../services/accountService');
+const pnlRenderService = require('../services/pnlRenderService');
 
 /**
  * Configure API routes
@@ -227,17 +229,23 @@ function createApiRoutes(storageService, bigQueryService) {
   });
 
   /**
-   * Get P&L data for a specific hierarchy and period
+   * Get P&L HTML for a specific hierarchy and period
    * 
    * GET /api/pl/data?hierarchy=district&selectedId=101&date=2025-12-01
    * 
    * Query Parameters:
    *   - hierarchy: "district", "region", or "subsidiary"
-   *   - selectedId: ID of the selected hierarchy item
+   *   - selectedId: ID of the selected hierarchy item (includes label in format "id - label")
    *   - date: Date in YYYY-MM-DD format
    * 
    * Response:
-   *   Array of transaction rows with aggregated values
+   *   {
+   *     html: "<div>...</div>", // Rendered P&L HTML
+   *     hierarchy: "district",
+   *     selectedLabel: "District 122",
+   *     date: "2025-12-01",
+   *     noRevenue: false
+   *   }
    */
   router.get('/pl/data', async (req, res) => {
     try {
@@ -261,14 +269,33 @@ function createApiRoutes(storageService, bigQueryService) {
         });
       }
 
-      console.log(`📊 Fetching P&L data: hierarchy=${hierarchy}, selectedId=${selectedId}, date=${date}`);
+      console.log(`📊 Generating P&L report: hierarchy=${hierarchy}, selectedId=${selectedId}, date=${date}`);
 
-      let queryParams = { hierarchy, date };
+      // Extract ID and label from selectedId (format: "id - label" or just "id")
+      let actualId, selectedLabel;
+      if (selectedId.includes(' - ')) {
+        const parts = selectedId.split(' - ');
+        actualId = parts[0];
+        selectedLabel = parts.slice(1).join(' - ');
+      } else {
+        actualId = selectedId;
+        selectedLabel = selectedId;
+      }
+
+      console.log(`   Using ID: ${actualId}, Label: ${selectedLabel}`);
+
+      // Fetch account configuration from Cloud Storage
+      console.log('   Fetching account configuration...');
+      const accountConfig = await storageService.getFileAsJson('account_config.json');
+      const childrenMap = accountService.buildChildrenMap(accountConfig);
+      const sectionConfig = accountService.getSectionConfig();
+
+      let queryParams = { hierarchy, date, accountConfig };
 
       // Get the appropriate IDs based on hierarchy type
       if (hierarchy === 'district') {
         // Get customer IDs for this district or district tag
-        const customerIds = await storageService.getCustomerIdsForDistrict(selectedId);
+        const customerIds = await storageService.getCustomerIdsForDistrict(actualId);
         
         if (customerIds.length === 0) {
           return res.status(404).json({ 
@@ -278,10 +305,10 @@ function createApiRoutes(storageService, bigQueryService) {
         }
         
         queryParams.customerIds = customerIds;
-        console.log(`   Found ${customerIds.length} customer IDs for district ${selectedId}`);
+        console.log(`   Found ${customerIds.length} customer IDs for district`);
       } else if (hierarchy === 'region') {
         // Get region internal ID
-        const regionId = await storageService.getRegionInternalId(selectedId);
+        const regionId = await storageService.getRegionInternalId(actualId);
         
         if (!regionId) {
           return res.status(404).json({ 
@@ -294,7 +321,7 @@ function createApiRoutes(storageService, bigQueryService) {
         console.log(`   Using region_internal_id=${regionId}`);
       } else if (hierarchy === 'subsidiary') {
         // Get subsidiary internal ID
-        const subsidiaryId = await storageService.getSubsidiaryInternalId(selectedId);
+        const subsidiaryId = await storageService.getSubsidiaryInternalId(actualId);
         
         if (!subsidiaryId) {
           return res.status(404).json({ 
@@ -307,22 +334,52 @@ function createApiRoutes(storageService, bigQueryService) {
         console.log(`   Using subsidiary_internal_id=${subsidiaryId}`);
       }
 
-      // Query BigQuery for P&L data
-      const plData = await bigQueryService.getPLData(queryParams);
+      // Query BigQuery for P&L data (returns array format)
+      console.log('   Querying BigQuery...');
+      const monthData = await bigQueryService.getPLData(queryParams);
+
+      // For now, skip YTD data (can be added later)
+      const ytdData = null;
+
+      // Build metadata for the report
+      const meta = {
+        typeLabel: hierarchy === 'district' ? 'District' 
+                  : hierarchy === 'region' ? 'Region' 
+                  : 'Subsidiary',
+        entityName: selectedLabel,
+        monthLabel: date,
+        facilityCount: hierarchy === 'district' ? queryParams.customerIds?.length : null,
+        plType: 'Standard' // Could be 'Operational' based on user preference
+      };
+
+      // Generate P&L HTML
+      console.log('   Generating P&L HTML...');
+      const result = await pnlRenderService.generatePNLReport(
+        monthData,
+        ytdData,
+        meta,
+        accountConfig,
+        childrenMap,
+        sectionConfig
+      );
+
+      console.log(`✅ P&L report generated successfully (noRevenue: ${result.noRevenue})`);
 
       res.json({
+        html: result.html,
+        noRevenue: result.noRevenue,
         hierarchy,
         selectedId,
+        selectedLabel,
         date,
-        rowCount: plData.length,
-        data: plData,
-        queryParams: queryParams // Include query params for debugging
+        meta
       });
     } catch (error) {
-      console.error('Error fetching P&L data:', error);
+      console.error('Error generating P&L report:', error);
       res.status(500).json({ 
         error: error.message,
-        code: 'PL_DATA_ERROR'
+        code: 'PL_GENERATION_ERROR',
+        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
       });
     }
   });
