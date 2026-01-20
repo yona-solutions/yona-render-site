@@ -129,8 +129,8 @@ function createApiRoutes(storageService, bigQueryService) {
    * 
    * Response:
    *   [
-   *     {id: "1829", label: "District 121 - Ben Riegle (D)", tags: [...]},
-   *     {id: "1830", label: "District 122 - John Smith", tags: []},
+   *     {id: "1829", label: "District 121 - Ben Riegle (D)", type: "district"},
+   *     {id: "tag_District 121", label: "District 121", type: "tag"},
    *     ...
    *   ]
    */
@@ -143,6 +143,56 @@ function createApiRoutes(storageService, bigQueryService) {
       res.status(500).json({ 
         error: error.message,
         code: 'DISTRICTS_FETCH_ERROR'
+      });
+    }
+  });
+
+  /**
+   * Get regions from region configuration
+   * 
+   * GET /api/storage/regions
+   * 
+   * Response:
+   *   [
+   *     {id: "101", label: "Region North", type: "region"},
+   *     {id: "tag_Region1", label: "Region1", type: "tag"},
+   *     ...
+   *   ]
+   */
+  router.get('/storage/regions', async (req, res) => {
+    try {
+      const regions = await storageService.getRegions();
+      res.json(regions);
+    } catch (error) {
+      console.error('Error fetching regions:', error);
+      res.status(500).json({ 
+        error: error.message,
+        code: 'REGIONS_FETCH_ERROR'
+      });
+    }
+  });
+
+  /**
+   * Get departments (subsidiaries) from department configuration
+   * 
+   * GET /api/storage/departments
+   * 
+   * Response:
+   *   [
+   *     {id: "201", label: "Department A", type: "department"},
+   *     {id: "tag_Dept1", label: "Dept1", type: "tag"},
+   *     ...
+   *   ]
+   */
+  router.get('/storage/departments', async (req, res) => {
+    try {
+      const departments = await storageService.getDepartments();
+      res.json(departments);
+    } catch (error) {
+      console.error('Error fetching departments:', error);
+      res.status(500).json({ 
+        error: error.message,
+        code: 'DEPARTMENTS_FETCH_ERROR'
       });
     }
   });

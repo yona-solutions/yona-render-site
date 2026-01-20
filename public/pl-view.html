@@ -957,15 +957,34 @@
     }
     
     /**
-     * Load available districts and district tags from customer configuration file
-     * Includes both individual districts and district tag groups
+     * Current hierarchy type (district, region, or subsidiary)
      */
-    async function loadHierarchyOptions() {
+    let currentHierarchy = 'district';
+    
+    /**
+     * Load hierarchy options based on the selected type
+     * 
+     * @param {string} hierarchyType - 'district', 'region', or 'subsidiary'
+     */
+    async function loadHierarchyOptions(hierarchyType = 'district') {
       try {
-        const response = await fetch('/api/storage/districts');
+        // Map hierarchy types to API endpoints
+        const endpointMap = {
+          'district': '/api/storage/districts',
+          'region': '/api/storage/regions',
+          'subsidiary': '/api/storage/departments'
+        };
+        
+        const endpoint = endpointMap[hierarchyType];
+        if (!endpoint) {
+          throw new Error(`Unknown hierarchy type: ${hierarchyType}`);
+        }
+        
+        console.log(`📡 Fetching ${hierarchyType} data from ${endpoint}...`);
+        const response = await fetch(endpoint);
         
         if (!response.ok) {
-          throw new Error('Failed to fetch districts');
+          throw new Error(`Failed to fetch ${hierarchyType} data`);
         }
         
         const items = await response.json();
@@ -980,21 +999,24 @@
         districtSelect.setOptions(options);
         
         // Count by type
-        const districts = items.filter(i => i.type === 'district').length;
-        const tags = items.filter(i => i.type === 'district_tag').length;
-        console.log(`✅ Loaded ${items.length} items from customer_config.json`);
-        console.log(`   - Individual districts: ${districts}`);
-        console.log(`   - District tags/groups: ${tags}`);
+        const mainItems = items.filter(i => i.type !== 'tag').length;
+        const tags = items.filter(i => i.type === 'tag').length;
+        console.log(`✅ Loaded ${items.length} ${hierarchyType} items`);
+        console.log(`   - Main items: ${mainItems}`);
+        console.log(`   - Tags: ${tags}`);
+        
+        // Update current hierarchy
+        currentHierarchy = hierarchyType;
       } catch (error) {
-        console.error('Error loading districts:', error);
+        console.error(`Error loading ${hierarchyType}:`, error);
         
         // Fallback to sample data
-        const fallbackDistricts = [
-          { value: '101', label: 'District 101 - Sample District' },
-          { value: '102', label: 'District 102 - Sample District' }
+        const fallbackData = [
+          { value: '101', label: `Sample ${hierarchyType} 101` },
+          { value: '102', label: `Sample ${hierarchyType} 102` }
         ];
-        districtSelect.setOptions(fallbackDistricts);
-        console.warn('Using sample districts as fallback');
+        districtSelect.setOptions(fallbackData);
+        console.warn(`Using sample ${hierarchyType} as fallback`);
       }
     }
     
@@ -1033,12 +1055,24 @@
       });
     });
 
-    // Tabs
+    // Hierarchy tabs - switch between District, Region, Subsidiary
     document.querySelectorAll('.tab').forEach(tab => {
       tab.addEventListener('click', function() {
         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
         this.classList.add('active');
-        console.log('Hierarchy changed to:', this.textContent);
+        
+        const hierarchyType = this.textContent.toLowerCase();
+        console.log('Hierarchy changed to:', hierarchyType);
+        
+        // Update the dropdown label
+        const hierarchyLabel = document.querySelector('.control-group:nth-child(3) .control-label');
+        hierarchyLabel.textContent = this.textContent;
+        
+        // Update the dropdown placeholder
+        districtSelect.input.setAttribute('placeholder', `Select ${hierarchyType}...`);
+        
+        // Load the appropriate hierarchy data
+        loadHierarchyOptions(hierarchyType);
       });
     });
 

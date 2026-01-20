@@ -193,6 +193,106 @@ class StorageService {
     
     return items;
   }
+
+  /**
+   * Get regions and region tags from region configuration file
+   * 
+   * Returns both individual regions and unique tag values.
+   * Regions are identified by having a parent (excluding root nodes).
+   * Entries with displayExcluded or operationalExcluded are filtered out.
+   * Tag values are extracted from the 'tags' field across all entries.
+   * 
+   * @returns {Promise<Array<{id: string, label: string, type: string}>>} Array of regions and tags
+   * @throws {Error} If storage is not initialized or file cannot be parsed
+   */
+  async getRegions() {
+    const configData = await this.getFileAsJson('region_config.json');
+    
+    const items = [];
+    const uniqueTags = new Set();
+    
+    // First pass: collect individual regions and tag values
+    for (const [id, config] of Object.entries(configData)) {
+      // Include regions that have a parent (not root nodes) and are not excluded
+      // Skip only the root "Region" node (parent === null)
+      // Include "All Regions" (parent '1') and actual regions (parent '2')
+      if (config.parent !== null && !config.displayExcluded && !config.operationalExcluded) {
+        items.push({
+          id: id,
+          label: config.label,
+          type: 'region'
+        });
+      }
+      
+      // Collect all unique tag values from the tags field
+      const tags = config.tags || [];
+      tags.forEach(tag => uniqueTags.add(tag));
+    }
+    
+    // Add unique tag values as selectable items
+    uniqueTags.forEach(tag => {
+      items.push({
+        id: `tag_${tag}`,
+        label: tag,
+        type: 'tag'
+      });
+    });
+    
+    // Sort all items alphabetically by label
+    items.sort((a, b) => a.label.localeCompare(b.label));
+    
+    return items;
+  }
+
+  /**
+   * Get departments (subsidiaries) and department tags from department configuration file
+   * 
+   * Returns both individual departments and unique tag values.
+   * Departments are identified by having a parent (excluding root nodes).
+   * Entries with displayExcluded or operationalExcluded are filtered out.
+   * Tag values are extracted from the 'tags' field across all entries.
+   * 
+   * @returns {Promise<Array<{id: string, label: string, type: string}>>} Array of departments and tags
+   * @throws {Error} If storage is not initialized or file cannot be parsed
+   */
+  async getDepartments() {
+    const configData = await this.getFileAsJson('department_config.json');
+    
+    const items = [];
+    const uniqueTags = new Set();
+    
+    // First pass: collect individual departments and tag values
+    for (const [id, config] of Object.entries(configData)) {
+      // Include departments that have a parent (not root nodes) and are not excluded
+      // Skip only the root "Department" node (parent === null)
+      // Include "All Departments" (parent '1') and actual departments (parent '2')
+      if (config.parent !== null && !config.displayExcluded && !config.operationalExcluded) {
+        items.push({
+          id: id,
+          label: config.label,
+          type: 'department'
+        });
+      }
+      
+      // Collect all unique tag values from the tags field
+      const tags = config.tags || [];
+      tags.forEach(tag => uniqueTags.add(tag));
+    }
+    
+    // Add unique tag values as selectable items
+    uniqueTags.forEach(tag => {
+      items.push({
+        id: `tag_${tag}`,
+        label: tag,
+        type: 'tag'
+      });
+    });
+    
+    // Sort all items alphabetically by label
+    items.sort((a, b) => a.label.localeCompare(b.label));
+    
+    return items;
+  }
 }
 
 module.exports = StorageService;
