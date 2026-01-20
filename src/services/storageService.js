@@ -364,6 +364,60 @@ class StorageService {
   }
 
   /**
+   * Get full customer details for a district or district tag
+   * Returns customer objects with label and ID for facility P&L generation
+   * 
+   * @param {string} districtId - District ID or tag ID (format: "tag_TagName")
+   * @returns {Promise<Array<Object>>} Array of customer objects with {customer_internal_id, label, configId}
+   * @throws {Error} If storage is not initialized or file cannot be parsed
+   */
+  async getCustomersForDistrict(districtId) {
+    const configData = await this.getFileAsJson('customer_config.json');
+    const customers = [];
+    const seenIds = new Set(); // Avoid duplicates
+    
+    // Check if this is a tag selection
+    const isTag = districtId.startsWith('tag_');
+    const searchValue = isTag ? districtId.substring(4) : districtId;
+    
+    // Find the district IDs to search for children
+    const districtIdsToSearch = [];
+    
+    if (isTag) {
+      // Tag selection: Find all districts with this tag
+      for (const [id, config] of Object.entries(configData)) {
+        if (config.isDistrict && !config.districtReportingExcluded && !config.displayExcluded) {
+          const tags = config.tags || [];
+          if (tags.includes(searchValue)) {
+            districtIdsToSearch.push(id);
+          }
+        }
+      }
+    } else {
+      // Direct district selection
+      districtIdsToSearch.push(districtId);
+    }
+    
+    // Now find all children (customers) of these districts
+    for (const [id, config] of Object.entries(configData)) {
+      // Check if this entry's parent is one of our districts
+      if (config.parent && districtIdsToSearch.includes(config.parent)) {
+        // This is a child of one of our districts
+        if (config.customer_internal_id && !seenIds.has(config.customer_internal_id)) {
+          seenIds.add(config.customer_internal_id);
+          customers.push({
+            customer_internal_id: config.customer_internal_id,
+            label: config.label,
+            configId: id
+          });
+        }
+      }
+    }
+    
+    return customers;
+  }
+
+  /**
    * Get region internal ID from region configuration
    * 
    * @param {string} regionId - Region ID

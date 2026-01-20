@@ -294,7 +294,9 @@ async function generatePNLReport(monthData, ytdData, meta, accountConfig, childr
   
   // Check for no revenue (facilities only)
   if (meta.typeLabel === 'Facility') {
-    if (Math.abs(incomeTotals.act) < 0.0001) {
+    const hasRevenue = Math.abs(incomeTotals.act) >= 0.0001;
+    console.log(`   🏢 Facility "${meta.entityName}": Income = ${incomeTotals.act}, hasRevenue = ${hasRevenue}`);
+    if (!hasRevenue) {
       return { noRevenue: true, html: '' };
     }
   }

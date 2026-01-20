@@ -294,17 +294,19 @@ function createApiRoutes(storageService, bigQueryService) {
 
       // Get the appropriate IDs based on hierarchy type
       if (hierarchy === 'district') {
-        // Get customer IDs for this district or district tag
-        const customerIds = await storageService.getCustomerIdsForDistrict(actualId);
+        // Get full customer details for this district or district tag
+        const customers = await storageService.getCustomersForDistrict(actualId);
         
-        if (customerIds.length === 0) {
+        if (customers.length === 0) {
           return res.status(404).json({ 
             error: 'No customers found for selected district',
             code: 'NO_CUSTOMERS_FOUND'
           });
         }
         
+        const customerIds = customers.map(c => c.customer_internal_id);
         queryParams.customerIds = customerIds;
+        queryParams.customers = customers; // Store full customer details for facility P&Ls
         console.log(`   Found ${customerIds.length} customer IDs for district`);
       } else if (hierarchy === 'region') {
         // Get region internal ID
@@ -334,46 +336,120 @@ function createApiRoutes(storageService, bigQueryService) {
         console.log(`   Using subsidiary_internal_id=${subsidiaryId}`);
       }
 
-      // Query BigQuery for P&L data (returns array format)
-      console.log('   Querying BigQuery...');
-      const monthData = await bigQueryService.getPLData(queryParams);
+      // Generate multi-level P&L for districts (district + facilities)
+      let htmlParts = [];
+      let totalNoRevenue = false;
+      
+      if (hierarchy === 'district') {
+        // 1. Generate district summary P&L (aggregate of all customers)
+        console.log('   Querying BigQuery for district summary...');
+        const districtData = await bigQueryService.getPLData(queryParams);
+        const ytdData = null;
+        
+        const districtMeta = {
+          typeLabel: 'District',
+          entityName: selectedLabel,
+          monthLabel: date,
+          facilityCount: queryParams.customers.length,
+          plType: 'Standard'
+        };
+        
+        console.log('   Generating district summary P&L...');
+        const districtResult = await pnlRenderService.generatePNLReport(
+          districtData,
+          ytdData,
+          districtMeta,
+          accountConfig,
+          childrenMap,
+          sectionConfig
+        );
+        
+        htmlParts.push(districtResult.html);
+        totalNoRevenue = districtResult.noRevenue;
+        
+        // 2. Generate facility P&L for each customer
+        console.log(`   Generating ${queryParams.customers.length} facility P&Ls...`);
+        for (const customer of queryParams.customers) {
+          // Query for just this customer
+          const facilityQueryParams = {
+            hierarchy: 'district',
+            customerIds: [customer.customer_internal_id],
+            date,
+            accountConfig
+          };
+          
+          const facilityData = await bigQueryService.getPLData(facilityQueryParams);
+          
+          const facilityMeta = {
+            typeLabel: 'Facility',
+            entityName: customer.label,
+            monthLabel: date,
+            parentDistrict: selectedLabel,
+            plType: 'Standard'
+          };
+          
+          const facilityResult = await pnlRenderService.generatePNLReport(
+            facilityData,
+            null,
+            facilityMeta,
+            accountConfig,
+            childrenMap,
+            sectionConfig
+          );
+          
+          // Only include facilities with revenue
+          if (!facilityResult.noRevenue) {
+            htmlParts.push(facilityResult.html);
+          }
+        }
+        
+        console.log(`✅ Generated district summary + ${htmlParts.length - 1} facility P&Ls`);
+        
+        res.json({
+          html: htmlParts.join('\n'),
+          noRevenue: totalNoRevenue,
+          hierarchy,
+          selectedId,
+          selectedLabel,
+          date,
+          facilityCount: htmlParts.length - 1,
+          meta: districtMeta
+        });
+      } else {
+        // For region and subsidiary, keep single-level for now
+        console.log('   Querying BigQuery...');
+        const monthData = await bigQueryService.getPLData(queryParams);
+        const ytdData = null;
 
-      // For now, skip YTD data (can be added later)
-      const ytdData = null;
+        const meta = {
+          typeLabel: hierarchy === 'region' ? 'Region' : 'Subsidiary',
+          entityName: selectedLabel,
+          monthLabel: date,
+          plType: 'Standard'
+        };
 
-      // Build metadata for the report
-      const meta = {
-        typeLabel: hierarchy === 'district' ? 'District' 
-                  : hierarchy === 'region' ? 'Region' 
-                  : 'Subsidiary',
-        entityName: selectedLabel,
-        monthLabel: date,
-        facilityCount: hierarchy === 'district' ? queryParams.customerIds?.length : null,
-        plType: 'Standard' // Could be 'Operational' based on user preference
-      };
+        console.log('   Generating P&L HTML...');
+        const result = await pnlRenderService.generatePNLReport(
+          monthData,
+          ytdData,
+          meta,
+          accountConfig,
+          childrenMap,
+          sectionConfig
+        );
 
-      // Generate P&L HTML
-      console.log('   Generating P&L HTML...');
-      const result = await pnlRenderService.generatePNLReport(
-        monthData,
-        ytdData,
-        meta,
-        accountConfig,
-        childrenMap,
-        sectionConfig
-      );
+        console.log(`✅ P&L report generated successfully (noRevenue: ${result.noRevenue})`);
 
-      console.log(`✅ P&L report generated successfully (noRevenue: ${result.noRevenue})`);
-
-      res.json({
-        html: result.html,
-        noRevenue: result.noRevenue,
-        hierarchy,
-        selectedId,
-        selectedLabel,
-        date,
-        meta
-      });
+        res.json({
+          html: result.html,
+          noRevenue: result.noRevenue,
+          hierarchy,
+          selectedId,
+          selectedLabel,
+          date,
+          meta
+        });
+      }
     } catch (error) {
       console.error('Error generating P&L report:', error);
       res.status(500).json({ 
