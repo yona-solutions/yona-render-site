@@ -50,9 +50,26 @@ npm start
 
 # Run with nodemon (auto-restart on changes)
 npm run dev
+
+# Deploy to Render
+./deploy.sh
 ```
 
 See [LOCAL_DEVELOPMENT.md](./LOCAL_DEVELOPMENT.md) for detailed instructions.
+
+### Environment Variables
+
+The `.env` file stores sensitive credentials:
+
+```env
+# GCP Service Account (required for Cloud Storage and BigQuery)
+GCP_SERVICE_ACCOUNT_KEY={"type":"service_account",...}
+
+# Render API (required for deployments)
+RENDER_API_KEY=rnd_xxxxxxxxxxxxxxxxxxxxx
+```
+
+**⚠️ Security:** The `.env` file is in `.gitignore` and will never be committed to Git.
 
 ## 📁 Project Structure
 
