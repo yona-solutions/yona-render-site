@@ -211,12 +211,11 @@ class StorageService {
     const items = [];
     const uniqueTags = new Set();
     
-    // First pass: collect individual regions and tag values
+    // First pass: collect individual regions (leaf nodes only) and tag values
     for (const [id, config] of Object.entries(configData)) {
-      // Include regions that have a parent (not root nodes) and are not excluded
-      // Skip only the root "Region" node (parent === null)
-      // Include "All Regions" (parent '1') and actual regions (parent '2')
-      if (config.parent !== null && !config.displayExcluded && !config.operationalExcluded) {
+      // Include only leaf nodes (parent === '2')
+      // This excludes root "Region" (parent null) and "All Regions" (parent '1')
+      if (config.parent === '2' && !config.displayExcluded && !config.operationalExcluded) {
         items.push({
           id: id,
           label: config.label,
@@ -261,12 +260,11 @@ class StorageService {
     const items = [];
     const uniqueTags = new Set();
     
-    // First pass: collect individual departments and tag values
+    // First pass: collect individual departments (leaf nodes only) and tag values
     for (const [id, config] of Object.entries(configData)) {
-      // Include departments that have a parent (not root nodes) and are not excluded
-      // Skip only the root "Department" node (parent === null)
-      // Include "All Departments" (parent '1') and actual departments (parent '2')
-      if (config.parent !== null && !config.displayExcluded && !config.operationalExcluded) {
+      // Include only leaf nodes (parent === '2')
+      // This excludes root "Department" (parent null) and "All Departments" (parent '1')
+      if (config.parent === '2' && !config.displayExcluded && !config.operationalExcluded) {
         items.push({
           id: id,
           label: config.label,
