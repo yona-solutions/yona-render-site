@@ -433,7 +433,7 @@ app.get('/api/storage/download/:filename(*)', async (req, res) => {
     
     // Set headers for download
     res.setHeader('Content-Type', metadata.contentType || 'application/octet-stream');
-    res.setHeader('Content-Disposition', \`attachment; filename="\${fileName.split('/').pop()}"\`);
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName.split('/').pop()}"`);
     
     // Stream the file
     file.createReadStream()
