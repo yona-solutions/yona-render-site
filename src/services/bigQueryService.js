@@ -84,14 +84,18 @@ class BigQueryService {
   /**
    * Get P&L data for a specific hierarchy and period
    * 
-   * TODO: Implement full P&L query
+   * Queries fct_transactions_summary based on hierarchy type:
+   * - District: Filters by customer_internal_id (includes all customers under district/tag)
+   * - Region: Filters by region_internal_id
+   * - Subsidiary: Filters by subsidiary_internal_id
    * 
    * @param {Object} params - Query parameters
    * @param {string} params.hierarchy - Hierarchy level (district, region, subsidiary)
-   * @param {string} params.id - ID of the entity
-   * @param {string} params.month - Month in YYYY-MM-DD format
-   * @param {string} params.type - P&L type (standard, operational)
-   * @returns {Promise<Object>} P&L data
+   * @param {Array<number>} params.customerIds - Customer IDs (for district hierarchy)
+   * @param {number} params.regionId - Region internal ID (for region hierarchy)
+   * @param {number} params.subsidiaryId - Subsidiary internal ID (for subsidiary hierarchy)
+   * @param {string} params.date - Date in YYYY-MM-DD format
+   * @returns {Promise<Array>} P&L data rows
    * @throws {Error} If BigQuery is not initialized or query fails
    */
   async getPLData(params) {
@@ -99,8 +103,73 @@ class BigQueryService {
       throw new Error('BigQuery not initialized');
     }
 
-    // TODO: Implement the actual P&L query
-    throw new Error('P&L data query not yet implemented');
+    const { hierarchy, customerIds, regionId, subsidiaryId, date } = params;
+
+    // Build the WHERE clause based on hierarchy type
+    let whereClause = '';
+    let queryParams = {};
+
+    if (hierarchy === 'district' && customerIds && customerIds.length > 0) {
+      whereClause = 'customer_internal_id IN UNNEST(@customerIds)';
+      queryParams.customerIds = customerIds;
+    } else if (hierarchy === 'region' && regionId) {
+      whereClause = 'region_internal_id = @regionId';
+      queryParams.regionId = regionId;
+    } else if (hierarchy === 'subsidiary' && subsidiaryId) {
+      whereClause = 'subsidiary_internal_id = @subsidiaryId';
+      queryParams.subsidiaryId = subsidiaryId;
+    } else {
+      throw new Error(`Invalid hierarchy parameters: ${hierarchy}`);
+    }
+
+    const query = `
+      WITH base AS (
+        SELECT
+          account_internal_id,
+          customer_internal_id,
+          region_internal_id,
+          subsidiary_internal_id,
+          scenario,
+          value
+        FROM \`${this.dataset}.fct_transactions_summary\`
+        WHERE time_date = @date
+          AND ${whereClause}
+      )
+      SELECT
+        account_internal_id,
+        customer_internal_id,
+        region_internal_id,
+        subsidiary_internal_id,
+        scenario,
+        SUM(value) AS value
+      FROM base
+      GROUP BY
+        account_internal_id,
+        customer_internal_id,
+        region_internal_id,
+        subsidiary_internal_id,
+        scenario
+      ORDER BY
+        account_internal_id,
+        scenario
+    `;
+
+    try {
+      const [rows] = await this.bigquery.query({
+        query: query,
+        location: 'US',
+        params: {
+          ...queryParams,
+          date: date
+        }
+      });
+
+      console.log(`✅ Retrieved ${rows.length} rows from BigQuery for ${hierarchy}`);
+      return rows;
+    } catch (error) {
+      console.error('Error fetching P&L data:', error);
+      throw new Error(`Failed to fetch P&L data from BigQuery: ${error.message}`);
+    }
   }
 }
 

@@ -229,15 +229,101 @@ function createApiRoutes(storageService, bigQueryService) {
   /**
    * Get P&L data for a specific hierarchy and period
    * 
-   * GET /api/pl/data?hierarchy=district&id=101&month=2025-12-01&type=standard
+   * GET /api/pl/data?hierarchy=district&selectedId=101&date=2025-12-01
    * 
-   * TODO: Implement P&L data fetching logic
+   * Query Parameters:
+   *   - hierarchy: "district", "region", or "subsidiary"
+   *   - selectedId: ID of the selected hierarchy item
+   *   - date: Date in YYYY-MM-DD format
+   * 
+   * Response:
+   *   Array of transaction rows with aggregated values
    */
-  router.get('/pl/data', (req, res) => {
-    res.status(501).json({ 
-      error: 'Not implemented',
-      message: 'P&L data endpoint will be implemented in next phase'
-    });
+  router.get('/pl/data', async (req, res) => {
+    try {
+      const { hierarchy, selectedId, date } = req.query;
+
+      // Validate required parameters
+      if (!hierarchy || !selectedId || !date) {
+        return res.status(400).json({ 
+          error: 'Missing required parameters',
+          code: 'INVALID_PARAMETERS',
+          required: ['hierarchy', 'selectedId', 'date']
+        });
+      }
+
+      // Validate hierarchy type
+      if (!['district', 'region', 'subsidiary'].includes(hierarchy)) {
+        return res.status(400).json({ 
+          error: 'Invalid hierarchy type',
+          code: 'INVALID_HIERARCHY',
+          allowed: ['district', 'region', 'subsidiary']
+        });
+      }
+
+      console.log(`📊 Fetching P&L data: hierarchy=${hierarchy}, selectedId=${selectedId}, date=${date}`);
+
+      let queryParams = { hierarchy, date };
+
+      // Get the appropriate IDs based on hierarchy type
+      if (hierarchy === 'district') {
+        // Get customer IDs for this district or district tag
+        const customerIds = await storageService.getCustomerIdsForDistrict(selectedId);
+        
+        if (customerIds.length === 0) {
+          return res.status(404).json({ 
+            error: 'No customers found for selected district',
+            code: 'NO_CUSTOMERS_FOUND'
+          });
+        }
+        
+        queryParams.customerIds = customerIds;
+        console.log(`   Found ${customerIds.length} customer IDs for district ${selectedId}`);
+      } else if (hierarchy === 'region') {
+        // Get region internal ID
+        const regionId = await storageService.getRegionInternalId(selectedId);
+        
+        if (!regionId) {
+          return res.status(404).json({ 
+            error: 'Region not found',
+            code: 'REGION_NOT_FOUND'
+          });
+        }
+        
+        queryParams.regionId = regionId;
+        console.log(`   Using region_internal_id=${regionId}`);
+      } else if (hierarchy === 'subsidiary') {
+        // Get subsidiary internal ID
+        const subsidiaryId = await storageService.getSubsidiaryInternalId(selectedId);
+        
+        if (!subsidiaryId) {
+          return res.status(404).json({ 
+            error: 'Subsidiary not found',
+            code: 'SUBSIDIARY_NOT_FOUND'
+          });
+        }
+        
+        queryParams.subsidiaryId = subsidiaryId;
+        console.log(`   Using subsidiary_internal_id=${subsidiaryId}`);
+      }
+
+      // Query BigQuery for P&L data
+      const plData = await bigQueryService.getPLData(queryParams);
+
+      res.json({
+        hierarchy,
+        selectedId,
+        date,
+        rowCount: plData.length,
+        data: plData
+      });
+    } catch (error) {
+      console.error('Error fetching P&L data:', error);
+      res.status(500).json({ 
+        error: error.message,
+        code: 'PL_DATA_ERROR'
+      });
+    }
   });
 
   return router;

@@ -291,6 +291,89 @@ class StorageService {
     
     return items;
   }
+
+  /**
+   * Get customer internal IDs for a district or district tag
+   * 
+   * For a district: Returns customers where customer_internal_id matches
+   * For a district tag: Returns customers where district has that tag
+   * 
+   * @param {string} districtId - District ID or tag ID (format: "tag_TagName")
+   * @returns {Promise<Array<number>>} Array of customer internal IDs
+   * @throws {Error} If storage is not initialized or file cannot be parsed
+   */
+  async getCustomerIdsForDistrict(districtId) {
+    const configData = await this.getFileAsJson('customer_config.json');
+    const customerIds = [];
+    
+    // Check if this is a tag selection
+    const isTag = districtId.startsWith('tag_');
+    const searchValue = isTag ? districtId.substring(4) : districtId;
+    
+    if (isTag) {
+      // Tag selection: Find all districts with this tag, then get their customer IDs
+      for (const [id, config] of Object.entries(configData)) {
+        if (config.isDistrict && !config.districtReportingExcluded && !config.displayExcluded) {
+          const tags = config.tags || [];
+          // Check if this district has the tag
+          if (tags.includes(searchValue)) {
+            // Use customer_internal_id if available, otherwise use id
+            const customerId = config.customer_internal_id || parseInt(id);
+            if (!isNaN(customerId)) {
+              customerIds.push(customerId);
+            }
+          }
+        }
+      }
+    } else {
+      // Direct district selection: Get customer ID for this specific district
+      const districtConfig = configData[districtId];
+      if (districtConfig && districtConfig.isDistrict) {
+        const customerId = districtConfig.customer_internal_id || parseInt(districtId);
+        if (!isNaN(customerId)) {
+          customerIds.push(customerId);
+        }
+      }
+    }
+    
+    return customerIds;
+  }
+
+  /**
+   * Get region internal ID from region configuration
+   * 
+   * @param {string} regionId - Region ID
+   * @returns {Promise<number|null>} Region internal ID or null if not found
+   * @throws {Error} If storage is not initialized or file cannot be parsed
+   */
+  async getRegionInternalId(regionId) {
+    const configData = await this.getFileAsJson('region_config.json');
+    const regionConfig = configData[regionId];
+    
+    if (regionConfig && regionConfig.region_internal_id) {
+      return parseInt(regionConfig.region_internal_id);
+    }
+    
+    return null;
+  }
+
+  /**
+   * Get subsidiary internal ID from department configuration
+   * 
+   * @param {string} departmentId - Department/subsidiary ID
+   * @returns {Promise<number|null>} Subsidiary internal ID or null if not found
+   * @throws {Error} If storage is not initialized or file cannot be parsed
+   */
+  async getSubsidiaryInternalId(departmentId) {
+    const configData = await this.getFileAsJson('department_config.json');
+    const deptConfig = configData[departmentId];
+    
+    if (deptConfig && deptConfig.subsidiary_internal_id) {
+      return parseInt(deptConfig.subsidiary_internal_id);
+    }
+    
+    return null;
+  }
 }
 
 module.exports = StorageService;
