@@ -659,6 +659,58 @@
   </div>
 
   <script>
+    // ============================================
+    // Initialize Page
+    // ============================================
+    
+    /**
+     * Load available dates from BigQuery and populate the month dropdown
+     */
+    async function loadAvailableDates() {
+      try {
+        const response = await fetch('/api/pl/dates');
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch dates');
+        }
+        
+        const dates = await response.json();
+        const monthSelect = document.getElementById('monthSelect');
+        
+        // Clear existing options
+        monthSelect.innerHTML = '';
+        
+        // Add dates to dropdown
+        dates.forEach((dateObj, index) => {
+          const option = document.createElement('option');
+          option.value = dateObj.time;
+          option.textContent = dateObj.formatted;
+          
+          // Select the first (most recent) date by default
+          if (index === 0) {
+            option.selected = true;
+          }
+          
+          monthSelect.appendChild(option);
+        });
+        
+        console.log(`✅ Loaded ${dates.length} available dates`);
+      } catch (error) {
+        console.error('Error loading dates:', error);
+        // Keep the default sample dates if API fails
+        console.warn('Using sample dates as fallback');
+      }
+    }
+    
+    // Load dates when page loads
+    document.addEventListener('DOMContentLoaded', () => {
+      loadAvailableDates();
+    });
+
+    // ============================================
+    // UI Event Handlers
+    // ============================================
+
     // Toggle buttons
     document.querySelectorAll('.toggle-btn').forEach(btn => {
       btn.addEventListener('click', function() {
@@ -691,20 +743,27 @@
     // Dropdown changes
     document.getElementById('monthSelect').addEventListener('change', function() {
       console.log('Month changed to:', this.value);
+      // TODO: Refresh P&L data based on selected month
     });
 
     document.getElementById('districtSelect').addEventListener('change', function() {
       console.log('District changed to:', this.value);
+      // TODO: Refresh P&L data based on selected district
     });
 
-    // Button functions
+    // ============================================
+    // Button Functions
+    // ============================================
+
     function refreshData() {
       console.log('Refresh Data clicked');
+      // TODO: Implement data refresh
       alert('Refresh Data functionality will be implemented soon!');
     }
 
     function downloadPDF() {
       console.log('Download PDF clicked');
+      // TODO: Implement PDF download
       alert('Download PDF functionality will be implemented soon!');
     }
   </script>

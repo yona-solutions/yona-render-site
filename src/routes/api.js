@@ -14,16 +14,18 @@ const router = express.Router();
  * Configure API routes
  * 
  * @param {StorageService} storageService - Storage service instance
+ * @param {BigQueryService} bigQueryService - BigQuery service instance
  * @returns {Router} Configured Express router
  */
-function createApiRoutes(storageService) {
+function createApiRoutes(storageService, bigQueryService) {
   // Health check endpoint
   router.get('/health', (req, res) => {
     res.json({ 
       status: 'healthy',
       timestamp: new Date().toISOString(),
       services: {
-        storage: storageService.isAvailable()
+        storage: storageService.isAvailable(),
+        bigquery: bigQueryService.isAvailable()
       }
     });
   });
@@ -121,8 +123,33 @@ function createApiRoutes(storageService) {
   });
 
   // ============================================
-  // P&L API Endpoints (Placeholder for future)
+  // P&L API Endpoints
   // ============================================
+
+  /**
+   * Get available dates for the date filter
+   * 
+   * GET /api/pl/dates
+   * 
+   * Response:
+   *   [
+   *     {time: "2025-12-01", formatted: "2025-12-01"},
+   *     {time: "2025-11-01", formatted: "2025-11-01"},
+   *     ...
+   *   ]
+   */
+  router.get('/pl/dates', async (req, res) => {
+    try {
+      const dates = await bigQueryService.getAvailableDates();
+      res.json(dates);
+    } catch (error) {
+      console.error('Error fetching dates:', error);
+      res.status(500).json({ 
+        error: error.message,
+        code: 'DATES_FETCH_ERROR'
+      });
+    }
+  });
 
   /**
    * Get P&L data for a specific hierarchy and period

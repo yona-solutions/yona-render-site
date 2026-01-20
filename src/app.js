@@ -9,8 +9,9 @@
 
 const express = require('express');
 const { configureExpress } = require('./config/express');
-const { initializeStorage } = require('./config/gcp');
+const { initializeStorage, initializeBigQuery } = require('./config/gcp');
 const StorageService = require('./services/storageService');
+const BigQueryService = require('./services/bigQueryService');
 const createApiRoutes = require('./routes/api');
 const createViewRoutes = require('./routes/views');
 
@@ -28,9 +29,12 @@ function createApp() {
   // Initialize services
   const storage = initializeStorage();
   const storageService = new StorageService(storage);
+  
+  const bigquery = initializeBigQuery();
+  const bigQueryService = new BigQueryService(bigquery);
 
   // Register routes
-  app.use('/api', createApiRoutes(storageService));
+  app.use('/api', createApiRoutes(storageService, bigQueryService));
   app.use('/', createViewRoutes());
 
   // 404 handler
