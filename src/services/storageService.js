@@ -295,8 +295,14 @@ class StorageService {
   /**
    * Get customer internal IDs for a district or district tag
    * 
-   * For a district: Returns customers where customer_internal_id matches
-   * For a district tag: Returns customers where district has that tag
+   * For a district: Returns customer_internal_id from all children of that district
+   * For a district tag: Returns customer_internal_id from all children of all districts with that tag
+   * 
+   * The hierarchy is:
+   * - District (isDistrict=true)
+   *   - Customer 1 (parent = district_id, has customer_internal_id)
+   *   - Customer 2 (parent = district_id, has customer_internal_id)
+   *   - ...
    * 
    * @param {string} districtId - District ID or tag ID (format: "tag_TagName")
    * @returns {Promise<Array<number>>} Array of customer internal IDs
@@ -304,39 +310,57 @@ class StorageService {
    */
   async getCustomerIdsForDistrict(districtId) {
     const configData = await this.getFileAsJson('customer_config.json');
-    const customerIds = [];
+    const customerIds = new Set(); // Use Set to avoid duplicates
     
     // Check if this is a tag selection
     const isTag = districtId.startsWith('tag_');
     const searchValue = isTag ? districtId.substring(4) : districtId;
     
+    console.log(`🔍 Finding customers for district: ${districtId} (isTag: ${isTag})`);
+    
+    // Find the district IDs to search for children
+    const districtIdsToSearch = [];
+    
     if (isTag) {
-      // Tag selection: Find all districts with this tag, then get their customer IDs
+      // Tag selection: Find all districts with this tag
       for (const [id, config] of Object.entries(configData)) {
         if (config.isDistrict && !config.districtReportingExcluded && !config.displayExcluded) {
           const tags = config.tags || [];
-          // Check if this district has the tag
           if (tags.includes(searchValue)) {
-            // Use customer_internal_id if available, otherwise use id
-            const customerId = config.customer_internal_id || parseInt(id);
-            if (!isNaN(customerId)) {
-              customerIds.push(customerId);
-            }
+            districtIdsToSearch.push(id);
+            console.log(`   Found district with tag: ${id} (${config.label})`);
           }
         }
       }
     } else {
-      // Direct district selection: Get customer ID for this specific district
+      // Direct district selection
+      districtIdsToSearch.push(districtId);
       const districtConfig = configData[districtId];
-      if (districtConfig && districtConfig.isDistrict) {
-        const customerId = districtConfig.customer_internal_id || parseInt(districtId);
-        if (!isNaN(customerId)) {
-          customerIds.push(customerId);
+      if (districtConfig) {
+        console.log(`   District: ${districtConfig.label}`);
+      }
+    }
+    
+    console.log(`   Searching for children of ${districtIdsToSearch.length} district(s)`);
+    
+    // Now find all children (customers) of these districts
+    for (const [id, config] of Object.entries(configData)) {
+      // Check if this entry's parent is one of our districts
+      if (config.parent && districtIdsToSearch.includes(config.parent)) {
+        // This is a child of one of our districts
+        if (config.customer_internal_id) {
+          customerIds.add(config.customer_internal_id);
+          console.log(`   ✓ Customer found: ${config.label} (customer_internal_id: ${config.customer_internal_id})`);
+        } else {
+          console.warn(`   ⚠ Child ${id} (${config.label}) has no customer_internal_id`);
         }
       }
     }
     
-    return customerIds;
+    const finalCustomerIds = Array.from(customerIds);
+    console.log(`   📊 Total unique customer IDs: ${finalCustomerIds.length}`);
+    
+    return finalCustomerIds;
   }
 
   /**
