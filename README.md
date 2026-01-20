@@ -83,8 +83,14 @@ See [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) for detailed architecture doc
 - `GET /api/storage/list?prefix=` - List files in bucket
 - `GET /api/storage/download/:filename` - Download a file
 
-### P&L Data (Coming Soon)
-- `GET /api/pl/data` - Fetch P&L report data
+### Hierarchy Configuration
+- `GET /api/storage/districts` - Get districts and district tags
+- `GET /api/storage/regions` - Get regions and region tags
+- `GET /api/storage/departments` - Get departments/subsidiaries and tags
+
+### P&L Data
+- `GET /api/pl/dates` - Get available dates for date filter
+- `GET /api/pl/data` - Fetch P&L report data (coming soon)
 
 ## 🎨 Pages
 
@@ -139,8 +145,8 @@ curl http://localhost:3000/api/storage/download/account_config.json -O
 ## 📚 Documentation
 
 - [Architecture Guide](./docs/ARCHITECTURE.md) - System design and structure
+- [Hierarchy System](./docs/HIERARCHY_SYSTEM.md) - Districts, Regions, Subsidiaries
 - [Local Development](./LOCAL_DEVELOPMENT.md) - Dev environment setup
-- [API Documentation](./docs/API.md) - API reference (coming soon)
 
 ## 🛡️ Security
 

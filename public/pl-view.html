@@ -1055,23 +1055,41 @@
       });
     });
 
-    // Hierarchy tabs - switch between District, Region, Subsidiary
+    /**
+     * Hierarchy tabs - switch between District, Region, Subsidiary
+     * 
+     * When a tab is clicked:
+     * 1. Update active tab styling
+     * 2. Extract hierarchy type from tab text ("District", "Region", "Subsidiary")
+     * 3. Update the dropdown label to match the hierarchy type
+     * 4. Update the dropdown placeholder text
+     * 5. Load the appropriate data via API call
+     * 
+     * This creates a seamless UX where a single dropdown adapts to show:
+     * - Districts (44 items + 9 tags) when District tab is active
+     * - Regions (12 items) when Region tab is active
+     * - Subsidiaries (7 items) when Subsidiary tab is active
+     */
     document.querySelectorAll('.tab').forEach(tab => {
       tab.addEventListener('click', function() {
+        // Remove active state from all tabs
         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        // Add active state to clicked tab
         this.classList.add('active');
         
+        // Get hierarchy type from tab text (lowercase for API compatibility)
         const hierarchyType = this.textContent.toLowerCase();
         console.log('Hierarchy changed to:', hierarchyType);
         
-        // Update the dropdown label
+        // Update the dropdown label to match selected hierarchy
         const hierarchyLabel = document.querySelector('.control-group:nth-child(3) .control-label');
         hierarchyLabel.textContent = this.textContent;
         
         // Update the dropdown placeholder
         districtSelect.input.setAttribute('placeholder', `Select ${hierarchyType}...`);
         
-        // Load the appropriate hierarchy data
+        // Load the appropriate hierarchy data from API
+        // Maps to: /api/storage/districts, /api/storage/regions, or /api/storage/departments
         loadHierarchyOptions(hierarchyType);
       });
     });

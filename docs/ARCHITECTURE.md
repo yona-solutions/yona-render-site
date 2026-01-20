@@ -25,17 +25,22 @@ yona_render_site/
 │   │   ├── api.js                # API endpoints
 │   │   └── views.js              # HTML view routes
 │   ├── services/                 # Business logic layer
-│   │   └── storageService.js     # GCP Storage operations
+│   │   ├── storageService.js     # GCP Storage operations
+│   │   └── bigQueryService.js    # GCP BigQuery operations
 │   ├── middleware/               # Custom middleware (future)
 │   └── utils/                    # Utility functions (future)
 ├── public/                       # Static files (HTML, CSS, JS)
 │   ├── pl-view.html              # P&L reporting dashboard
 │   └── storage-browser.html      # GCP Storage file browser
 ├── docs/                         # Documentation
-│   └── ARCHITECTURE.md           # This file
+│   ├── ARCHITECTURE.md           # This file
+│   └── HIERARCHY_SYSTEM.md       # Hierarchy system documentation
 ├── server.js                     # Application entry point
 ├── package.json                  # Dependencies & scripts
 ├── render.yaml                   # Render deployment configuration
+├── LOCAL_DEVELOPMENT.md          # Local dev setup guide
+├── setup-local.sh                # Local setup script
+├── restart.sh                    # Server restart script
 └── README.md                     # Project overview
 
 ```
@@ -63,13 +68,21 @@ yona_render_site/
   - File listing with folder navigation
   - File download with streaming
   - Bucket operations
+  - Hierarchy configuration parsing (districts, regions, departments)
+- **bigQueryService.js**: Business logic for BigQuery
+  - Date range queries for P&L filters
 
 ### 5. Routes Layer (`src/routes/`)
 - **api.js**: REST API endpoints
   - `/api/health` - Health check
   - `/api/info` - Application info
-  - `/api/storage/*` - Storage operations
-  - `/api/pl/*` - P&L data (future)
+  - `/api/storage/list` - List files in bucket
+  - `/api/storage/download/:filename` - Download file
+  - `/api/storage/districts` - Get district hierarchy
+  - `/api/storage/regions` - Get region hierarchy
+  - `/api/storage/departments` - Get department hierarchy
+  - `/api/pl/dates` - Get available dates
+  - `/api/pl/data` - P&L data (future)
 - **views.js**: HTML page routes
   - `/` - P&L View dashboard
   - `/storage-browser` - File browser
@@ -107,6 +120,73 @@ Client renders page
     ↓
 Client makes API calls for data
 ```
+
+## Hierarchy System
+
+### Overview
+The application supports three hierarchical views for P&L reporting: Districts, Regions, and Subsidiaries. Users can toggle between these views via tabs in the UI.
+
+### Architecture
+
+**Frontend (public/pl-view.html)**
+- Three hierarchy tabs: District, Region, Subsidiary
+- Single searchable dropdown that dynamically changes content
+- JavaScript handlers for tab switching and data loading
+
+**Backend (src/services/storageService.js)**
+- `getDistricts()` - Parses customer_config.json
+- `getRegions()` - Parses region_config.json
+- `getDepartments()` - Parses department_config.json
+
+**API Endpoints (src/routes/api.js)**
+- `GET /api/storage/districts` - Returns districts + tags
+- `GET /api/storage/regions` - Returns regions + tags
+- `GET /api/storage/departments` - Returns departments + tags
+
+### Data Sources
+
+All configuration files stored in GCP Storage bucket: `dimension_configurations`
+
+1. **customer_config.json** - District configurations
+   - Filter: `isDistrict === true && !districtReportingExcluded && !displayExcluded`
+   - Returns: 44 districts + 9 tag values
+
+2. **region_config.json** - Region configurations
+   - Filter: `parent === '2' && !displayExcluded && !operationalExcluded`
+   - Returns: 12 regions (leaf nodes only)
+
+3. **department_config.json** - Subsidiary configurations
+   - Filter: `parent === '2' && !displayExcluded && !operationalExcluded`
+   - Returns: 7 departments (leaf nodes only)
+
+### Tag System
+
+Tags are string values in the `tags` field of config entries. They represent groupings that can span multiple hierarchy items.
+
+- Tags are extracted from ALL entries in config files
+- Deduplicated using Set()
+- Added to dropdown with `tag_` ID prefix
+- Currently only districts have tag values (9 tags)
+
+### Response Format
+
+All hierarchy endpoints return:
+```json
+[
+  {
+    "id": "1971",
+    "label": "District 101 - John Miller",
+    "type": "district"
+  },
+  {
+    "id": "tag_District 121",
+    "label": "District 121",
+    "type": "tag"
+  }
+]
+```
+
+See [HIERARCHY_SYSTEM.md](./HIERARCHY_SYSTEM.md) for detailed documentation.
 
 ## Key Design Decisions
 
