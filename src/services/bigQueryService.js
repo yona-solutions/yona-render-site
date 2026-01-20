@@ -201,10 +201,11 @@ class BigQueryService {
   transformToArrayFormat(rows, accountConfig) {
     // Build reverse mapping: account_internal_id -> label
     const accountIdToLabel = {};
-    for (const label in accountConfig) {
-      const id = accountConfig[label]?.account_internal_id;
+    for (const configId in accountConfig) {
+      const config = accountConfig[configId];
+      const id = config?.account_internal_id;
       if (id != null) {
-        accountIdToLabel[id] = label;
+        accountIdToLabel[id] = config.label;  // Map to the actual label, not config ID
       }
     }
 

@@ -573,8 +573,7 @@
     /* P&L Report Styles */
     .pnl-content-container {
       overflow: auto;
-      max-height: calc(100vh - 200px);
-      min-height: 600px;
+      max-height: calc(100vh - 250px);
       background: white;
       border-radius: 4px;
       padding: 20px;
@@ -768,6 +767,164 @@
       </div>
       <div class="pnl-content-container" id="pnlContent">
         <!-- P&L HTML rendered here -->
+      </div>
+    </div>
+              <td>249,778</td>
+              <td>54.2%</td>
+              <td>227,773</td>
+              <td>54.8%</td>
+              <td>22,005</td>
+              <td>2,800,160</td>
+              <td>54.6%</td>
+              <td>2,733,281</td>
+              <td>54.8%</td>
+              <td>66,879</td>
+            </tr>
+            <tr>
+              <td class="row-indent-1">40300 Revenue - Laundry Wages</td>
+              <td>167,177</td>
+              <td>36.3%</td>
+              <td>150,338</td>
+              <td>36.2%</td>
+              <td>16,839</td>
+              <td>1,851,385</td>
+              <td>36.1%</td>
+              <td>1,804,052</td>
+              <td>36.2%</td>
+              <td>47,333</td>
+            </tr>
+            <tr>
+              <td class="row-indent-1">40375 Revenue - Administration</td>
+              <td>8,691</td>
+              <td>1.9%</td>
+              <td>7,851</td>
+              <td>1.9%</td>
+              <td>840</td>
+              <td>96,535</td>
+              <td>1.9%</td>
+              <td>94,212</td>
+              <td>1.9%</td>
+              <td>2,323</td>
+            </tr>
+            <tr>
+              <td class="row-indent-1">40200 Revenue - Housekeeping Supplies</td>
+              <td>12,609</td>
+              <td>2.7%</td>
+              <td>10,785</td>
+              <td>2.6%</td>
+              <td>1,824</td>
+              <td>133,072</td>
+              <td>2.6%</td>
+              <td>129,425</td>
+              <td>2.6%</td>
+              <td>3,647</td>
+            </tr>
+            <tr>
+              <td class="row-indent-1">40400 Revenue - Laundry Supplies</td>
+              <td>20,223</td>
+              <td>4.4%</td>
+              <td>18,931</td>
+              <td>4.6%</td>
+              <td>1,292</td>
+              <td>231,797</td>
+              <td>4.5%</td>
+              <td>227,167</td>
+              <td>4.6%</td>
+              <td>4,630</td>
+            </tr>
+            <tr>
+              <td class="row-indent-1">40500 Revenue - BCR Labor</td>
+              <td>2,617</td>
+              <td>0.6%</td>
+              <td class="empty-cell">-</td>
+              <td class="empty-cell">-</td>
+              <td>2,617</td>
+              <td>11,039</td>
+              <td>0.2%</td>
+              <td class="empty-cell">-</td>
+              <td class="empty-cell">-</td>
+              <td>11,039</td>
+            </tr>
+            <tr>
+              <td class="row-indent-1">40600 Revenue - BCR Supplies & Materials</td>
+              <td class="empty-cell">-</td>
+              <td class="empty-cell">-</td>
+              <td class="empty-cell">-</td>
+              <td class="empty-cell">-</td>
+              <td class="empty-cell">-</td>
+              <td>848</td>
+              <td>0.0%</td>
+              <td class="empty-cell">-</td>
+              <td class="empty-cell">-</td>
+              <td>848</td>
+            </tr>
+            <tr class="section-total">
+              <td>Income</td>
+              <td>461,095</td>
+              <td>100.0%</td>
+              <td>415,678</td>
+              <td>100.0%</td>
+              <td>45,417</td>
+              <td>5,124,837</td>
+              <td>100.0%</td>
+              <td>4,988,137</td>
+              <td>100.0%</td>
+              <td>136,700</td>
+            </tr>
+            <tr class="row-header">
+              <td>COST OF GOODS SOLD</td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+            </tr>
+            <tr>
+              <td class="row-indent-1">51100 Labor</td>
+              <td>108,486</td>
+              <td>23.5%</td>
+              <td>232,868</td>
+              <td>56.0%</td>
+              <td class="negative">(124,383)</td>
+              <td>2,503,706</td>
+              <td>48.9%</td>
+              <td>2,704,294</td>
+              <td>54.2%</td>
+              <td class="negative">(200,588)</td>
+            </tr>
+            <tr>
+              <td class="row-indent-1">51125 Labor Management</td>
+              <td>20,293</td>
+              <td>4.4%</td>
+              <td>48,870</td>
+              <td>11.8%</td>
+              <td class="negative">(28,577)</td>
+              <td>525,244</td>
+              <td>10.2%</td>
+              <td>575,406</td>
+              <td>11.5%</td>
+              <td class="negative">(50,161)</td>
+            </tr>
+            <tr>
+              <td class="row-indent-1">51150 Labor Overtime</td>
+              <td>16,132</td>
+              <td>3.5%</td>
+              <td class="empty-cell">-</td>
+              <td class="empty-cell">-</td>
+              <td>16,132</td>
+              <td>170,319</td>
+              <td>3.3%</td>
+              <td class="empty-cell">-</td>
+              <td class="empty-cell">-</td>
+              <td>170,319</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
   </div>

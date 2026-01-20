@@ -150,8 +150,8 @@ function generateHeader(meta) {
  * 
  * @param {string} accountLabel - Account to render
  * @param {number} level - Indentation level
- * @param {Object} accountConfig - Account configuration
- * @param {Object} childrenMap - Map of parent -> children
+ * @param {Object} labelToConfig - Map of label -> account config
+ * @param {Object} childrenMap - Map of parent label -> children labels
  * @param {Object} valMonthAct - Month actuals by account
  * @param {Object} valMonthBud - Month budget by account
  * @param {Object} valYtdAct - YTD actuals by account
@@ -164,7 +164,7 @@ function generateHeader(meta) {
 function renderAccountRows(
   accountLabel,
   level,
-  accountConfig,
+  labelToConfig,
   childrenMap,
   valMonthAct,
   valMonthBud,
@@ -177,7 +177,7 @@ function renderAccountRows(
   let html = '';
   const INDENT = 8;
   
-  const cfg = accountConfig[accountLabel] || {};
+  const cfg = labelToConfig[accountLabel] || {};
   const kids = childrenMap[accountLabel] || [];
   
   // Check if excluded
@@ -189,7 +189,7 @@ function renderAccountRows(
     // Still render children
     kids.forEach(c => {
       html += renderAccountRows(
-        c, level, accountConfig, childrenMap, valMonthAct, valMonthBud,
+        c, level, labelToConfig, childrenMap, valMonthAct, valMonthBud,
         valYtdAct, valYtdBud, incomeTotals, isOperational, sectionAccounts
       );
     });
@@ -201,18 +201,19 @@ function renderAccountRows(
   const ytdA = valYtdAct[accountLabel] || 0;
   const ytdB = valYtdBud[accountLabel] || 0;
   
-  // Skip if no values
-  if (Math.abs(act + ytdA) < 0.0001) {
-    return html;
-  }
-  
   // Render children first (they appear below parent)
+  // Children are rendered even if parent has zero value
   kids.forEach(c => {
     html += renderAccountRows(
-      c, level + 1, accountConfig, childrenMap, valMonthAct, valMonthBud,
+      c, level + 1, labelToConfig, childrenMap, valMonthAct, valMonthBud,
       valYtdAct, valYtdBud, incomeTotals, isOperational, sectionAccounts
     );
   });
+  
+  // Skip rendering this account if it has no values
+  if (Math.abs(act + ytdA) < 0.0001) {
+    return html;
+  }
   
   // Apply double lines if configured
   const borderStyle = cfg.doubleLines 
@@ -262,6 +263,15 @@ function renderAccountRows(
 async function generatePNLReport(monthData, ytdData, meta, accountConfig, childrenMap, sectionConfig) {
   const isOperational = meta.plType === 'Operational';
   
+  // Build label-to-config map for efficient lookups
+  const labelToConfig = {};
+  for (const configId in accountConfig) {
+    const config = accountConfig[configId];
+    if (config.label) {
+      labelToConfig[config.label] = config;
+    }
+  }
+  
   // Build totals by scenario
   const monthActuals = accountService.buildAccountTotals(monthData, 'Actuals');
   const monthBudget = accountService.buildAccountTotals(monthData, 'Budget');
@@ -304,6 +314,14 @@ async function generatePNLReport(monthData, ytdData, meta, accountConfig, childr
   for (const section of Object.keys(sectionConfig)) {
     const accounts = sectionConfig[section].accounts || [];
     
+    console.log(`\n📋 Rendering section: ${section}`);
+    console.log(`   Section accounts: ${accounts.join(', ')}`);
+    console.log(`   Sample values for first account "${accounts[0]}":`);
+    console.log(`     - Month Actuals: ${valMonthAct[accounts[0]] || 0}`);
+    console.log(`     - Month Budget: ${valMonthBud[accounts[0]] || 0}`);
+    console.log(`     - Has children: ${(childrenMap[accounts[0]] || []).length > 0}`);
+    console.log(`     - Children: ${(childrenMap[accounts[0]] || []).slice(0, 3).join(', ')}`);
+    
     rowsHtml += `
       <tr>
         <td colspan="12" style="font-weight:700; text-decoration:underline; text-transform:uppercase; padding-top: 12px;">
@@ -313,10 +331,12 @@ async function generatePNLReport(monthData, ytdData, meta, accountConfig, childr
     `;
     
     accounts.forEach(acct => {
-      rowsHtml += renderAccountRows(
-        acct, 1, accountConfig, childrenMap, valMonthAct, valMonthBud,
+      const accountRows = renderAccountRows(
+        acct, 1, labelToConfig, childrenMap, valMonthAct, valMonthBud,
         valYtdAct, valYtdBud, incomeTotals, isOperational, sectionAccounts
       );
+      console.log(`   ${acct} generated ${accountRows.length} chars of HTML`);
+      rowsHtml += accountRows;
     });
   }
   

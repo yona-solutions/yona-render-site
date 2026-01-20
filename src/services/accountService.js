@@ -25,21 +25,30 @@ const SECTION_CONFIG = {
 };
 
 /**
- * Builds a map of parent account IDs to their children
+ * Builds a map of parent account LABELS to their children LABELS
  * 
  * @param {Object} accountConfig - The account configuration object
- * @returns {Object} Map of parentId -> [childId, childId, ...]
+ * @returns {Object} Map of parentLabel -> [childLabel, childLabel, ...]
  */
 function buildChildrenMap(accountConfig) {
   const childrenMap = {};
   
-  for (const acctId in accountConfig) {
-    const parent = accountConfig[acctId]?.parent;
-    if (parent) {
-      if (!childrenMap[parent]) {
-        childrenMap[parent] = [];
+  for (const configId in accountConfig) {
+    const config = accountConfig[configId];
+    const parentConfigId = config?.parent;
+    
+    if (parentConfigId) {
+      // Get parent's label
+      const parentLabel = accountConfig[parentConfigId]?.label;
+      // Get this account's label
+      const childLabel = config.label;
+      
+      if (parentLabel && childLabel) {
+        if (!childrenMap[parentLabel]) {
+          childrenMap[parentLabel] = [];
+        }
+        childrenMap[parentLabel].push(childLabel);
       }
-      childrenMap[parent].push(acctId);
     }
   }
   
@@ -86,13 +95,22 @@ function buildAccountTotals(data, scenario) {
  * Respects displayExcluded and operationalExcluded flags
  * 
  * @param {Object} rawTotals - Raw account totals (no rollups yet)
- * @param {Object} accountConfig - Account configuration
- * @param {Object} childrenMap - Map of parent -> children
+ * @param {Object} accountConfig - Account configuration (keyed by config ID)
+ * @param {Object} childrenMap - Map of parent label -> children labels
  * @param {boolean} isOperational - Whether this is an operational P&L (affects exclusions)
  * @returns {Object} Map of account label -> rolled up total value
  */
 function computeRollups(rawTotals, accountConfig, childrenMap, isOperational = false) {
   const totals = {};
+  
+  // Build a reverse map: label -> config
+  const labelToConfig = {};
+  for (const configId in accountConfig) {
+    const config = accountConfig[configId];
+    if (config.label) {
+      labelToConfig[config.label] = config;
+    }
+  }
   
   function compute(acctLabel) {
     // Already computed
@@ -106,7 +124,7 @@ function computeRollups(rawTotals, accountConfig, childrenMap, isOperational = f
     // Add children's rolled-up values
     const children = childrenMap[acctLabel] || [];
     for (const childLabel of children) {
-      const childConfig = accountConfig[childLabel] || {};
+      const childConfig = labelToConfig[childLabel] || {};
       
       // Determine if we should exclude this child from rollup
       const shouldExclude = isOperational 
@@ -125,8 +143,8 @@ function computeRollups(rawTotals, accountConfig, childrenMap, isOperational = f
     return total;
   }
   
-  // Compute all accounts
-  Object.keys(accountConfig).forEach(compute);
+  // Compute all account labels
+  Object.keys(labelToConfig).forEach(compute);
   
   return totals;
 }
