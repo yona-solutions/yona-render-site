@@ -596,6 +596,24 @@ router.get('/email-config/health', async (req, res) => {
 router.post('/report-schedules/:id/send-email', async (req, res) => {
   try {
     const { id } = req.params;
+    const { recipientEmail } = req.body;
+
+    // Validate recipient email
+    if (!recipientEmail || !recipientEmail.trim()) {
+      return res.status(400).json({
+        error: 'Recipient email required',
+        message: 'Please provide a recipient email address'
+      });
+    }
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(recipientEmail)) {
+      return res.status(400).json({
+        error: 'Invalid email address',
+        message: 'Please provide a valid email address'
+      });
+    }
 
     // Check if email service is available
     if (!emailService.isAvailable()) {
@@ -764,10 +782,8 @@ router.post('/report-schedules/:id/send-email', async (req, res) => {
     const pdfBuffer = Buffer.from(await pdfResponse.arrayBuffer());
     console.log(`   PDF generated: ${(pdfBuffer.length / 1024).toFixed(1)} KB`);
 
-    // Get recipient email (hardcoded for now)
-    const recipientEmail = process.env.RECIPIENT_EMAIL || 'eaadler9@gmail.com';
-
-    // Send email with PDF attachment
+    // Send email with PDF attachment (using recipient from request body)
+    console.log(`   Sending to: ${recipientEmail}`);
     const result = await emailService.sendPDFEmail(schedule, pdfBuffer, recipientEmail, latestDate);
 
     console.log(`✅ Email sent successfully`);
