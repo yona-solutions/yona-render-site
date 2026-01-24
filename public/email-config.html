@@ -1778,6 +1778,7 @@
         console.log('📥 Starting PDF download for schedule:', schedule.template_name);
         
         // Get the most recent date available
+        console.log('📅 Fetching available dates...');
         const datesResponse = await fetch('/api/pl/dates');
         if (!datesResponse.ok) throw new Error('Failed to fetch dates');
         const dates = await datesResponse.json();
@@ -1785,18 +1786,28 @@
           alert('No P&L data available');
           return;
         }
-        const latestDate = dates[0]; // Assuming dates are sorted newest first
+        // Extract the date string from the object (dates have { time: "2025-12-01", formatted: "2025-12-01" })
+        const latestDate = dates[0].time || dates[0].formatted;
+        console.log('📅 Latest date:', latestDate);
         
         console.log('📊 Fetching P&L data...');
+        console.log('   Hierarchy:', schedule.template_type);
+        console.log('   Entity ID:', entityId);
+        console.log('   Date:', latestDate);
+        
         // Fetch P&L data
         const dataUrl = `/api/pl/data?hierarchy=${schedule.template_type}&selectedId=${encodeURIComponent(entityId)}&date=${latestDate}`;
+        console.log('   URL:', dataUrl);
         const dataResponse = await fetch(dataUrl);
         
         if (!dataResponse.ok) {
-          throw new Error('Failed to fetch P&L data');
+          const errorText = await dataResponse.text();
+          console.error('❌ P&L data fetch failed:', dataResponse.status, errorText);
+          throw new Error(`Failed to fetch P&L data: ${dataResponse.status}`);
         }
         
         const htmlContent = await dataResponse.text();
+        console.log('✅ Received HTML content, length:', htmlContent.length);
         
         if (!htmlContent || !htmlContent.trim()) {
           alert('No report data available for the selected configuration');
