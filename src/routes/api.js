@@ -1162,6 +1162,26 @@ function createApiRoutes(storageService, bigQueryService) {
   });
 
   /**
+   * GET /api/customers
+   * 
+   * Get all customers from dim_customers table
+   * 
+   * Response: Array of {customer_id, display_name, display_name_with_id}
+   */
+  router.get('/customers', async (req, res) => {
+    try {
+      const customers = await bigQueryService.getCustomers();
+      res.json(customers);
+    } catch (error) {
+      console.error('Error fetching customers:', error);
+      res.status(500).json({ 
+        error: 'Failed to fetch customers',
+        code: 'CUSTOMERS_FETCH_ERROR'
+      });
+    }
+  });
+
+  /**
    * PUT /api/config/:dimension
    * 
    * Save configuration for a specific dimension
