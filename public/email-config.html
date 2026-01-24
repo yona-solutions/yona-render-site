@@ -498,6 +498,91 @@
     @keyframes spin {
       to { transform: rotate(360deg); }
     }
+
+    /* Inline Editing Styles */
+    .inline-input, .inline-select {
+      width: 100%;
+      padding: 6px 10px;
+      border: 1px solid #e2e8f0;
+      border-radius: 4px;
+      font-size: 13px;
+      font-family: inherit;
+      background: white;
+      transition: all 0.15s ease;
+    }
+
+    .inline-input:focus, .inline-select:focus {
+      outline: none;
+      border-color: #5a6fd8;
+      box-shadow: 0 0 0 2px rgba(90, 111, 216, 0.1);
+    }
+
+    .inline-input:hover, .inline-select:hover {
+      border-color: #cbd5e0;
+    }
+
+    /* Toggle Switch */
+    .toggle-switch {
+      position: relative;
+      display: inline-block;
+      width: 44px;
+      height: 24px;
+    }
+
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .toggle-slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #cbd5e0;
+      transition: 0.3s;
+      border-radius: 24px;
+    }
+
+    .toggle-slider:before {
+      position: absolute;
+      content: "";
+      height: 18px;
+      width: 18px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: 0.3s;
+      border-radius: 50%;
+    }
+
+    input:checked + .toggle-slider {
+      background-color: #48bb78;
+    }
+
+    input:checked + .toggle-slider:before {
+      transform: translateX(20px);
+    }
+
+    /* Saving Indicator */
+    .saving-indicator {
+      display: inline-block;
+      margin-left: 8px;
+      font-size: 11px;
+      color: #718096;
+      font-style: italic;
+    }
+
+    .saving-indicator.success {
+      color: #48bb78;
+    }
+
+    .saving-indicator.error {
+      color: #f56565;
+    }
   </style>
 </head>
 <body>
@@ -570,7 +655,7 @@
             <h2>📊 Report Schedules</h2>
             <div class="subtitle">Configure automated P&L report delivery</div>
           </div>
-          <button class="btn btn-primary" onclick="openReportScheduleModal()">
+          <button class="btn btn-primary" onclick="addNewReportSchedule()">
             ➕ New Report Schedule
           </button>
         </div>
@@ -579,18 +664,20 @@
           <table id="reportSchedulesTable">
             <thead>
               <tr>
-                <th>Report Type</th>
-                <th>Hierarchy</th>
-                <th>Entity</th>
-                <th>Email Group</th>
-                <th>Frequency</th>
-                <th>Status</th>
-                <th>Actions</th>
+                <th style="width: 180px;">Template Name</th>
+                <th style="width: 120px;">Template Type</th>
+                <th style="width: 110px;">Process</th>
+                <th style="width: 180px;">District</th>
+                <th style="width: 180px;">Region</th>
+                <th style="width: 180px;">Subsidiary</th>
+                <th style="width: 150px;">Email Group</th>
+                <th style="width: 80px;">Enabled</th>
+                <th style="width: 60px;">Actions</th>
               </tr>
             </thead>
             <tbody id="reportSchedulesBody">
               <tr>
-                <td colspan="7">
+                <td colspan="9">
                   <div class="loading">
                     <div class="loading-spinner"></div>
                     <p>Loading report schedules...</p>
@@ -647,77 +734,6 @@
     </div>
   </div>
 
-  <!-- Report Schedule Modal -->
-  <div class="modal" id="reportScheduleModal">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h3 id="reportScheduleModalTitle">Create Report Schedule</h3>
-        <button class="modal-close" onclick="closeReportScheduleModal()">×</button>
-      </div>
-      <div class="modal-body">
-        <form id="reportScheduleForm">
-          <input type="hidden" id="scheduleId">
-          
-          <div class="form-group">
-            <label for="reportType">Report Type *</label>
-            <select id="reportType" required>
-              <option value="">Select report type...</option>
-              <option value="standard">Standard P&L</option>
-              <option value="operational">Operational P&L</option>
-            </select>
-          </div>
-
-          <div class="form-group">
-            <label for="hierarchy">Hierarchy Level *</label>
-            <select id="hierarchy" required onchange="loadEntitiesForHierarchy()">
-              <option value="">Select hierarchy...</option>
-              <option value="district">District</option>
-              <option value="region">Region</option>
-              <option value="subsidiary">Subsidiary</option>
-            </select>
-          </div>
-
-          <div class="form-group">
-            <label for="entityId">Entity *</label>
-            <select id="entityId" required disabled>
-              <option value="">Select hierarchy first...</option>
-            </select>
-            <div class="form-help">Select a hierarchy level to load available entities</div>
-          </div>
-
-          <div class="form-group">
-            <label for="emailGroupId">Email Group *</label>
-            <select id="emailGroupId" required>
-              <option value="">Select email group...</option>
-            </select>
-          </div>
-
-          <div class="form-group">
-            <label for="frequency">Frequency *</label>
-            <select id="frequency" required>
-              <option value="">Select frequency...</option>
-              <option value="monthly">Monthly</option>
-              <option value="weekly">Weekly</option>
-              <option value="daily">Daily</option>
-            </select>
-            <div class="form-help">How often this report should be sent</div>
-          </div>
-
-          <div class="form-group">
-            <label for="scheduleStatus">Status *</label>
-            <select id="scheduleStatus" required>
-              <option value="active">Active</option>
-              <option value="paused">Paused</option>
-            </select>
-          </div>
-        </form>
-      </div>
-      <div class="modal-footer">
-        <button class="btn btn-secondary" onclick="closeReportScheduleModal()">Cancel</button>
-        <button class="btn btn-primary" onclick="saveReportSchedule()">Save Schedule</button>
-      </div>
-    </div>
-  </div>
 
   <script>
     // ============================================
@@ -728,13 +744,22 @@
     let currentEmailList = [];
     let editingEmailGroupId = null;
     let editingScheduleId = null;
+    
+    // Hierarchy options
+    let districtOptions = [];
+    let regionOptions = [];
+    let subsidiaryOptions = [];
 
     // ============================================
     // Initialization
     // ============================================
-    document.addEventListener('DOMContentLoaded', () => {
-      loadEmailGroups();
-      loadReportSchedules();
+    document.addEventListener('DOMContentLoaded', async () => {
+      // Load all data in parallel
+      await Promise.all([
+        loadEmailGroups(),
+        loadHierarchyOptions(),
+        loadReportSchedules()
+      ]);
       
       // Allow adding email with Enter key
       document.getElementById('newEmail').addEventListener('keypress', (e) => {
@@ -775,39 +800,55 @@
       }
     }
 
-    async function loadEntitiesForHierarchy() {
-      const hierarchy = document.getElementById('hierarchy').value;
-      const entitySelect = document.getElementById('entityId');
-      
-      if (!hierarchy) {
-        entitySelect.disabled = true;
-        entitySelect.innerHTML = '<option value="">Select hierarchy first...</option>';
-        return;
-      }
-
+    async function loadHierarchyOptions() {
       try {
-        entitySelect.disabled = true;
-        entitySelect.innerHTML = '<option value="">Loading...</option>';
-        
-        const response = await fetch(`/api/storage/${hierarchy}s`);
-        if (!response.ok) throw new Error('Failed to load entities');
-        
-        const entities = await response.json();
-        
-        entitySelect.innerHTML = '<option value="">Select entity...</option>';
-        entities.forEach(entity => {
-          const option = document.createElement('option');
-          option.value = entity.id;
-          option.textContent = entity.label || entity.name;
-          entitySelect.appendChild(option);
+        // Load districts, regions, and subsidiaries in parallel
+        const [districts, regions, subsidiaries] = await Promise.all([
+          fetch('/api/storage/districts').then(r => r.json()),
+          fetch('/api/storage/regions').then(r => r.json()),
+          fetch('/api/storage/departments').then(r => r.json())
+        ]);
+
+        // Filter districts (exclude ones with 'not available' tag)
+        districtOptions = Object.entries(districts)
+          .filter(([id, data]) => {
+            if (data.districtReportingExcluded) return false;
+            if (data.tags && data.tags.includes('not available')) return false;
+            return true;
+          })
+          .map(([id, data]) => ({
+            id: id,
+            label: data.label || id,
+            isTag: data.isDistrict || false,
+            tags: data.tags || []
+          }));
+
+        // Filter regions (exclude ones with displayExcluded)
+        regionOptions = Object.entries(regions)
+          .filter(([id, data]) => !data.displayExcluded)
+          .map(([id, data]) => ({
+            id: id,
+            label: data.label || id
+          }));
+
+        // Filter subsidiaries (exclude ones with displayExcluded)
+        subsidiaryOptions = Object.entries(subsidiaries)
+          .filter(([id, data]) => !data.displayExcluded)
+          .map(([id, data]) => ({
+            id: id,
+            label: data.label || id
+          }));
+
+        console.log('📊 Loaded hierarchy options:', {
+          districts: districtOptions.length,
+          regions: regionOptions.length,
+          subsidiaries: subsidiaryOptions.length
         });
-        
-        entitySelect.disabled = false;
       } catch (error) {
-        console.error('Error loading entities:', error);
-        entitySelect.innerHTML = '<option value="">Error loading entities</option>';
+        console.error('Error loading hierarchy options:', error);
       }
     }
+
 
     // ============================================
     // Render Functions
@@ -847,19 +888,123 @@
 
       tbody.innerHTML = reportSchedules.map(schedule => {
         const group = emailGroups.find(g => g.id === schedule.email_group_id);
-        const statusColor = schedule.status === 'active' ? '#48bb78' : '#ecc94b';
         
         return `
-          <tr>
-            <td>${escapeHtml(schedule.report_type)}</td>
-            <td>${escapeHtml(schedule.hierarchy)}</td>
-            <td>${escapeHtml(schedule.entity_name || schedule.entity_id)}</td>
-            <td>${escapeHtml(group?.name || 'Unknown')}</td>
-            <td>${escapeHtml(schedule.frequency)}</td>
-            <td><span class="badge" style="background: ${statusColor}; color: white;">${escapeHtml(schedule.status)}</span></td>
+          <tr data-schedule-id="${schedule.id}">
+            <!-- Template Name -->
+            <td>
+              <input 
+                type="text" 
+                class="inline-input" 
+                value="${escapeHtml(schedule.template_name || '')}"
+                onchange="updateScheduleField(${schedule.id}, 'template_name', this.value)"
+                placeholder="Enter name..."
+              />
+            </td>
+            
+            <!-- Template Type -->
+            <td>
+              <select 
+                class="inline-select" 
+                onchange="updateScheduleField(${schedule.id}, 'template_type', this.value)"
+              >
+                <option value="">Select...</option>
+                <option value="district" ${schedule.template_type === 'district' ? 'selected' : ''}>District</option>
+                <option value="region" ${schedule.template_type === 'region' ? 'selected' : ''}>Region</option>
+                <option value="subsidiary" ${schedule.template_type === 'subsidiary' ? 'selected' : ''}>Subsidiary</option>
+              </select>
+            </td>
+            
+            <!-- Process -->
+            <td>
+              <select 
+                class="inline-select" 
+                onchange="updateScheduleField(${schedule.id}, 'process', this.value)"
+              >
+                <option value="">Select...</option>
+                <option value="standard" ${schedule.process === 'standard' ? 'selected' : ''}>Standard</option>
+                <option value="operational" ${schedule.process === 'operational' ? 'selected' : ''}>Operational</option>
+              </select>
+            </td>
+            
+            <!-- District -->
+            <td>
+              <select 
+                class="inline-select" 
+                onchange="updateScheduleField(${schedule.id}, 'district_id', this.value)"
+                ${schedule.template_type !== 'district' ? 'disabled style="background: #f7fafc;"' : ''}
+              >
+                <option value="">—</option>
+                ${districtOptions.map(opt => `
+                  <option value="${opt.id}" ${schedule.district_id === opt.id ? 'selected' : ''}>
+                    ${escapeHtml(opt.label)}${opt.isTag ? ' (tag)' : ''}
+                  </option>
+                `).join('')}
+              </select>
+            </td>
+            
+            <!-- Region -->
+            <td>
+              <select 
+                class="inline-select" 
+                onchange="updateScheduleField(${schedule.id}, 'region_id', this.value)"
+                ${schedule.template_type !== 'region' ? 'disabled style="background: #f7fafc;"' : ''}
+              >
+                <option value="">—</option>
+                ${regionOptions.map(opt => `
+                  <option value="${opt.id}" ${schedule.region_id === opt.id ? 'selected' : ''}>
+                    ${escapeHtml(opt.label)}
+                  </option>
+                `).join('')}
+              </select>
+            </td>
+            
+            <!-- Subsidiary -->
+            <td>
+              <select 
+                class="inline-select" 
+                onchange="updateScheduleField(${schedule.id}, 'subsidiary_id', this.value)"
+                ${schedule.template_type !== 'subsidiary' ? 'disabled style="background: #f7fafc;"' : ''}
+              >
+                <option value="">—</option>
+                ${subsidiaryOptions.map(opt => `
+                  <option value="${opt.id}" ${schedule.subsidiary_id === opt.id ? 'selected' : ''}>
+                    ${escapeHtml(opt.label)}
+                  </option>
+                `).join('')}
+              </select>
+            </td>
+            
+            <!-- Email Group -->
+            <td>
+              <select 
+                class="inline-select" 
+                onchange="updateScheduleField(${schedule.id}, 'email_group_id', this.value)"
+              >
+                <option value="">Select...</option>
+                ${emailGroups.map(g => `
+                  <option value="${g.id}" ${schedule.email_group_id === g.id ? 'selected' : ''}>
+                    ${escapeHtml(g.name)}
+                  </option>
+                `).join('')}
+              </select>
+            </td>
+            
+            <!-- Enabled Toggle -->
+            <td style="text-align: center;">
+              <label class="toggle-switch">
+                <input 
+                  type="checkbox" 
+                  ${schedule.enabled ? 'checked' : ''}
+                  onchange="updateScheduleField(${schedule.id}, 'enabled', this.checked)"
+                />
+                <span class="toggle-slider"></span>
+              </label>
+            </td>
+            
+            <!-- Actions -->
             <td>
               <div class="action-buttons">
-                <button class="icon-btn" onclick="editReportSchedule(${schedule.id})" title="Edit">✏️</button>
                 <button class="icon-btn danger" onclick="deleteReportSchedule(${schedule.id})" title="Delete">🗑️</button>
               </div>
             </td>
@@ -1038,97 +1183,100 @@
     }
 
     // ============================================
-    // Report Schedule Modal Functions
+    // Report Schedule Inline Editing Functions
     // ============================================
     
-    function openReportScheduleModal() {
-      editingScheduleId = null;
-      
-      document.getElementById('reportScheduleModalTitle').textContent = 'Create Report Schedule';
-      document.getElementById('reportScheduleForm').reset();
-      document.getElementById('scheduleId').value = '';
-      document.getElementById('entityId').disabled = true;
-      
-      // Populate email groups dropdown
-      const groupSelect = document.getElementById('emailGroupId');
-      groupSelect.innerHTML = '<option value="">Select email group...</option>' +
-        emailGroups.map(g => `<option value="${g.id}">${escapeHtml(g.name)}</option>`).join('');
-      
-      document.getElementById('reportScheduleModal').classList.add('active');
-    }
-
-    function closeReportScheduleModal() {
-      document.getElementById('reportScheduleModal').classList.remove('active');
-    }
-
-    async function editReportSchedule(id) {
-      const schedule = reportSchedules.find(s => s.id === id);
-      if (!schedule) return;
-
-      editingScheduleId = id;
-      
-      document.getElementById('reportScheduleModalTitle').textContent = 'Edit Report Schedule';
-      document.getElementById('scheduleId').value = schedule.id;
-      document.getElementById('reportType').value = schedule.report_type;
-      document.getElementById('hierarchy').value = schedule.hierarchy;
-      document.getElementById('frequency').value = schedule.frequency;
-      document.getElementById('scheduleStatus').value = schedule.status;
-      
-      // Load entities for the hierarchy
-      await loadEntitiesForHierarchy();
-      document.getElementById('entityId').value = schedule.entity_id;
-      
-      // Populate email groups dropdown
-      const groupSelect = document.getElementById('emailGroupId');
-      groupSelect.innerHTML = '<option value="">Select email group...</option>' +
-        emailGroups.map(g => `<option value="${g.id}">${escapeHtml(g.name)}</option>`).join('');
-      groupSelect.value = schedule.email_group_id;
-      
-      document.getElementById('reportScheduleModal').classList.add('active');
-    }
-
-    async function saveReportSchedule() {
-      const reportType = document.getElementById('reportType').value;
-      const hierarchy = document.getElementById('hierarchy').value;
-      const entityId = document.getElementById('entityId').value;
-      const emailGroupId = document.getElementById('emailGroupId').value;
-      const frequency = document.getElementById('frequency').value;
-      const status = document.getElementById('scheduleStatus').value;
-      
-      if (!reportType || !hierarchy || !entityId || !emailGroupId || !frequency || !status) {
-        alert('Please fill in all required fields');
-        return;
-      }
-
-      const data = {
-        report_type: reportType,
-        hierarchy,
-        entity_id: entityId,
-        email_group_id: parseInt(emailGroupId),
-        frequency,
-        status
+    async function addNewReportSchedule() {
+      // Create a new empty schedule
+      const newSchedule = {
+        template_name: 'New Report Schedule',
+        template_type: '',
+        process: '',
+        district_id: null,
+        region_id: null,
+        subsidiary_id: null,
+        email_group_id: null,
+        enabled: true
       };
 
       try {
-        const url = editingScheduleId 
-          ? `/api/report-schedules/${editingScheduleId}`
-          : '/api/report-schedules';
-        
-        const method = editingScheduleId ? 'PUT' : 'POST';
-        
-        const response = await fetch(url, {
-          method,
+        const response = await fetch('/api/report-schedules', {
+          method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data)
+          body: JSON.stringify(newSchedule)
         });
 
-        if (!response.ok) throw new Error('Failed to save report schedule');
+        if (!response.ok) throw new Error('Failed to create report schedule');
 
-        closeReportScheduleModal();
-        loadReportSchedules();
+        await loadReportSchedules();
       } catch (error) {
-        console.error('Error saving report schedule:', error);
-        alert('Failed to save report schedule: ' + error.message);
+        console.error('Error creating report schedule:', error);
+        alert('Failed to create report schedule: ' + error.message);
+      }
+    }
+
+    async function updateScheduleField(scheduleId, fieldName, value) {
+      const schedule = reportSchedules.find(s => s.id === scheduleId);
+      if (!schedule) return;
+
+      // Update local state
+      schedule[fieldName] = value;
+
+      // If template_type changed, re-render to enable/disable appropriate dropdowns
+      if (fieldName === 'template_type') {
+        renderReportSchedulesTable();
+      }
+
+      // Show saving indicator
+      const row = document.querySelector(`tr[data-schedule-id="${scheduleId}"]`);
+      if (row) {
+        const existingIndicator = row.querySelector('.saving-indicator');
+        if (existingIndicator) {
+          existingIndicator.remove();
+        }
+
+        const indicator = document.createElement('span');
+        indicator.className = 'saving-indicator';
+        indicator.textContent = 'Saving...';
+        row.cells[0].appendChild(indicator);
+
+        // Prepare the update payload based on field name
+        let updatePayload = { [fieldName]: value };
+
+        // If we're updating entity fields, also include the entity name
+        if (fieldName === 'district_id') {
+          const option = districtOptions.find(o => o.id === value);
+          updatePayload.district_name = option ? option.label : null;
+        } else if (fieldName === 'region_id') {
+          const option = regionOptions.find(o => o.id === value);
+          updatePayload.region_name = option ? option.label : null;
+        } else if (fieldName === 'subsidiary_id') {
+          const option = subsidiaryOptions.find(o => o.id === value);
+          updatePayload.subsidiary_name = option ? option.label : null;
+        }
+
+        try {
+          const response = await fetch(`/api/report-schedules/${scheduleId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updatePayload)
+          });
+
+          if (!response.ok) throw new Error('Failed to update');
+
+          // Update local data with response
+          const updatedSchedule = await response.json();
+          Object.assign(schedule, updatedSchedule);
+
+          indicator.textContent = '✓ Saved';
+          indicator.className = 'saving-indicator success';
+          setTimeout(() => indicator.remove(), 2000);
+        } catch (error) {
+          console.error('Error updating schedule:', error);
+          indicator.textContent = '✗ Error';
+          indicator.className = 'saving-indicator error';
+          setTimeout(() => indicator.remove(), 3000);
+        }
       }
     }
 

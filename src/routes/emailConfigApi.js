@@ -350,97 +350,70 @@ router.get('/report-schedules/due', async (req, res) => {
 
 /**
  * POST /api/report-schedules
- * Create a new report schedule
+ * Create a new report schedule (supports minimal data for inline editing)
  */
 router.post('/report-schedules', async (req, res) => {
   try {
     const {
+      template_name,
+      template_type,
+      process,
+      district_id,
+      district_name,
+      region_id,
+      region_name,
+      subsidiary_id,
+      subsidiary_name,
+      email_group_id,
+      frequency,
+      day_of_week,
+      day_of_month,
+      time_of_day,
+      enabled,
+      // Legacy fields for compatibility
       report_type,
       hierarchy,
       entity_id,
       entity_name,
-      email_group_id,
-      frequency,
-      status,
-      day_of_week,
-      day_of_month,
-      time_of_day
+      status
     } = req.body;
 
-    // Validation
-    if (!report_type || !hierarchy || !entity_id || !email_group_id || !frequency) {
-      return res.status(400).json({
-        error: 'Validation failed',
-        message: 'Missing required fields'
-      });
-    }
-
-    // Validate enum values
-    const validReportTypes = ['standard', 'operational'];
-    const validHierarchies = ['district', 'region', 'subsidiary'];
-    const validFrequencies = ['daily', 'weekly', 'monthly'];
-    const validStatuses = ['active', 'paused'];
-
-    if (!validReportTypes.includes(report_type)) {
-      return res.status(400).json({
-        error: 'Validation failed',
-        message: `Invalid report type. Must be one of: ${validReportTypes.join(', ')}`
-      });
-    }
-
-    if (!validHierarchies.includes(hierarchy)) {
-      return res.status(400).json({
-        error: 'Validation failed',
-        message: `Invalid hierarchy. Must be one of: ${validHierarchies.join(', ')}`
-      });
-    }
-
-    if (!validFrequencies.includes(frequency)) {
-      return res.status(400).json({
-        error: 'Validation failed',
-        message: `Invalid frequency. Must be one of: ${validFrequencies.join(', ')}`
-      });
-    }
-
-    if (status && !validStatuses.includes(status)) {
-      return res.status(400).json({
-        error: 'Validation failed',
-        message: `Invalid status. Must be one of: ${validStatuses.join(', ')}`
-      });
-    }
+    // For inline editing, allow creating with minimal data
+    // Use defaults for required fields that aren't provided
+    const scheduleData = {
+      template_name: template_name || 'New Report Schedule',
+      template_type: template_type || '',
+      process: process || '',
+      district_id: district_id || null,
+      district_name: district_name || null,
+      region_id: region_id || null,
+      region_name: region_name || null,
+      subsidiary_id: subsidiary_id || null,
+      subsidiary_name: subsidiary_name || null,
+      email_group_id: email_group_id ? parseInt(email_group_id) : null,
+      frequency: frequency || 'monthly',
+      day_of_week: day_of_week || null,
+      day_of_month: day_of_month || null,
+      time_of_day: time_of_day || null,
+      enabled: enabled !== undefined ? enabled : true,
+      // Legacy fields
+      report_type: report_type || '',
+      hierarchy: hierarchy || '',
+      entity_id: entity_id || '',
+      entity_name: entity_name || '',
+      status: status || 'active'
+    };
 
     // Use mock data if database not available
     if (!emailConfigService.isAvailable()) {
-      const schedule = mockEmailData.createMockReportSchedule({
-        report_type,
-        hierarchy,
-        entity_id,
-        entity_name,
-        email_group_id: parseInt(email_group_id),
-        frequency,
-        status: status || 'active',
-        day_of_week,
-        day_of_month,
-        time_of_day
-      });
-      console.log(`✅ Created mock report schedule: ${schedule.report_type} ${schedule.hierarchy} (ID: ${schedule.id})`);
+      const schedule = mockEmailData.createMockReportSchedule(scheduleData);
+      console.log(`✅ Created mock report schedule: ${schedule.template_name} (ID: ${schedule.id})`);
       return res.status(201).json(schedule);
     }
 
-    const schedule = await emailConfigService.createReportSchedule({
-      report_type,
-      hierarchy,
-      entity_id,
-      entity_name,
-      email_group_id: parseInt(email_group_id),
-      frequency,
-      status: status || 'active',
-      day_of_week,
-      day_of_month,
-      time_of_day
-    });
+    const schedule = await emailConfigService.createReportSchedule(scheduleData);
 
-    console.log(`✅ Created report schedule: ${schedule.report_type} ${schedule.hierarchy} (ID: ${schedule.id})`);
+    console.log(`✅ Created report schedule: ${schedule.template_name} (ID: ${schedule.id})`);
     res.status(201).json(schedule);
   } catch (error) {
     console.error('Error creating report schedule:', error);
@@ -462,38 +435,59 @@ router.post('/report-schedules', async (req, res) => {
 
 /**
  * PUT /api/report-schedules/:id
- * Update a report schedule
+ * Update a report schedule (supports partial updates for inline editing)
  */
 router.put('/report-schedules/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const {
-      report_type,
-      hierarchy,
-      entity_id,
-      entity_name,
-      email_group_id,
-      frequency,
-      status
-    } = req.body;
+    
+    // Extract all possible fields from request body
+    const updateData = {};
+    
+    // Only include fields that are provided in the request
+    const allowedFields = [
+      'template_name',
+      'template_type',
+      'process',
+      'district_id',
+      'district_name',
+      'region_id',
+      'region_name',
+      'subsidiary_id',
+      'subsidiary_name',
+      'email_group_id',
+      'frequency',
+      'day_of_week',
+      'day_of_month',
+      'time_of_day',
+      'enabled',
+      // Legacy fields
+      'report_type',
+      'hierarchy',
+      'entity_id',
+      'entity_name',
+      'status'
+    ];
 
-    // Validation (same as POST)
-    if (!report_type || !hierarchy || !entity_id || !email_group_id || !frequency || !status) {
-      return res.status(400).json({
-        error: 'Validation failed',
-        message: 'Missing required fields'
-      });
+    allowedFields.forEach(field => {
+      if (req.body[field] !== undefined) {
+        updateData[field] = req.body[field];
+      }
+    });
+
+    // Convert email_group_id to integer if present
+    if (updateData.email_group_id !== undefined) {
+      updateData.email_group_id = parseInt(updateData.email_group_id);
     }
 
-    const schedule = await emailConfigService.updateReportSchedule(parseInt(id), {
-      report_type,
-      hierarchy,
-      entity_id,
-      entity_name,
-      email_group_id: parseInt(email_group_id),
-      frequency,
-      status
-    });
+    // Use mock data if database not available
+    if (!emailConfigService.isAvailable()) {
+      const schedule = mockEmailData.updateReportSchedule(parseInt(id), updateData);
+      console.log(`✅ Updated mock report schedule ID: ${id}`);
+      return res.json(schedule);
+    }
+
+    const schedule = await emailConfigService.updateReportSchedule(parseInt(id), updateData);
 
     console.log(`✅ Updated report schedule ID: ${id}`);
     res.json(schedule);
