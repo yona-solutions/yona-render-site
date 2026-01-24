@@ -15,11 +15,11 @@ const path = require('path');
  * @param {express.Application} app - Express application instance
  */
 function configureExpress(app) {
-  // Parse JSON request bodies
-  app.use(express.json());
+  // Parse JSON request bodies (with increased limit for large config files)
+  app.use(express.json({ limit: '2mb' }));
   
-  // Parse URL-encoded request bodies
-  app.use(express.urlencoded({ extended: true }));
+  // Parse URL-encoded request bodies (with increased limit)
+  app.use(express.urlencoded({ extended: true, limit: '2mb' }));
   
   // Serve static files from public directory
   app.use(express.static(path.join(__dirname, '../../public')));

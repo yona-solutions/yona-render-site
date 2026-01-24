@@ -466,6 +466,28 @@
       font-weight: 500;
     }
 
+    .custom-select-option.hidden {
+      display: none;
+    }
+
+    .custom-select-option.disabled {
+      color: #cbd5e0;
+      cursor: not-allowed;
+      background: #f9f9f9;
+    }
+
+    .custom-select-option.disabled:hover {
+      background: #f9f9f9;
+    }
+
+    .custom-select-no-results {
+      padding: 10px 12px;
+      font-size: 13px;
+      color: #999;
+      text-align: center;
+      font-style: italic;
+    }
+
     .field-select {
       width: 100%;
       font-size: 12px;
@@ -544,6 +566,29 @@
       border-color: #4a7c9e;
       color: #4a7c9e;
       box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .btn-primary {
+      flex: 1;
+      padding: 12px 20px;
+      border-radius: 6px;
+      border: 1px solid #4a7c9e;
+      background: linear-gradient(135deg, #4a7c9e 0%, #3d6a8a 100%);
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      transition: all 0.15s;
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: linear-gradient(135deg, #3d6a8a 0%, #2e5169 100%);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+      transform: translateY(-1px);
+    }
+
+    .btn-primary:active {
+      transform: translateY(0);
     }
 
     .field-hint {
@@ -690,6 +735,7 @@
 
       <div class="sidebar-actions">
         <button class="btn-cancel" onclick="closeEditSidebar()">Cancel</button>
+        <button class="btn-primary" onclick="saveChanges()">Save</button>
       </div>
     </div>
   </div>
@@ -1157,7 +1203,7 @@
     });
 
     // Edit Sidebar Functions
-    function openEditSidebar(node) {
+    async function openEditSidebar(node) {
       AppState.editingNode = node;
       
       // Populate fields
@@ -1169,8 +1215,8 @@
       document.getElementById('accountCheckboxesSection').style.display = isAccountTab ? 'block' : 'none';
       
       if (isAccountTab) {
-        // Populate account mapping dropdown
-        populateAccountMappingDropdown(node);
+        // Populate account mapping dropdown (async)
+        await populateAccountMappingDropdown(node);
         
         // Set checkboxes
         document.getElementById('editDisplayExcluded').checked = node.displayExcluded || false;
@@ -1190,7 +1236,91 @@
       document.getElementById('editSidebar').classList.remove('open');
     }
 
-    function populateAccountMappingDropdown(node) {
+    async function saveChanges() {
+      if (!AppState.editingNode) {
+        console.error('No node being edited');
+        return;
+      }
+
+      const node = AppState.editingNode;
+      const nodeId = node.id;
+      const dimension = AppState.currentDimension;
+      
+      // Get updated values from form
+      const newLabel = document.getElementById('editName').value.trim();
+      if (!newLabel) {
+        alert('Name cannot be empty');
+        return;
+      }
+
+      // Get parent value
+      const parentInput = document.getElementById('editParent');
+      const newParent = parentInput.dataset.selectedValue || null;
+
+      // Update node in AppState
+      const configData = AppState.dimensions[dimension];
+      if (!configData[nodeId]) {
+        console.error('Node not found in config:', nodeId);
+        return;
+      }
+
+      // Update label
+      configData[nodeId].label = newLabel;
+      
+      // Update parent
+      configData[nodeId].parent = newParent;
+
+      // For Account tab, update account-specific fields
+      if (dimension === 'account') {
+        // Get account mapping value
+        const accountMappingInput = document.getElementById('editAccountMapping');
+        const accountMappingValue = accountMappingInput.dataset.selectedValue;
+        if (accountMappingValue) {
+          configData[nodeId].account_internal_id = accountMappingValue;
+        } else {
+          delete configData[nodeId].account_internal_id;
+        }
+
+        // Get checkbox values
+        configData[nodeId].displayExcluded = document.getElementById('editDisplayExcluded').checked;
+        configData[nodeId].doubleLines = document.getElementById('editDoubleLines').checked;
+        configData[nodeId].operationalExcluded = document.getElementById('editOperationalExcluded').checked;
+      }
+
+      // Save to backend
+      try {
+        const response = await fetch(`/api/config/${dimension}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(configData)
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const result = await response.json();
+        if (result.success) {
+          console.log('✅ Configuration saved successfully');
+          
+          // Rebuild tree from updated data and re-render
+          AppState.trees[dimension] = buildTree(configData);
+          renderTree(AppState.trees[dimension], AppState.searchQuery);
+          
+          // Close sidebar
+          closeEditSidebar();
+        } else {
+          throw new Error('Save failed');
+        }
+      } catch (error) {
+        console.error('Error saving configuration:', error);
+        alert(`Failed to save: ${error.message}`);
+      }
+    }
+
+    async function populateAccountMappingDropdown(node) {
       const input = document.getElementById('editAccountMapping');
       const dropdown = document.getElementById('editAccountMappingDropdown');
       const hint = document.getElementById('accountMappingHint');
@@ -1198,42 +1328,103 @@
       // Clear existing options
       dropdown.innerHTML = '';
       
-      // Create "No account mapped" option
-      const noMapOption = document.createElement('div');
-      noMapOption.className = 'custom-select-option';
-      noMapOption.textContent = '(No account mapped)';
-      noMapOption.dataset.value = '';
-      dropdown.appendChild(noMapOption);
+      // Show loading state
+      const loadingOption = document.createElement('div');
+      loadingOption.className = 'custom-select-no-results';
+      loadingOption.textContent = 'Loading accounts...';
+      dropdown.appendChild(loadingOption);
       
-      // For now, just show if it's mapped
-      if (node.account_internal_id) {
-        const option = document.createElement('div');
-        option.className = 'custom-select-option selected';
-        option.textContent = `${node.display_name || 'Unknown'} (${node.account_internal_id})`;
-        option.dataset.value = node.account_internal_id;
-        dropdown.appendChild(option);
+      try {
+        // Fetch accounts from API
+        const response = await fetch('/api/accounts');
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        const accounts = await response.json();
         
-        input.value = `${node.display_name || 'Unknown'} (${node.account_internal_id})`;
-        hint.textContent = `Display: ${node.display_name || 'Unknown'}`;
-        hint.style.display = 'block';
-      } else {
-        input.value = '';
-        noMapOption.classList.add('selected');
-        hint.style.display = 'none';
-      }
-      
-      // Setup dropdown behavior
-      setupCustomDropdown(input, dropdown, (value, text) => {
-        input.value = text;
-        if (value) {
-          hint.textContent = `Display: ${text.split('(')[0].trim()}`;
+        // Clear loading state
+        dropdown.innerHTML = '';
+        
+        // Create "No account mapped" option
+        const noMapOption = document.createElement('div');
+        noMapOption.className = 'custom-select-option';
+        noMapOption.textContent = '(No account mapped)';
+        noMapOption.dataset.value = '';
+        dropdown.appendChild(noMapOption);
+        
+        // Get all already-mapped account IDs (excluding current node)
+        const currentData = AppState.dimensions[AppState.currentDimension];
+        const mappedAccountIds = new Set();
+        
+        for (const [itemId, itemData] of Object.entries(currentData)) {
+          if (itemId !== node.id && itemData.account_internal_id) {
+            mappedAccountIds.add(parseInt(itemData.account_internal_id));
+          }
+        }
+        
+        // Add all account options
+        let selectedText = '';
+        accounts.forEach(account => {
+          const option = document.createElement('div');
+          option.className = 'custom-select-option';
+          const baseText = account.display_name_with_id || `${account.display_name} (${account.account_id})`;
+          option.textContent = baseText;
+          option.dataset.value = account.account_id;
+          
+          // Check if this is the currently selected account
+          const isCurrentSelection = node.account_internal_id && parseInt(node.account_internal_id) === parseInt(account.account_id);
+          
+          // Check if this account is already mapped to another item
+          const isAlreadyMapped = mappedAccountIds.has(parseInt(account.account_id));
+          
+          if (isAlreadyMapped) {
+            option.classList.add('disabled');
+            option.textContent += ' (already mapped)';
+          }
+          
+          if (isCurrentSelection) {
+            option.classList.add('selected');
+            // Use base text for selected text (without "already mapped")
+            selectedText = baseText;
+          }
+          
+          dropdown.appendChild(option);
+        });
+        
+        // Set input value and hint
+        if (node.account_internal_id && selectedText) {
+          input.value = selectedText;
+          input.dataset.selectedValue = node.account_internal_id;
+          hint.textContent = `Mapped to account ID: ${node.account_internal_id}`;
           hint.style.display = 'block';
         } else {
+          input.value = '';
+          input.dataset.selectedValue = '';
+          noMapOption.classList.add('selected');
           hint.style.display = 'none';
         }
-      });
-      
-      // TODO: Load actual account options from API when implementing save
+        
+        input.setAttribute('readonly', 'readonly');
+        
+        // Setup dropdown behavior
+        setupCustomDropdown(input, dropdown, (value, text) => {
+          input.value = text;
+          input.dataset.selectedValue = value;
+          if (value) {
+            hint.textContent = `Mapped to account ID: ${value}`;
+            hint.style.display = 'block';
+          } else {
+            hint.style.display = 'none';
+          }
+        });
+      } catch (error) {
+        console.error('Error loading accounts:', error);
+        dropdown.innerHTML = '';
+        const errorOption = document.createElement('div');
+        errorOption.className = 'custom-select-no-results';
+        errorOption.textContent = 'Error loading accounts';
+        dropdown.appendChild(errorOption);
+      }
     }
 
     function populateParentDropdown(node) {
@@ -1282,8 +1473,10 @@
       
       addParentOptions(currentData);
       
-      // Set selected value
+      // Set selected value and data attribute
       input.value = selectedText;
+      input.dataset.selectedValue = node.parent || '';
+      input.setAttribute('readonly', 'readonly');
       if (!node.parent) {
         rootOption.classList.add('selected');
       }
@@ -1293,6 +1486,10 @@
     }
 
     function setupCustomDropdown(input, dropdown, onChange) {
+      // Store the selected value for restoration
+      let originalValue = input.value;
+      let isInputHandlerAdded = false;
+      
       // Toggle dropdown on input click
       input.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -1304,18 +1501,78 @@
         });
         
         // Toggle this dropdown
-        dropdown.classList.toggle('show');
-        
         if (!isOpen) {
+          // Opening dropdown
+          dropdown.classList.add('show');
           input.style.borderRadius = '4px 4px 0 0';
+          
+          // Store current value and clear input for searching
+          originalValue = input.value;
+          input.value = '';
+          input.removeAttribute('readonly');
+          input.focus();
+          
+          // Reset all options to visible
+          dropdown.querySelectorAll('.custom-select-option').forEach(opt => {
+            opt.classList.remove('hidden');
+          });
+          
+          // Remove any "no results" message
+          const noResults = dropdown.querySelector('.custom-select-no-results');
+          if (noResults) {
+            noResults.remove();
+          }
         } else {
-          input.style.borderRadius = '4px';
+          // Closing dropdown
+          closeDropdown();
         }
       });
+      
+      // Add input handler for filtering (only once)
+      if (!isInputHandlerAdded) {
+        input.addEventListener('input', (e) => {
+          if (!dropdown.classList.contains('show')) return;
+          
+          const searchTerm = e.target.value.toLowerCase();
+          const options = dropdown.querySelectorAll('.custom-select-option');
+          let visibleCount = 0;
+          
+          options.forEach(option => {
+            const text = option.textContent.toLowerCase();
+            const matches = text.includes(searchTerm);
+            
+            if (matches) {
+              option.classList.remove('hidden');
+              visibleCount++;
+            } else {
+              option.classList.add('hidden');
+            }
+          });
+          
+          // Show "no results" message if no matches
+          let noResults = dropdown.querySelector('.custom-select-no-results');
+          if (visibleCount === 0) {
+            if (!noResults) {
+              noResults = document.createElement('div');
+              noResults.className = 'custom-select-no-results';
+              noResults.textContent = 'No matching options';
+              dropdown.appendChild(noResults);
+            }
+          } else if (noResults) {
+            noResults.remove();
+          }
+        });
+        isInputHandlerAdded = true;
+      }
       
       // Handle option clicks
       dropdown.addEventListener('click', (e) => {
         if (e.target.classList.contains('custom-select-option')) {
+          // Don't allow clicking disabled options
+          if (e.target.classList.contains('disabled')) {
+            return;
+          }
+          
           const value = e.target.dataset.value;
           const text = e.target.textContent;
           
@@ -1325,8 +1582,11 @@
           });
           e.target.classList.add('selected');
           
-          // Update input
+          // Update input and store selected value
           input.value = text;
+          input.dataset.selectedValue = value;
+          originalValue = text;
+          input.setAttribute('readonly', 'readonly');
           
           // Call onChange callback if provided
           if (onChange) {
@@ -1339,11 +1599,29 @@
         }
       });
       
+      // Function to close dropdown and restore value
+      function closeDropdown() {
+        dropdown.classList.remove('show');
+        input.style.borderRadius = '4px';
+        input.value = originalValue;
+        input.setAttribute('readonly', 'readonly');
+        
+        // Reset all options to visible
+        dropdown.querySelectorAll('.custom-select-option').forEach(opt => {
+          opt.classList.remove('hidden');
+        });
+        
+        // Remove any "no results" message
+        const noResults = dropdown.querySelector('.custom-select-no-results');
+        if (noResults) {
+          noResults.remove();
+        }
+      }
+      
       // Close on outside click
-      document.addEventListener('click', () => {
-        if (dropdown.classList.contains('show')) {
-          dropdown.classList.remove('show');
-          input.style.borderRadius = '4px';
+      document.addEventListener('click', (e) => {
+        if (dropdown.classList.contains('show') && !input.contains(e.target) && !dropdown.contains(e.target)) {
+          closeDropdown();
         }
       });
     }

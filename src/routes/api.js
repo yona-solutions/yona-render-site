@@ -1141,6 +1141,71 @@ function createApiRoutes(storageService, bigQueryService) {
     }
   });
 
+  /**
+   * GET /api/accounts
+   * 
+   * Get all accounts from dim_accounts table
+   * 
+   * Response: Array of {account_internal_id, display_name}
+   */
+  router.get('/accounts', async (req, res) => {
+    try {
+      const accounts = await bigQueryService.getAccounts();
+      res.json(accounts);
+    } catch (error) {
+      console.error('Error fetching accounts:', error);
+      res.status(500).json({ 
+        error: 'Failed to fetch accounts',
+        code: 'ACCOUNTS_FETCH_ERROR'
+      });
+    }
+  });
+
+  /**
+   * PUT /api/config/:dimension
+   * 
+   * Save configuration for a specific dimension
+   * 
+   * Request body: Complete configuration object
+   * Response: { success: true }
+   */
+  router.put('/config/:dimension', async (req, res) => {
+    try {
+      const { dimension } = req.params;
+      const config = req.body;
+      
+      // Validate dimension
+      const validDimensions = ['account', 'customer', 'department', 'region', 'vendor'];
+      if (!validDimensions.includes(dimension)) {
+        return res.status(400).json({ 
+          error: 'Invalid dimension',
+          code: 'INVALID_DIMENSION'
+        });
+      }
+      
+      // Validate config is an object
+      if (!config || typeof config !== 'object') {
+        return res.status(400).json({ 
+          error: 'Invalid configuration data',
+          code: 'INVALID_CONFIG'
+        });
+      }
+      
+      const filename = `${dimension}_config.json`;
+      await storageService.saveFileAsJson(filename, config);
+      
+      console.log(`✅ Saved ${filename} to GCS`);
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error saving config:', error);
+      res.status(500).json({ 
+        error: 'Failed to save configuration',
+        code: 'CONFIG_SAVE_ERROR'
+      });
+    }
+  });
+
   return router;
 }
 

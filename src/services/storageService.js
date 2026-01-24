@@ -148,6 +148,35 @@ class StorageService {
   }
 
   /**
+   * Save JSON data to a file in GCS
+   * 
+   * @param {string} fileName - Name of file in GCS bucket
+   * @param {Object} data - JavaScript object to save as JSON
+   * @returns {Promise<void>}
+   */
+  async saveFileAsJson(fileName, data) {
+    if (!this.isAvailable()) {
+      throw new Error('GCP Storage not initialized');
+    }
+
+    const bucket = this.storage.bucket(this.bucketName);
+    const file = bucket.file(fileName);
+    
+    // Convert to JSON string with pretty formatting
+    const jsonString = JSON.stringify(data, null, 2);
+    
+    // Upload to GCS
+    await file.save(jsonString, {
+      contentType: 'application/json',
+      metadata: {
+        cacheControl: 'no-cache',
+      }
+    });
+    
+    console.log(`✅ Saved ${fileName} to GCS bucket ${this.bucketName}`);
+  }
+
+  /**
    * Get districts and district tags from customer configuration file
    * 
    * Returns both individual districts and unique tag values.

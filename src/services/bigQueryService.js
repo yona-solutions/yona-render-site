@@ -375,6 +375,45 @@ class BigQueryService {
       throw new Error(`Failed to fetch customers from BigQuery: ${error.message}`);
     }
   }
+  /**
+   * Get all accounts from dim_accounts table
+   * 
+   * Fetches all accounts with their IDs and display names
+   * for populating account mapping dropdowns.
+   * 
+   * @returns {Promise<Array<{account_id: number, display_name: string, display_name_with_id: string}>>} Array of accounts
+   * @throws {Error} If BigQuery is not initialized or query fails
+   */
+  async getAccounts() {
+    if (!this.isAvailable()) {
+      throw new Error('BigQuery not initialized');
+    }
+
+    const query = `
+      SELECT
+        account_id,
+        display_name,
+        display_name_with_id
+      FROM \`${this.dataset}.dim_accounts\`
+      ORDER BY display_name
+    `;
+
+    try {
+      const [rows] = await this.bigquery.query({
+        query: query,
+        location: 'US'
+      });
+      
+      return rows.map(row => ({
+        account_id: row.account_id,
+        display_name: row.display_name,
+        display_name_with_id: row.display_name_with_id
+      }));
+    } catch (error) {
+      console.error('Error fetching accounts from BigQuery:', error);
+      throw new Error(`Failed to fetch accounts: ${error.message}`);
+    }
+  }
 }
 
 module.exports = BigQueryService;
