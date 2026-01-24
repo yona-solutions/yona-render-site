@@ -789,35 +789,132 @@ router.post('/report-schedules/:id/send-email', async (req, res) => {
   }
 });
 
-// Helper function to build PDF HTML
+// Helper function to build PDF HTML (matches exact styling from frontend download)
 function buildPDFHTML(content) {
   return `<!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>P&L Report</title>
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif; padding: 20px; background: white; font-size: 11px; }
-    .pnl-report-container { page-break-after: always; margin-bottom: 40px; }
-    .pnl-report-container:last-child { page-break-after: auto; }
-    .pnl-report-header { margin-bottom: 15px; }
-    .pnl-title { font-size: 18px; font-weight: 600; color: #1a202c; margin-bottom: 4px; }
-    .pnl-subtitle { font-size: 13px; color: #4a5568; margin-bottom: 2px; }
-    .pnl-meta { font-size: 11px; color: #718096; }
-    .pnl-divider { border: none; border-top: 2px solid #e2e8f0; margin: 12px 0; }
-    .pnl-report-table { width: 100%; border-collapse: collapse; font-size: 11px; }
-    .pnl-report-table thead th { background: #f7fafc; padding: 8px; text-align: left; font-weight: 600; color: #2d3748; border-bottom: 2px solid #cbd5e0; font-size: 10px; }
-    .pnl-report-table td { padding: 6px 8px; border-bottom: 1px solid #e2e8f0; vertical-align: top; }
-    .pnl-report-table td:first-child { white-space: normal; word-wrap: break-word; max-width: 140px; }
-    .pnl-report-table td:not(:first-child) { text-align: right; white-space: nowrap; }
-    .pnl-report-table td:empty::after { content: '—'; color: #cbd5e0; }
-    .pnl-report-table tr:hover { background: #f7fafc; }
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+    }
+
+    .pnl-report-container {
+      background: #ffffff;
+      font-family: Arial, sans-serif;
+      color: #000000;
+      width: 100%;
+      margin: 0 auto;
+      padding: 8px 24px 12px 24px;
+      page-break-after: always;
+    }
+
+    .pnl-report-container:last-of-type {
+      page-break-after: auto !important;
+    }
+
+    /* ---------------- Header Styles ---------------- */
+    .pnl-report-header {
+      text-align: center;
+      margin-bottom: 6px;
+      padding: 0;
+      line-height: 1.2;
+    }
+
+    .pnl-report-header .pnl-title {
+      font-weight: 700;
+      font-size: 13px;
+      margin: 0;
+      line-height: 1.1;
+    }
+
+    .pnl-report-header .pnl-subtitle {
+      font-weight: 600;
+      font-size: 10px;
+      margin: 1px 0 0 0;
+      line-height: 1.1;
+    }
+
+    .pnl-report-header .pnl-meta,
+    .pnl-report-header .meta {
+      font-size: 8px;
+      line-height: 1.2;
+      margin: 0;
+    }
+
+    .pnl-divider {
+      border: none;
+      border-top: 1px solid #ccc;
+      margin: 4px 0 6px 0;
+    }
+
+    /* ---------------- Table Styles ---------------- */
+    .pnl-report-table {
+      width: 100%;
+      margin: 0 auto;
+      border-collapse: collapse;
+      font-size: 7.5px;
+      background: #ffffff;
+      table-layout: auto;
+    }
+
+    .pnl-report-table th,
+    .pnl-report-table td {
+      padding: 2px 2px;
+      border: none;
+      white-space: nowrap;
+      height: 12px;
+      line-height: 1.2;
+      vertical-align: middle;
+    }
+
+    .pnl-report-table th {
+      font-weight: 600;
+      text-align: center;
+      border-bottom: 1px solid #fff;
+      background: transparent;
+      font-size: 7.5px;
+    }
+
+    .pnl-report-table td:first-child,
+    .pnl-report-table th:first-child {
+      text-align: left;
+      white-space: normal;
+      word-wrap: break-word;
+      max-width: 140px;
+      font-size: 7.5px;
+    }
+
+    .pnl-report-table td:not(:first-child),
+    .pnl-report-table th:not(:first-child) {
+      text-align: right;
+      font-size: 7.5px;
+    }
+
+    /* Centered dashes for empty values - but not for the gap column (7th column) */
+    .pnl-report-table td:empty:not(:nth-child(7))::after {
+      content: "-";
+      display: inline-block;
+      text-align: center;
+      width: 100%;
+      color: #000;
+      opacity: 0.8;
+    }
+
+    .pnl-report-table td {
+      vertical-align: middle;
+    }
+
     @media print {
-      body { padding: 10px; }
-      .pnl-report-container { page-break-after: always; margin-bottom: 0; }
-      .pnl-report-container:last-child { page-break-after: auto; }
+      .pnl-report-container {
+        page-break-after: always;
+      }
     }
   </style>
 </head>
