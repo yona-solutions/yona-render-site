@@ -102,15 +102,15 @@ const mockEmailContacts = [
   { id: 29, email_group_id: 6, email: 'ne.support@yona.com', name: 'NE Support Team', created_at: new Date('2026-01-20T08:35:00Z') }
 ];
 
-// Mock Report Schedules - Updated with new structure
+// Mock Report Schedules - Updated with new structure and REAL IDs from configs
 const mockReportSchedules = [
   {
     id: 1,
-    template_name: 'Weekly West District Standard Report',
+    template_name: 'Weekly District 101 Standard Report',
     template_type: 'district',          // district, region, or subsidiary
     process: 'standard',                // standard or operational
-    district_id: 'tag_West',           // Can be district ID or tag_* for district tags
-    district_name: 'West',             // Display name
+    district_id: '1971',                // Real district ID from config (District 101 - John Miller)
+    district_name: 'District 101 - John Miller',
     region_id: null,
     region_name: null,
     subsidiary_id: null,
@@ -129,13 +129,13 @@ const mockReportSchedules = [
   },
   {
     id: 2,
-    template_name: 'Monthly Northeast Region Operational Review',
+    template_name: 'Monthly R200 Region Operational Review',
     template_type: 'region',
     process: 'operational',
     district_id: null,
     district_name: null,
-    region_id: '210',                   // Specific region ID
-    region_name: 'Northeast Region',
+    region_id: '4',                     // Real region ID from config (R200)
+    region_name: 'R200',
     subsidiary_id: null,
     subsidiary_name: null,
     email_group_id: 2,
@@ -159,8 +159,8 @@ const mockReportSchedules = [
     district_name: null,
     region_id: null,
     region_name: null,
-    subsidiary_id: 'yona_main',
-    subsidiary_name: 'Yona Solutions',
+    subsidiary_id: '13',                // Real subsidiary ID from config (Yona Solutions, LLC)
+    subsidiary_name: 'Yona Solutions, LLC',
     email_group_id: 4,
     email_group_name: 'Executive Team',
     frequency: 'monthly',
@@ -175,11 +175,11 @@ const mockReportSchedules = [
   },
   {
     id: 4,
-    template_name: 'Friday Facility Operational Summary',
+    template_name: 'Friday District 102 Operational Summary',
     template_type: 'district',
     process: 'operational',
-    district_id: 'tag_West',           // Using district tag
-    district_name: 'West',
+    district_id: '1982',                // Real district ID (District 102 - Michelle King)
+    district_name: 'District 102 - Michelle King',
     region_id: null,
     region_name: null,
     subsidiary_id: null,
@@ -198,13 +198,13 @@ const mockReportSchedules = [
   },
   {
     id: 5,
-    template_name: 'Finance Monthly Standard - Northeast',
+    template_name: 'Finance Monthly Standard - R300',
     template_type: 'region',
     process: 'standard',
     district_id: null,
     district_name: null,
-    region_id: '210',
-    region_name: 'Northeast Region',
+    region_id: '5',                     // Real region ID (R300)
+    region_name: 'R300',
     subsidiary_id: null,
     subsidiary_name: null,
     email_group_id: 3,
@@ -221,13 +221,13 @@ const mockReportSchedules = [
   },
   {
     id: 6,
-    template_name: 'West Region Weekly Ops (PAUSED)',
+    template_name: 'R400 Region Weekly Ops (PAUSED)',
     template_type: 'region',
     process: 'operational',
     district_id: null,
     district_name: null,
-    region_id: '220',
-    region_name: 'West Region',
+    region_id: '6',                     // Real region ID (R400)
+    region_name: 'R400',
     subsidiary_id: null,
     subsidiary_name: null,
     email_group_id: 2,
@@ -244,11 +244,11 @@ const mockReportSchedules = [
   },
   {
     id: 7,
-    template_name: 'South District Tag Monthly Report',
+    template_name: 'District 201 Monthly Report',
     template_type: 'district',
     process: 'standard',
-    district_id: 'tag_South',          // Using district tag
-    district_name: 'South',
+    district_id: '2006',                // Real district ID (District 201 - Vestee Garcia)
+    district_name: 'District 201 - Vestee Garcia',
     region_id: null,
     region_name: null,
     subsidiary_id: null,
@@ -274,8 +274,8 @@ const mockReportSchedules = [
     district_name: null,
     region_id: null,
     region_name: null,
-    subsidiary_id: 'yona_main',
-    subsidiary_name: 'Yona Solutions',
+    subsidiary_id: '8',                 // Real subsidiary ID (Yona Holdings LLC)
+    subsidiary_name: 'Yona Holdings LLC',
     email_group_id: 3,
     email_group_name: 'Finance Team',
     frequency: 'weekly',
