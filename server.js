@@ -82,8 +82,4 @@ async function startServer() {
 }
 
 // Start the server
-const serverPromise = startServer();
-
-module.exports = serverPromise;
-
-module.exports = server;
+startServer();
