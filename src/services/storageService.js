@@ -417,6 +417,7 @@ class StorageService {
     const configData = await this.getFileAsJson('customer_config.json');
     const customers = [];
     const seenIds = new Set(); // Avoid duplicates
+    let districtDisplayName = districtId; // Default to ID if not found
     
     // Check if this is a tag selection (IDs starting with "tag_" are tags)
     const isTag = districtId.startsWith('tag_');
@@ -429,6 +430,7 @@ class StorageService {
       // Tag selection: Find all districts with this tag
       // For tags, we include ALL districts with the tag, even if districtReportingExcluded is true
       // The tag represents a logical grouping that supersedes individual district exclusions
+      districtDisplayName = searchValue; // For tags, display name is the tag itself
       for (const [id, config] of Object.entries(configData)) {
         if (config.isDistrict && !config.displayExcluded) {
           const tags = config.tags || [];
@@ -440,6 +442,12 @@ class StorageService {
     } else {
       // Direct district selection
       districtIdsToSearch.push(districtId);
+      
+      // Get the district's display name (label)
+      const districtConfig = configData[districtId];
+      if (districtConfig && districtConfig.label) {
+        districtDisplayName = districtConfig.label;
+      }
     }
     
     // Find all customers whose parent is one of the selected districts
@@ -456,7 +464,11 @@ class StorageService {
       }
     }
     
-    return customers;
+    return {
+      customers,
+      districtName: districtDisplayName,
+      isTag
+    };
   }
 
   /**

@@ -315,7 +315,8 @@ function createApiRoutes(storageService, bigQueryService) {
       if (hierarchy === 'district') {
         // Get full customer details for this district or district tag
         // Tags are treated as districts - they just aggregate multiple districts' customers
-        const customers = await storageService.getCustomersForDistrict(actualId);
+        const districtResult = await storageService.getCustomersForDistrict(actualId);
+        const { customers, districtName, isTag } = districtResult;
         
         if (customers.length === 0) {
           return res.status(404).json({ 
@@ -324,10 +325,14 @@ function createApiRoutes(storageService, bigQueryService) {
           });
         }
         
+        // Update selectedLabel to use the district display name
+        selectedLabel = districtName;
+        
         const customerIds = customers.map(c => c.customer_internal_id);
         queryParams.customerIds = customerIds;
         queryParams.customers = customers; // Store full customer details for facility P&Ls
-        console.log(`   Found ${customerIds.length} customer IDs for district`);
+        queryParams.isTag = isTag; // Store whether this is a tag for header generation
+        console.log(`   Found ${customerIds.length} customer IDs for ${isTag ? 'tag' : 'district'}: ${districtName}`);
       } else if (hierarchy === 'region') {
         // Get region internal ID
         const regionId = await storageService.getRegionInternalId(actualId);
@@ -463,7 +468,7 @@ function createApiRoutes(storageService, bigQueryService) {
         const districtYtdData = await bigQueryService.getPLData({ ...queryParams, ytd: true });
         
         const districtMeta = {
-          typeLabel: 'District',
+          typeLabel: queryParams.isTag ? 'District Tag' : 'District',
           entityName: selectedLabel,
           monthLabel: date,
           facilityCount: 0, // Will be updated after processing
