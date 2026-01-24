@@ -188,6 +188,11 @@
       background: #cbd5e0;
     }
 
+    .btn-small {
+      padding: 6px 12px;
+      font-size: 12px;
+    }
+
     .btn-danger {
       background: #fc8181;
       color: white;
@@ -211,7 +216,7 @@
     table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 12px;
+      font-size: 11px;
       table-layout: fixed;
     }
 
@@ -223,19 +228,19 @@
 
     th {
       text-align: left;
-      padding: 8px 10px;
+      padding: 6px 8px;
       font-weight: 600;
       color: #4a5568;
-      font-size: 11px;
+      font-size: 10px;
       text-transform: uppercase;
-      letter-spacing: 0.03em;
+      letter-spacing: 0.02em;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
     }
 
     td {
-      padding: 8px 10px;
+      padding: 6px 8px;
       border-bottom: 1px solid #e2e8f0;
       color: #2d3748;
       vertical-align: middle;
@@ -507,10 +512,10 @@
     /* Inline Editing Styles */
     .inline-input, .inline-select {
       width: 100%;
-      padding: 5px 8px;
+      padding: 4px 6px;
       border: 1px solid #e2e8f0;
-      border-radius: 5px;
-      font-size: 12px;
+      border-radius: 4px;
+      font-size: 11px;
       font-family: inherit;
       background: white;
       transition: all 0.15s ease;
@@ -551,11 +556,11 @@
 
     .searchable-select-trigger {
       width: 100%;
-      padding: 5px 8px;
-      padding-right: 28px;
+      padding: 4px 6px;
+      padding-right: 24px;
       border: 1px solid #e2e8f0;
-      border-radius: 5px;
-      font-size: 12px;
+      border-radius: 4px;
+      font-size: 11px;
       background: white;
       color: #2d3748;
       cursor: pointer;
@@ -563,7 +568,7 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      min-height: 30px;
+      min-height: 26px;
       text-align: left;
     }
 
@@ -638,10 +643,10 @@
 
     .searchable-select-search input {
       width: 100%;
-      padding: 6px 10px;
+      padding: 5px 8px;
       border: 1px solid #e2e8f0;
       border-radius: 4px;
-      font-size: 12px;
+      font-size: 11px;
       transition: all 0.15s ease;
     }
 
@@ -653,12 +658,12 @@
 
     .searchable-select-options {
       overflow-y: auto;
-      max-height: 220px;
+      max-height: 200px;
     }
 
     .searchable-select-option {
-      padding: 7px 10px;
-      font-size: 12px;
+      padding: 6px 8px;
+      font-size: 11px;
       color: #2d3748;
       cursor: pointer;
       transition: all 0.1s ease;
@@ -689,8 +694,8 @@
     .toggle-switch {
       position: relative;
       display: inline-block;
-      width: 38px;
-      height: 20px;
+      width: 34px;
+      height: 18px;
     }
 
     .toggle-switch input {
@@ -714,8 +719,8 @@
     .toggle-slider:before {
       position: absolute;
       content: "";
-      height: 14px;
-      width: 14px;
+      height: 12px;
+      width: 12px;
       left: 3px;
       bottom: 3px;
       background-color: white;
@@ -729,7 +734,7 @@
     }
 
     input:checked + .toggle-slider:before {
-      transform: translateX(18px);
+      transform: translateX(16px);
     }
 
     /* Saving Indicator */
@@ -747,6 +752,16 @@
 
     .saving-indicator.error {
       color: #f56565;
+    }
+
+    /* Changed Row Indicator */
+    tr.has-changes {
+      background: #fffbeb !important;
+      border-left: 3px solid #f59e0b;
+    }
+
+    tr.has-changes:hover {
+      background: #fef3c7 !important;
     }
   </style>
 </head>
@@ -820,24 +835,47 @@
             <h2>📊 Report Schedules</h2>
             <div class="subtitle">Configure automated P&L report delivery</div>
           </div>
-          <button class="btn btn-primary" onclick="addNewReportSchedule()">
-            ➕ New Report Schedule
-          </button>
+          <div style="display: flex; gap: 12px;">
+            <button class="btn btn-primary" onclick="saveAllChanges()" id="saveAllBtn" style="display: none;">
+              💾 Save Changes
+            </button>
+            <button class="btn btn-primary" onclick="addNewReportSchedule()">
+              ➕ New Report Schedule
+            </button>
+          </div>
+        </div>
+        
+        <!-- Filter Bar -->
+        <div style="margin-bottom: 16px; padding: 12px; background: #f7fafc; border-radius: 6px; border: 1px solid #e2e8f0;">
+          <div style="display: flex; gap: 12px; align-items: center;">
+            <div style="flex: 1;">
+              <input 
+                type="text" 
+                id="scheduleFilterInput" 
+                placeholder="🔍 Filter by template name, type, or email group..." 
+                style="width: 100%; padding: 6px 12px; border: 1px solid #cbd5e0; border-radius: 4px; font-size: 12px;"
+                oninput="filterReportSchedules()"
+              />
+            </div>
+            <button class="btn btn-secondary btn-small" onclick="clearScheduleFilter()">
+              Clear
+            </button>
+          </div>
         </div>
         
         <div class="table-container">
           <table id="reportSchedulesTable">
             <thead>
               <tr>
-                <th style="width: 140px;">Template Name</th>
-                <th style="width: 100px;">Template Type</th>
-                <th style="width: 90px;">Process</th>
-                <th style="width: 140px;">District</th>
-                <th style="width: 140px;">Region</th>
-                <th style="width: 140px;">Subsidiary</th>
-                <th style="width: 130px;">Email Group</th>
-                <th style="width: 70px;">Enabled</th>
-                <th style="width: 50px;">Actions</th>
+                <th style="width: 130px;">Template Name</th>
+                <th style="width: 90px;">Type</th>
+                <th style="width: 80px;">Process</th>
+                <th style="width: 130px;">District</th>
+                <th style="width: 110px;">Region</th>
+                <th style="width: 130px;">Subsidiary</th>
+                <th style="width: 120px;">Email Group</th>
+                <th style="width: 60px;">Enabled</th>
+                <th style="width: 45px;"></th>
               </tr>
             </thead>
             <tbody id="reportSchedulesBody">
@@ -914,6 +952,10 @@
     let districtOptions = [];
     let regionOptions = [];
     let subsidiaryOptions = [];
+    
+    // Track unsaved changes
+    let unsavedChanges = new Map(); // scheduleId -> changes object
+    let filteredSchedules = []; // For filtering
 
     // ============================================
     // Initialization
@@ -960,6 +1002,7 @@
         if (!response.ok) throw new Error('Failed to load report schedules');
         
         reportSchedules = await response.json();
+        filteredSchedules = [...reportSchedules];
         renderReportSchedulesTable();
       } catch (error) {
         console.error('Error loading report schedules:', error);
@@ -1211,14 +1254,24 @@
     function renderReportSchedulesTable() {
       const tbody = document.getElementById('reportSchedulesBody');
       
-      if (reportSchedules.length === 0) {
-        showEmptyState('reportSchedulesBody', 'No report schedules yet. Create one to automate report delivery!', '📊');
+      // Use filtered schedules if filter is active, otherwise use all
+      const schedulesToRender = filteredSchedules.length > 0 || document.getElementById('scheduleFilterInput')?.value 
+        ? filteredSchedules 
+        : reportSchedules;
+      
+      if (schedulesToRender.length === 0) {
+        const filterActive = document.getElementById('scheduleFilterInput')?.value;
+        const message = filterActive 
+          ? 'No schedules match your filter. Try a different search term.'
+          : 'No report schedules yet. Create one to automate report delivery!';
+        showEmptyState('reportSchedulesBody', message, '📊');
         return;
       }
 
       const setupFunctions = [];
       
-      tbody.innerHTML = reportSchedules.map(schedule => {
+      tbody.innerHTML = schedulesToRender.map(schedule => {
+        const hasChanges = unsavedChanges.has(schedule.id);
         const group = emailGroups.find(g => g.id === schedule.email_group_id);
         
         // Create searchable selects for hierarchy dropdowns
@@ -1255,7 +1308,7 @@
         });
         
         return `
-          <tr data-schedule-id="${schedule.id}">
+          <tr data-schedule-id="${schedule.id}" class="${hasChanges ? 'has-changes' : ''}">
             <!-- Template Name -->
             <td>
               <input 
@@ -1556,68 +1609,104 @@
       }
     }
 
-    async function updateScheduleField(scheduleId, fieldName, value) {
+    function updateScheduleField(scheduleId, fieldName, value) {
       const schedule = reportSchedules.find(s => s.id === scheduleId);
       if (!schedule) return;
 
       // Update local state
       schedule[fieldName] = value;
 
+      // Track this change
+      if (!unsavedChanges.has(scheduleId)) {
+        unsavedChanges.set(scheduleId, {});
+      }
+      const changes = unsavedChanges.get(scheduleId);
+      changes[fieldName] = value;
+
+      // If we're updating entity fields, also include the entity name
+      if (fieldName === 'district_id') {
+        const option = districtOptions.find(o => o.id === value);
+        changes.district_name = option ? option.label : null;
+      } else if (fieldName === 'region_id') {
+        const option = regionOptions.find(o => o.id === value);
+        changes.region_name = option ? option.label : null;
+      } else if (fieldName === 'subsidiary_id') {
+        const option = subsidiaryOptions.find(o => o.id === value);
+        changes.subsidiary_name = option ? option.label : null;
+      }
+
+      // Mark row as changed
+      const row = document.querySelector(`tr[data-schedule-id="${scheduleId}"]`);
+      if (row) {
+        row.classList.add('has-changes');
+      }
+
+      // Show save button
+      document.getElementById('saveAllBtn').style.display = 'inline-flex';
+
       // If template_type changed, re-render to enable/disable appropriate dropdowns
       if (fieldName === 'template_type') {
         renderReportSchedulesTable();
       }
+    }
 
-      // Show saving indicator
-      const row = document.querySelector(`tr[data-schedule-id="${scheduleId}"]`);
-      if (row) {
-        const existingIndicator = row.querySelector('.saving-indicator');
-        if (existingIndicator) {
-          existingIndicator.remove();
-        }
+    async function saveAllChanges() {
+      const saveBtn = document.getElementById('saveAllBtn');
+      saveBtn.disabled = true;
+      saveBtn.textContent = '💾 Saving...';
 
-        const indicator = document.createElement('span');
-        indicator.className = 'saving-indicator';
-        indicator.textContent = 'Saving...';
-        row.cells[0].appendChild(indicator);
+      let successCount = 0;
+      let errorCount = 0;
 
-        // Prepare the update payload based on field name
-        let updatePayload = { [fieldName]: value };
-
-        // If we're updating entity fields, also include the entity name
-        if (fieldName === 'district_id') {
-          const option = districtOptions.find(o => o.id === value);
-          updatePayload.district_name = option ? option.label : null;
-        } else if (fieldName === 'region_id') {
-          const option = regionOptions.find(o => o.id === value);
-          updatePayload.region_name = option ? option.label : null;
-        } else if (fieldName === 'subsidiary_id') {
-          const option = subsidiaryOptions.find(o => o.id === value);
-          updatePayload.subsidiary_name = option ? option.label : null;
-        }
-
+      for (const [scheduleId, changes] of unsavedChanges.entries()) {
         try {
           const response = await fetch(`/api/report-schedules/${scheduleId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(updatePayload)
+            body: JSON.stringify(changes)
           });
 
           if (!response.ok) throw new Error('Failed to update');
 
-          // Update local data with response
           const updatedSchedule = await response.json();
-          Object.assign(schedule, updatedSchedule);
+          const schedule = reportSchedules.find(s => s.id === scheduleId);
+          if (schedule) {
+            Object.assign(schedule, updatedSchedule);
+          }
 
-          indicator.textContent = '✓ Saved';
-          indicator.className = 'saving-indicator success';
-          setTimeout(() => indicator.remove(), 2000);
+          // Remove highlight from row
+          const row = document.querySelector(`tr[data-schedule-id="${scheduleId}"]`);
+          if (row) {
+            row.classList.remove('has-changes');
+          }
+
+          successCount++;
         } catch (error) {
-          console.error('Error updating schedule:', error);
-          indicator.textContent = '✗ Error';
-          indicator.className = 'saving-indicator error';
-          setTimeout(() => indicator.remove(), 3000);
+          console.error(`Error updating schedule ${scheduleId}:`, error);
+          errorCount++;
         }
+      }
+
+      // Clear unsaved changes
+      unsavedChanges.clear();
+
+      // Update button
+      if (errorCount === 0) {
+        saveBtn.textContent = '✓ Saved!';
+        setTimeout(() => {
+          saveBtn.style.display = 'none';
+          saveBtn.textContent = '💾 Save Changes';
+          saveBtn.disabled = false;
+        }, 2000);
+      } else {
+        saveBtn.textContent = `⚠️ ${successCount} saved, ${errorCount} failed`;
+        saveBtn.disabled = false;
+        setTimeout(() => {
+          if (unsavedChanges.size === 0) {
+            saveBtn.style.display = 'none';
+            saveBtn.textContent = '💾 Save Changes';
+          }
+        }, 3000);
       }
     }
 
@@ -1633,11 +1722,55 @@
 
         if (!response.ok) throw new Error('Failed to delete report schedule');
 
+        // Remove from unsaved changes if it exists
+        unsavedChanges.delete(id);
+        if (unsavedChanges.size === 0) {
+          document.getElementById('saveAllBtn').style.display = 'none';
+        }
+
         loadReportSchedules();
       } catch (error) {
         console.error('Error deleting report schedule:', error);
         alert('Failed to delete report schedule: ' + error.message);
       }
+    }
+
+    // ============================================
+    // Filtering Functions
+    // ============================================
+    
+    function filterReportSchedules() {
+      const filterInput = document.getElementById('scheduleFilterInput');
+      const query = filterInput.value.toLowerCase().trim();
+      
+      if (!query) {
+        filteredSchedules = [...reportSchedules];
+      } else {
+        filteredSchedules = reportSchedules.filter(schedule => {
+          const group = emailGroups.find(g => g.id === schedule.email_group_id);
+          
+          // Search in multiple fields
+          const searchableText = [
+            schedule.template_name || '',
+            schedule.template_type || '',
+            schedule.process || '',
+            schedule.district_name || '',
+            schedule.region_name || '',
+            schedule.subsidiary_name || '',
+            group?.name || ''
+          ].join(' ').toLowerCase();
+          
+          return searchableText.includes(query);
+        });
+      }
+      
+      renderReportSchedulesTable();
+    }
+    
+    function clearScheduleFilter() {
+      document.getElementById('scheduleFilterInput').value = '';
+      filteredSchedules = [...reportSchedules];
+      renderReportSchedulesTable();
     }
 
     // ============================================
