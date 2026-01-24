@@ -1740,7 +1740,7 @@
     // PDF Download Function
     // ============================================
     
-    function downloadSchedulePDF(scheduleId) {
+    async function downloadSchedulePDF(scheduleId) {
       const schedule = reportSchedules.find(s => s.id === scheduleId);
       if (!schedule) {
         alert('Schedule not found');
@@ -1758,27 +1758,196 @@
         return;
       }
 
-      // Build URL parameters
-      const params = new URLSearchParams();
-      params.set('hierarchy', schedule.template_type); // district, region, subsidiary
-      params.set('process', schedule.process); // standard, operational
-      params.set('autoDownload', 'true'); // Trigger auto-download
-
-      // Add entity ID based on template type
+      // Get entity ID based on template type
+      let entityId, entityName;
       if (schedule.template_type === 'district' && schedule.district_id) {
-        params.set('entity', schedule.district_id);
+        entityId = schedule.district_id;
+        entityName = schedule.district_name || 'District';
       } else if (schedule.template_type === 'region' && schedule.region_id) {
-        params.set('entity', schedule.region_id);
+        entityId = schedule.region_id;
+        entityName = schedule.region_name || 'Region';
       } else if (schedule.template_type === 'subsidiary' && schedule.subsidiary_id) {
-        params.set('entity', schedule.subsidiary_id);
+        entityId = schedule.subsidiary_id;
+        entityName = schedule.subsidiary_name || 'Subsidiary';
       } else {
         alert(`Please select a ${schedule.template_type} before downloading`);
         return;
       }
 
-      // Open P&L page with parameters (root path serves pl-view.html)
-      const url = `/?${params.toString()}`;
-      window.open(url, '_blank');
+      try {
+        console.log('📥 Starting PDF download for schedule:', schedule.template_name);
+        
+        // Get the most recent date available
+        const datesResponse = await fetch('/api/pl/dates');
+        if (!datesResponse.ok) throw new Error('Failed to fetch dates');
+        const dates = await datesResponse.json();
+        if (!dates || dates.length === 0) {
+          alert('No P&L data available');
+          return;
+        }
+        const latestDate = dates[0]; // Assuming dates are sorted newest first
+        
+        console.log('📊 Fetching P&L data...');
+        // Fetch P&L data
+        const dataUrl = `/api/pl/data?hierarchy=${schedule.template_type}&selectedId=${encodeURIComponent(entityId)}&date=${latestDate}`;
+        const dataResponse = await fetch(dataUrl);
+        
+        if (!dataResponse.ok) {
+          throw new Error('Failed to fetch P&L data');
+        }
+        
+        const htmlContent = await dataResponse.text();
+        
+        if (!htmlContent || !htmlContent.trim()) {
+          alert('No report data available for the selected configuration');
+          return;
+        }
+        
+        console.log('🔨 Processing HTML for PDF...');
+        
+        // Parse and filter the HTML (keep only non-zero income reports)
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(`<div id="root">${htmlContent}</div>`, "text/html");
+        const root = doc.getElementById("root");
+        
+        // Remove any explicit page-break divs
+        root.querySelectorAll(".page-break").forEach(el => el.remove());
+        
+        // Collect only report pages with non-zero Income
+        const kept = [];
+        root.querySelectorAll(".pnl-report-container").forEach(container => {
+          if (hasNonZeroIncome(container)) {
+            kept.push(container.outerHTML);
+          }
+        });
+        
+        const filteredHtmlContent = kept.length ? kept.join("\n") : 
+          (root.querySelector(".pnl-report-container")?.outerHTML || htmlContent);
+        
+        console.log(`📊 Filtered to ${kept.length} reports with non-zero income`);
+        
+        // Build complete PDF HTML with styles
+        const fullHTML = buildPDFHTML(filteredHtmlContent);
+        
+        // Convert to PDF using PDFShift
+        console.log('🔄 Generating PDF...');
+        const pdfResponse = await fetch('https://api.pdfshift.io/v3/convert/pdf', {
+          method: 'POST',
+          headers: {
+            'X-API-Key': 'sk_3df748acf1ce265988e07e04544b6452ece1b20e',
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            source: fullHTML,
+            landscape: false,
+            use_print: true,
+            margin: { top: 10, bottom: 10, left: 10, right: 10 }
+          })
+        });
+        
+        if (!pdfResponse.ok) {
+          const errorText = await pdfResponse.text();
+          throw new Error("PDF generation failed: " + pdfResponse.status);
+        }
+        
+        // Download the PDF
+        const blob = await pdfResponse.blob();
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `PNL_${schedule.template_type}_${entityName.replace(/[^a-zA-Z0-9]/g, '_')}_${latestDate}.pdf`;
+        link.style.display = 'none';
+        document.body.appendChild(link);
+        link.click();
+        
+        setTimeout(() => {
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+        }, 100);
+        
+        console.log('✅ PDF downloaded successfully');
+        
+      } catch (error) {
+        console.error('❌ Error downloading PDF:', error);
+        alert('Failed to generate PDF: ' + error.message);
+      }
+    }
+    
+    // Helper function to check if a report has non-zero income
+    function hasNonZeroIncome(container) {
+      const table = container.querySelector("table");
+      if (!table) return false;
+      
+      const rows = Array.from(table.querySelectorAll("tr"));
+      for (const row of rows) {
+        const firstCell = row.querySelector("td, th");
+        if (firstCell && firstCell.textContent.trim().toLowerCase() === "income") {
+          const cells = Array.from(row.querySelectorAll("td, th"));
+          if (cells.length < 2) return false;
+          
+          const currentMonthCell = cells[1];
+          const value = parseAccountingToNumber(currentMonthCell?.textContent || "");
+          return Math.abs(value) > 0.0001;
+        }
+      }
+      return false;
+    }
+    
+    // Helper function to parse accounting format numbers
+    function parseAccountingToNumber(text) {
+      if (!text) return 0;
+      let cleaned = text.replace(/[$,\s]/g, "");
+      if (cleaned.startsWith("(") && cleaned.endsWith(")")) {
+        cleaned = "-" + cleaned.slice(1, -1);
+      }
+      const num = parseFloat(cleaned);
+      return isNaN(num) ? 0 : num;
+    }
+    
+    // Helper function to build PDF HTML with all styles
+    function buildPDFHTML(content) {
+      return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 0; }
+    .pnl-report-container {
+      background: #ffffff;
+      font-family: Arial, sans-serif;
+      color: #000000;
+      width: 100%;
+      margin: 0 auto;
+      padding: 8px 24px 12px 24px;
+      page-break-after: always;
+    }
+    .pnl-report-container:last-of-type { page-break-after: auto !important; }
+    .pnl-report-header { text-align: center; margin-bottom: 6px; padding: 0; line-height: 1.2; }
+    .pnl-report-header .pnl-title { font-weight: 700; font-size: 13px; margin: 0; line-height: 1.1; }
+    .pnl-report-header .pnl-subtitle { font-weight: 600; font-size: 10px; margin: 1px 0 0 0; line-height: 1.1; }
+    .pnl-report-header .pnl-meta, .pnl-report-header .meta { font-size: 8px; line-height: 1.2; margin: 0; }
+    .pnl-divider { border: none; border-top: 1px solid #ccc; margin: 4px 0 6px 0; }
+    .pnl-report-table { width: 100%; margin: 0 auto; border-collapse: collapse; font-size: 7.5px; background: #ffffff; table-layout: auto; }
+    .pnl-report-table th, .pnl-report-table td { padding: 2px 2px; border: none; white-space: nowrap; height: 12px; line-height: 1.2; vertical-align: middle; }
+    .pnl-report-table th { font-weight: 600; text-align: center; border-bottom: 1px solid #fff; background: transparent; font-size: 7.5px; }
+    .pnl-report-table td:first-child, .pnl-report-table th:first-child { text-align: left; padding-left: 4px; max-width: 180px; overflow: hidden; text-overflow: ellipsis; }
+    .pnl-report-table td { text-align: right; padding-right: 4px; }
+    .pnl-report-table tr.depth-0 td:first-child { font-weight: 700; font-size: 8px; padding-left: 2px; }
+    .pnl-report-table tr.depth-1 td:first-child { padding-left: 8px; }
+    .pnl-report-table tr.depth-2 td:first-child { padding-left: 16px; }
+    .pnl-report-table tr.depth-3 td:first-child { padding-left: 24px; }
+    .pnl-report-table tr.depth-4 td:first-child { padding-left: 32px; }
+    .pnl-report-table tr.depth-5 td:first-child { padding-left: 40px; }
+    .pnl-report-table tr.section-header { font-weight: 700; background: transparent; }
+    .pnl-report-table tr.total-row { font-weight: 600; border-top: 1px solid #000; }
+    .pnl-report-table tr.double-underline { border-top: 2px double #000; border-bottom: 2px double #000; }
+  </style>
+</head>
+<body>
+  ${content}
+</body>
+</html>`;
     }
 
     // ============================================
