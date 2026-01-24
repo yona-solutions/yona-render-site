@@ -115,8 +115,7 @@ const mockReportSchedules = [
     region_name: null,
     subsidiary_id: null,
     subsidiary_name: null,
-    email_group_id: 1,
-    email_group_name: 'District Managers',
+    email_group_ids: [1],  // Array of email group IDs
     frequency: 'weekly',
     day_of_week: 'Monday',
     day_of_month: null,
@@ -138,8 +137,7 @@ const mockReportSchedules = [
     region_name: 'R200',
     subsidiary_id: null,
     subsidiary_name: null,
-    email_group_id: 2,
-    email_group_name: 'Regional Directors',
+    email_group_ids: [2, 3],  // Multiple email groups
     frequency: 'monthly',
     day_of_week: null,
     day_of_month: 5,
@@ -161,8 +159,7 @@ const mockReportSchedules = [
     region_name: null,
     subsidiary_id: '13',                // Real subsidiary ID from config (Yona Solutions, LLC)
     subsidiary_name: 'Yona Solutions, LLC',
-    email_group_id: 4,
-    email_group_name: 'Executive Team',
+    email_group_ids: [4],
     frequency: 'monthly',
     day_of_week: null,
     day_of_month: 1,
@@ -184,8 +181,7 @@ const mockReportSchedules = [
     region_name: null,
     subsidiary_id: null,
     subsidiary_name: null,
-    email_group_id: 5,
-    email_group_name: 'West District Facilities',
+    email_group_ids: [5, 1],  // Facilities + District Managers
     frequency: 'weekly',
     day_of_week: 'Friday',
     day_of_month: null,
@@ -207,8 +203,7 @@ const mockReportSchedules = [
     region_name: 'R300',
     subsidiary_id: null,
     subsidiary_name: null,
-    email_group_id: 3,
-    email_group_name: 'Finance Team',
+    email_group_ids: [3],
     frequency: 'monthly',
     day_of_week: null,
     day_of_month: 3,
@@ -230,8 +225,7 @@ const mockReportSchedules = [
     region_name: 'R400',
     subsidiary_id: null,
     subsidiary_name: null,
-    email_group_id: 2,
-    email_group_name: 'Regional Directors',
+    email_group_ids: [2],
     frequency: 'weekly',
     day_of_week: 'Wednesday',
     day_of_month: null,
@@ -253,8 +247,7 @@ const mockReportSchedules = [
     region_name: null,
     subsidiary_id: null,
     subsidiary_name: null,
-    email_group_id: 1,
-    email_group_name: 'District Managers',
+    email_group_ids: [1, 6],  // District Managers + Northeast Operations
     frequency: 'monthly',
     day_of_week: null,
     day_of_month: 10,
@@ -276,8 +269,7 @@ const mockReportSchedules = [
     region_name: null,
     subsidiary_id: '8',                 // Real subsidiary ID (Yona Holdings LLC)
     subsidiary_name: 'Yona Holdings LLC',
-    email_group_id: 3,
-    email_group_name: 'Finance Team',
+    email_group_ids: [3, 4],  // Finance Team + Executive Team
     frequency: 'weekly',
     day_of_week: 'Tuesday',
     day_of_month: null,
@@ -371,9 +363,6 @@ function createMockEmailGroup(data) {
 function createMockReportSchedule(data) {
   const newId = Math.max(...mockReportSchedules.map(s => s.id)) + 1;
   
-  // Find email group name
-  const emailGroup = mockEmailGroups.find(g => g.id === parseInt(data.email_group_id));
-  
   const newSchedule = {
     id: newId,
     template_name: data.template_name,
@@ -385,8 +374,7 @@ function createMockReportSchedule(data) {
     region_name: data.region_name || null,
     subsidiary_id: data.subsidiary_id || null,
     subsidiary_name: data.subsidiary_name || null,
-    email_group_id: parseInt(data.email_group_id),
-    email_group_name: emailGroup ? emailGroup.name : 'Unknown',
+    email_group_ids: data.email_group_ids || [],  // Array of group IDs
     frequency: data.frequency,
     day_of_week: data.day_of_week || null,
     day_of_month: data.day_of_month || null,
@@ -400,6 +388,22 @@ function createMockReportSchedule(data) {
   
   mockReportSchedules.push(newSchedule);
   return newSchedule;
+}
+
+/**
+ * Update mock report schedule (simulated)
+ */
+function updateMockReportSchedule(id, updates) {
+  const schedule = mockReportSchedules.find(s => s.id === parseInt(id));
+  if (!schedule) {
+    return null;
+  }
+
+  // Apply updates
+  Object.assign(schedule, updates);
+  schedule.updated_at = new Date();
+
+  return JSON.parse(JSON.stringify(schedule));
 }
 
 /**
@@ -442,6 +446,7 @@ module.exports = {
   getMockReportSchedule,
   createMockEmailGroup,
   createMockReportSchedule,
+  updateMockReportSchedule,
   deleteMockEmailGroup,
   deleteMockReportSchedule
 };

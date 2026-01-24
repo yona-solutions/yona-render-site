@@ -852,6 +852,61 @@
       font-weight: bold;
       color: #28a745;
     }
+
+    /* Email Groups Tags */
+    .email-groups-cell {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .tags-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      min-height: 24px;
+    }
+
+    .email-group-tag {
+      background: #e3f2fd;
+      color: #1565c0;
+      border: 1px solid #90caf9;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+    }
+
+    .tag-remove {
+      background: none;
+      border: none;
+      color: #1565c0;
+      cursor: pointer;
+      padding: 0;
+      font-size: 16px;
+      line-height: 1;
+      font-weight: bold;
+      opacity: 0.7;
+      transition: opacity 0.15s;
+    }
+
+    .tag-remove:hover {
+      opacity: 1;
+      color: #d32f2f;
+    }
+
+    .add-group-select {
+      font-size: 11px !important;
+      padding: 4px 6px !important;
+      color: #666;
+    }
+
+    .add-group-select option:disabled {
+      color: #ccc;
+    }
   </style>
 </head>
 <body>
@@ -1464,19 +1519,32 @@
               ${subsidiarySelect.html}
             </td>
             
-            <!-- Email Group -->
+            <!-- Email Groups (Multiple) -->
             <td>
-              <select 
-                class="inline-select" 
-                onchange="updateScheduleField(${schedule.id}, 'email_group_id', this.value)"
-              >
-                <option value="">Select...</option>
-                ${emailGroups.map(g => `
-                  <option value="${g.id}" ${schedule.email_group_id === g.id ? 'selected' : ''}>
-                    ${escapeHtml(g.name)}
-                  </option>
-                `).join('')}
-              </select>
+              <div class="email-groups-cell" data-schedule-id="${schedule.id}">
+                <div class="tags-container">
+                  ${(schedule.email_group_ids || []).map(groupId => {
+                    const group = emailGroups.find(g => g.id === groupId);
+                    return group ? `
+                      <span class="tag email-group-tag">
+                        ${escapeHtml(group.name)}
+                        <button class="tag-remove" onclick="removeEmailGroupFromSchedule(${schedule.id}, ${groupId})" title="Remove">×</button>
+                      </span>
+                    ` : '';
+                  }).join('')}
+                </div>
+                <select 
+                  class="inline-select add-group-select" 
+                  onchange="addEmailGroupToSchedule(${schedule.id}, this.value); this.value='';"
+                >
+                  <option value="">+ Add Group...</option>
+                  ${emailGroups.map(g => `
+                    <option value="${g.id}" ${(schedule.email_group_ids || []).includes(g.id) ? 'disabled' : ''}>
+                      ${escapeHtml(g.name)}
+                    </option>
+                  `).join('')}
+                </select>
+              </div>
             </td>
             
             <!-- Enabled Toggle -->
@@ -1753,6 +1821,74 @@
       if (fieldName === 'template_type') {
         renderReportSchedulesTable();
       }
+    }
+
+    // Add email group to schedule
+    function addEmailGroupToSchedule(scheduleId, groupId) {
+      if (!groupId) return;
+      
+      const schedule = reportSchedules.find(s => s.id === scheduleId);
+      if (!schedule) return;
+
+      // Initialize array if it doesn't exist
+      if (!schedule.email_group_ids) {
+        schedule.email_group_ids = [];
+      }
+
+      // Don't add if already exists
+      const gid = parseInt(groupId);
+      if (schedule.email_group_ids.includes(gid)) {
+        return;
+      }
+
+      // Add the group
+      schedule.email_group_ids.push(gid);
+
+      // Track change
+      if (!unsavedChanges.has(scheduleId)) {
+        unsavedChanges.set(scheduleId, {});
+      }
+      unsavedChanges.get(scheduleId).email_group_ids = [...schedule.email_group_ids];
+
+      // Mark row as changed
+      const row = document.querySelector(`tr[data-schedule-id="${scheduleId}"]`);
+      if (row) {
+        row.classList.add('has-changes');
+      }
+
+      // Show save button
+      document.getElementById('saveAllBtn').style.display = 'inline-flex';
+
+      // Re-render to update UI
+      renderReportSchedulesTable();
+    }
+
+    // Remove email group from schedule
+    function removeEmailGroupFromSchedule(scheduleId, groupId) {
+      const schedule = reportSchedules.find(s => s.id === scheduleId);
+      if (!schedule || !schedule.email_group_ids) return;
+
+      // Remove the group
+      const gid = parseInt(groupId);
+      schedule.email_group_ids = schedule.email_group_ids.filter(id => id !== gid);
+
+      // Track change
+      if (!unsavedChanges.has(scheduleId)) {
+        unsavedChanges.set(scheduleId, {});
+      }
+      unsavedChanges.get(scheduleId).email_group_ids = [...schedule.email_group_ids];
+
+      // Mark row as changed
+      const row = document.querySelector(`tr[data-schedule-id="${scheduleId}"]`);
+      if (row) {
+        row.classList.add('has-changes');
+      }
+
+      // Show save button
+      document.getElementById('saveAllBtn').style.display = 'inline-flex';
+
+      // Re-render to update UI
+      renderReportSchedulesTable();
     }
 
     async function saveAllChanges() {
@@ -2237,7 +2373,10 @@
         filteredSchedules = [...reportSchedules];
       } else {
         filteredSchedules = reportSchedules.filter(schedule => {
-          const group = emailGroups.find(g => g.id === schedule.email_group_id);
+          // Get all email group names for this schedule
+          const groupNames = (schedule.email_group_ids || [])
+            .map(groupId => emailGroups.find(g => g.id === groupId)?.name || '')
+            .join(' ');
           
           // Search in multiple fields
           const searchableText = [
@@ -2247,7 +2386,7 @@
             schedule.district_name || '',
             schedule.region_name || '',
             schedule.subsidiary_name || '',
-            group?.name || ''
+            groupNames
           ].join(' ').toLowerCase();
           
           return searchableText.includes(query);

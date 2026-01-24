@@ -455,7 +455,7 @@ router.put('/report-schedules/:id', async (req, res) => {
       'region_name',
       'subsidiary_id',
       'subsidiary_name',
-      'email_group_id',
+      'email_group_ids',  // Now an array
       'frequency',
       'day_of_week',
       'day_of_month',
@@ -475,14 +475,19 @@ router.put('/report-schedules/:id', async (req, res) => {
       }
     });
 
-    // Convert email_group_id to integer if present
-    if (updateData.email_group_id !== undefined) {
-      updateData.email_group_id = parseInt(updateData.email_group_id);
+    // Convert email_group_ids array to integers if present
+    if (updateData.email_group_ids !== undefined) {
+      updateData.email_group_ids = Array.isArray(updateData.email_group_ids) 
+        ? updateData.email_group_ids.map(id => parseInt(id))
+        : [];
     }
 
     // Use mock data if database not available
     if (!emailConfigService.isAvailable()) {
-      const schedule = mockEmailData.updateReportSchedule(parseInt(id), updateData);
+      const schedule = mockEmailData.updateMockReportSchedule(parseInt(id), updateData);
+      if (!schedule) {
+        return res.status(404).json({ error: 'Report schedule not found' });
+      }
       console.log(`✅ Updated mock report schedule ID: ${id}`);
       return res.json(schedule);
     }
