@@ -907,6 +907,32 @@
     .add-group-select option:disabled {
       color: #ccc;
     }
+
+    /* Required field indicators */
+    .required-field {
+      border: 1px solid #f56565 !important;
+      background-color: #fff5f5 !important;
+    }
+
+    .required-field:focus {
+      outline: 2px solid #fc8181 !important;
+    }
+
+    .new-row {
+      background-color: #f0fff4 !important;
+      border-left: 3px solid #48bb78 !important;
+    }
+
+    .validation-error {
+      color: #e53e3e;
+      font-size: 11px;
+      margin-top: 4px;
+      display: none;
+    }
+
+    .validation-error.visible {
+      display: block;
+    }
   </style>
 </head>
 <body>
@@ -998,9 +1024,6 @@
             <button class="btn btn-primary" onclick="saveAllChanges()" id="saveAllBtn" style="display: none;">
               💾 Save Changes
             </button>
-            <button class="btn btn-primary" onclick="addNewReportSchedule()">
-              ➕ New Report Schedule
-            </button>
           </div>
         </div>
         
@@ -1026,9 +1049,9 @@
           <table id="reportSchedulesTable">
             <thead>
               <tr>
-                <th style="width: 120px;">Template Name</th>
-                <th style="width: 85px;">Type</th>
-                <th style="width: 75px;">Process</th>
+                <th style="width: 120px;">Template Name <span style="color: #e53e3e;">*</span></th>
+                <th style="width: 85px;">Type <span style="color: #e53e3e;">*</span></th>
+                <th style="width: 75px;">Process <span style="color: #e53e3e;">*</span></th>
                 <th style="width: 120px;">District</th>
                 <th style="width: 100px;">Region</th>
                 <th style="width: 120px;">Subsidiary</th>
@@ -1048,6 +1071,13 @@
               </tr>
             </tbody>
           </table>
+        </div>
+        
+        <!-- Add New Schedule Button -->
+        <div style="margin-top: 12px; text-align: center;">
+          <button class="btn btn-secondary" onclick="addNewScheduleRow()" style="min-width: 200px;">
+            ➕ Add New Schedule
+          </button>
         </div>
       </div>
     </div>
@@ -1812,6 +1842,18 @@
       const row = document.querySelector(`tr[data-schedule-id="${scheduleId}"]`);
       if (row) {
         row.classList.add('has-changes');
+        
+        // Remove required-field highlighting if a required field is now filled
+        if (fieldName === 'template_name' && value && value.trim() !== '') {
+          const input = row.querySelector('input[type="text"]');
+          if (input) input.classList.remove('required-field');
+        } else if (fieldName === 'template_type' && value) {
+          const select = row.querySelectorAll('select')[0];
+          if (select) select.classList.remove('required-field');
+        } else if (fieldName === 'process' && value) {
+          const select = row.querySelectorAll('select')[1];
+          if (select) select.classList.remove('required-field');
+        }
       }
 
       // Show save button
@@ -1892,38 +1934,81 @@
     }
 
     async function saveAllChanges() {
+      // Validate all schedules before saving
+      const validationErrors = validateSchedules();
+      if (validationErrors.length > 0) {
+        alert(`Please fix the following errors before saving:\n\n${validationErrors.join('\n')}`);
+        
+        // Highlight invalid fields
+        validationErrors.forEach(error => {
+          const match = error.match(/Schedule (\d+):/);
+          if (match) {
+            const scheduleId = parseInt(match[1]);
+            highlightRequiredFields(scheduleId);
+          }
+        });
+        return;
+      }
+
       const saveBtn = document.getElementById('saveAllBtn');
       saveBtn.disabled = true;
       saveBtn.textContent = '💾 Saving...';
 
       let successCount = 0;
       let errorCount = 0;
+      let newSchedulesCreated = 0;
 
       for (const [scheduleId, changes] of unsavedChanges.entries()) {
         try {
-          const response = await fetch(`/api/report-schedules/${scheduleId}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(changes)
-          });
+          let response, savedSchedule;
+          
+          // Check if this is a new schedule (negative ID) or existing (positive ID)
+          if (scheduleId < 0) {
+            // Create new schedule
+            response = await fetch('/api/report-schedules', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(changes)
+            });
+            
+            if (!response.ok) throw new Error('Failed to create');
+            
+            savedSchedule = await response.json();
+            
+            // Remove the temporary schedule and add the real one
+            const tempIndex = reportSchedules.findIndex(s => s.id === scheduleId);
+            if (tempIndex !== -1) {
+              reportSchedules.splice(tempIndex, 1);
+            }
+            reportSchedules.push(savedSchedule);
+            
+            newSchedulesCreated++;
+          } else {
+            // Update existing schedule
+            response = await fetch(`/api/report-schedules/${scheduleId}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(changes)
+            });
 
-          if (!response.ok) throw new Error('Failed to update');
+            if (!response.ok) throw new Error('Failed to update');
 
-          const updatedSchedule = await response.json();
-          const schedule = reportSchedules.find(s => s.id === scheduleId);
-          if (schedule) {
-            Object.assign(schedule, updatedSchedule);
+            savedSchedule = await response.json();
+            const schedule = reportSchedules.find(s => s.id === scheduleId);
+            if (schedule) {
+              Object.assign(schedule, savedSchedule);
+            }
           }
 
           // Remove highlight from row
           const row = document.querySelector(`tr[data-schedule-id="${scheduleId}"]`);
           if (row) {
-            row.classList.remove('has-changes');
+            row.classList.remove('has-changes', 'new-row');
           }
 
           successCount++;
         } catch (error) {
-          console.error(`Error updating schedule ${scheduleId}:`, error);
+          console.error(`Error saving schedule ${scheduleId}:`, error);
           errorCount++;
         }
       }
@@ -1931,13 +2016,26 @@
       // Clear unsaved changes
       unsavedChanges.clear();
 
+      // Reload schedules to get fresh data with real IDs
+      if (newSchedulesCreated > 0) {
+        await loadReportSchedules();
+      }
+
       // Update button
       if (errorCount === 0) {
-        saveBtn.textContent = '✓ Saved!';
+        const message = newSchedulesCreated > 0 
+          ? `✓ Saved! (${newSchedulesCreated} new)`
+          : '✓ Saved!';
+        saveBtn.textContent = message;
         setTimeout(() => {
           saveBtn.style.display = 'none';
           saveBtn.textContent = '💾 Save Changes';
           saveBtn.disabled = false;
+          
+          // Re-render to update UI
+          if (newSchedulesCreated === 0) {
+            renderReportSchedulesTable();
+          }
         }, 2000);
       } else {
         saveBtn.textContent = `⚠️ ${successCount} saved, ${errorCount} failed`;
@@ -1950,6 +2048,112 @@
         }, 3000);
       }
     }
+
+    // Validate all schedules before saving
+    function validateSchedules() {
+      const errors = [];
+      
+      for (const schedule of reportSchedules) {
+        // Only validate if it has unsaved changes
+        if (!unsavedChanges.has(schedule.id)) continue;
+        
+        const changes = unsavedChanges.get(schedule.id);
+        const data = { ...schedule, ...changes };
+        
+        if (!data.template_name || data.template_name.trim() === '') {
+          errors.push(`Schedule ${schedule.id < 0 ? '(new)' : schedule.id}: Template Name is required`);
+        }
+        
+        if (!data.template_type) {
+          errors.push(`Schedule ${schedule.id < 0 ? '(new)' : schedule.id}: Type is required`);
+        }
+        
+        if (!data.process) {
+          errors.push(`Schedule ${schedule.id < 0 ? '(new)' : schedule.id}: Process is required`);
+        }
+      }
+      
+      return errors;
+    }
+
+    // Highlight required fields for a schedule
+    function highlightRequiredFields(scheduleId) {
+      const row = document.querySelector(`tr[data-schedule-id="${scheduleId}"]`);
+      if (!row) return;
+      
+      const schedule = reportSchedules.find(s => s.id === scheduleId);
+      if (!schedule) return;
+      
+      // Check template_name
+      const nameInput = row.querySelector('input[type="text"]');
+      if (nameInput && (!schedule.template_name || schedule.template_name.trim() === '')) {
+        nameInput.classList.add('required-field');
+      }
+      
+      // Check template_type
+      const typeSelect = row.querySelectorAll('select')[0];
+      if (typeSelect && !schedule.template_type) {
+        typeSelect.classList.add('required-field');
+      }
+      
+      // Check process
+      const processSelect = row.querySelectorAll('select')[1];
+      if (processSelect && !schedule.process) {
+        processSelect.classList.add('required-field');
+      }
+    }
+
+    // Add new schedule row
+    let newScheduleCounter = -1;  // Use negative IDs for new schedules
+    
+    function addNewScheduleRow() {
+      // Create a new temporary schedule
+      const newSchedule = {
+        id: newScheduleCounter--,  // Negative ID
+        template_name: '',
+        template_type: '',
+        process: '',
+        district_id: null,
+        district_name: null,
+        region_id: null,
+        region_name: null,
+        subsidiary_id: null,
+        subsidiary_name: null,
+        email_group_ids: [],
+        enabled: true,
+        created_at: new Date(),
+        updated_at: new Date()
+      };
+      
+      // Add to reportSchedules array
+      reportSchedules.push(newSchedule);
+      
+      // Mark as having changes
+      unsavedChanges.set(newSchedule.id, { ...newSchedule });
+      
+      // Show save button
+      document.getElementById('saveAllBtn').style.display = 'inline-flex';
+      
+      // Re-render table
+      renderReportSchedulesTable();
+      
+      // Scroll to bottom
+      setTimeout(() => {
+        const tbody = document.getElementById('reportSchedulesBody');
+        const newRow = tbody.querySelector(`tr[data-schedule-id="${newSchedule.id}"]`);
+        if (newRow) {
+          newRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          newRow.classList.add('new-row');
+          
+          // Focus on first input
+          const firstInput = newRow.querySelector('input');
+          if (firstInput) {
+            firstInput.focus();
+          }
+        }
+      }, 100);
+    }
+    
 
     async function deleteReportSchedule(id) {
       if (!confirm('Are you sure you want to delete this report schedule?')) {

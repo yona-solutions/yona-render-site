@@ -364,7 +364,7 @@ router.post('/report-schedules', async (req, res) => {
       region_name,
       subsidiary_id,
       subsidiary_name,
-      email_group_id,
+      email_group_ids,  // Now an array
       frequency,
       day_of_week,
       day_of_month,
@@ -390,7 +390,7 @@ router.post('/report-schedules', async (req, res) => {
       region_name: region_name || null,
       subsidiary_id: subsidiary_id || null,
       subsidiary_name: subsidiary_name || null,
-      email_group_id: email_group_id ? parseInt(email_group_id) : null,
+      email_group_ids: Array.isArray(email_group_ids) ? email_group_ids.map(id => parseInt(id)) : [],
       frequency: frequency || 'monthly',
       day_of_week: day_of_week || null,
       day_of_month: day_of_month || null,
