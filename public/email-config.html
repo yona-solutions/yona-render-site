@@ -763,9 +763,113 @@
     tr.has-changes:hover {
       background: #fef3c7 !important;
     }
+
+    /* Loading Modal */
+    .loading-modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.7);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 10000;
+    }
+
+    .loading-modal.active {
+      display: flex;
+    }
+
+    .loading-content {
+      background: white;
+      padding: 30px 40px;
+      border-radius: 8px;
+      text-align: center;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+      min-width: 350px;
+    }
+
+    .loading-spinner {
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #007bff;
+      border-radius: 50%;
+      width: 50px;
+      height: 50px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 20px;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .loading-message {
+      font-size: 16px;
+      color: #333;
+      font-weight: 600;
+      margin-bottom: 15px;
+    }
+
+    .loading-steps {
+      text-align: left;
+      margin-top: 15px;
+    }
+
+    .loading-step {
+      font-size: 13px;
+      color: #999;
+      margin: 6px 0;
+      padding-left: 20px;
+      position: relative;
+    }
+
+    .loading-step::before {
+      content: '○';
+      position: absolute;
+      left: 0;
+      font-size: 14px;
+    }
+
+    .loading-step.active {
+      color: #007bff;
+      font-weight: 500;
+    }
+
+    .loading-step.active::before {
+      content: '◉';
+      color: #007bff;
+    }
+
+    .loading-step.completed {
+      color: #28a745;
+    }
+
+    .loading-step.completed::before {
+      content: '✓';
+      font-weight: bold;
+      color: #28a745;
+    }
   </style>
 </head>
 <body>
+  <!-- Loading Modal -->
+  <div id="loadingModal" class="loading-modal">
+    <div class="loading-content">
+      <div class="loading-spinner"></div>
+      <div class="loading-message" id="loadingMessage">Generating PDF...</div>
+      <div class="loading-steps">
+        <div class="loading-step" id="step1">Fetching available dates</div>
+        <div class="loading-step" id="step2">Loading P&L data</div>
+        <div class="loading-step" id="step3">Processing report</div>
+        <div class="loading-step" id="step4">Converting to PDF</div>
+        <div class="loading-step" id="step5">Downloading file</div>
+      </div>
+    </div>
+  </div>
+
   <!-- Sidebar -->
   <div class="sidebar">
     <div class="logo">
@@ -1737,6 +1841,52 @@
     }
 
     // ============================================
+    // Loading Modal Functions
+    // ============================================
+    
+    function showLoadingModal(message = 'Generating PDF...') {
+      const modal = document.getElementById('loadingModal');
+      const messageEl = document.getElementById('loadingMessage');
+      messageEl.textContent = message;
+      
+      // Reset all steps
+      for (let i = 1; i <= 5; i++) {
+        const step = document.getElementById(`step${i}`);
+        step.classList.remove('active', 'completed');
+      }
+      
+      modal.classList.add('active');
+    }
+    
+    function hideLoadingModal() {
+      const modal = document.getElementById('loadingModal');
+      modal.classList.remove('active');
+    }
+    
+    function updateLoadingStep(stepNumber) {
+      // Mark previous steps as completed
+      for (let i = 1; i < stepNumber; i++) {
+        const step = document.getElementById(`step${i}`);
+        step.classList.remove('active');
+        step.classList.add('completed');
+      }
+      
+      // Mark current step as active
+      const currentStep = document.getElementById(`step${stepNumber}`);
+      if (currentStep) {
+        currentStep.classList.add('active');
+      }
+    }
+    
+    function completeAllSteps() {
+      for (let i = 1; i <= 5; i++) {
+        const step = document.getElementById(`step${i}`);
+        step.classList.remove('active');
+        step.classList.add('completed');
+      }
+    }
+
+    // ============================================
     // PDF Download Function
     // ============================================
     
@@ -1777,12 +1927,17 @@
       try {
         console.log('📥 Starting PDF download for schedule:', schedule.template_name);
         
-        // Get the most recent date available
+        // Show loading modal
+        showLoadingModal('Generating PDF...');
+        
+        // Step 1: Get the most recent date available
+        updateLoadingStep(1);
         console.log('📅 Fetching available dates...');
         const datesResponse = await fetch('/api/pl/dates');
         if (!datesResponse.ok) throw new Error('Failed to fetch dates');
         const dates = await datesResponse.json();
         if (!dates || dates.length === 0) {
+          hideLoadingModal();
           alert('No P&L data available');
           return;
         }
@@ -1790,6 +1945,8 @@
         const latestDate = dates[0].time || dates[0].formatted;
         console.log('📅 Latest date:', latestDate);
         
+        // Step 2: Fetch P&L data
+        updateLoadingStep(2);
         console.log('📊 Fetching P&L data...');
         console.log('   Hierarchy:', schedule.template_type);
         console.log('   Entity ID:', entityId);
@@ -1812,10 +1969,13 @@
         console.log('✅ Received HTML content, length:', htmlContent.length);
         
         if (!htmlContent || !htmlContent.trim()) {
+          hideLoadingModal();
           alert('No report data available for the selected configuration');
           return;
         }
         
+        // Step 3: Process report
+        updateLoadingStep(3);
         console.log('🔨 Processing HTML for PDF...');
         
         // Parse and filter the HTML (keep only non-zero income reports)
@@ -1842,7 +2002,8 @@
         // Build complete PDF HTML with styles
         const fullHTML = buildPDFHTML(filteredHtmlContent);
         
-        // Convert to PDF using PDFShift
+        // Step 4: Convert to PDF using PDFShift
+        updateLoadingStep(4);
         console.log('🔄 Generating PDF...');
         const pdfResponse = await fetch('https://api.pdfshift.io/v3/convert/pdf', {
           method: 'POST',
@@ -1860,10 +2021,12 @@
         
         if (!pdfResponse.ok) {
           const errorText = await pdfResponse.text();
+          hideLoadingModal();
           throw new Error("PDF generation failed: " + pdfResponse.status);
         }
         
-        // Download the PDF
+        // Step 5: Download the PDF
+        updateLoadingStep(5);
         const blob = await pdfResponse.blob();
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
@@ -1878,10 +2041,20 @@
           URL.revokeObjectURL(url);
         }, 100);
         
+        // Complete all steps and briefly show success
+        completeAllSteps();
+        document.getElementById('loadingMessage').textContent = 'PDF Downloaded!';
+        
         console.log('✅ PDF downloaded successfully');
+        
+        // Hide modal after a brief delay
+        setTimeout(() => {
+          hideLoadingModal();
+        }, 1000);
         
       } catch (error) {
         console.error('❌ Error downloading PDF:', error);
+        hideLoadingModal();
         alert('Failed to generate PDF: ' + error.message);
       }
     }
