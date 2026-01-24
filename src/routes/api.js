@@ -334,30 +334,34 @@ function createApiRoutes(storageService, bigQueryService) {
         queryParams.isTag = isTag; // Store whether this is a tag for header generation
         console.log(`   Found ${customerIds.length} customer IDs for ${isTag ? 'tag' : 'district'}: ${districtName}`);
       } else if (hierarchy === 'region') {
-        // Get region internal ID
-        const regionId = await storageService.getRegionInternalId(actualId);
+        // Get region internal ID and name
+        const regionResult = await storageService.getRegionInternalId(actualId);
         
-        if (!regionId) {
+        if (!regionResult) {
           return res.status(404).json({ 
             error: 'Region not found',
             code: 'REGION_NOT_FOUND'
           });
         }
         
+        const { regionId, regionName } = regionResult;
+        selectedLabel = regionName; // Use the region name in the header
+        
         // Check for optional subsidiary filter
         let subsidiaryId = null;
         const subsidiaryFilter = req.query.subsidiaryFilter;
         
         if (subsidiaryFilter && subsidiaryFilter !== 'all') {
-          subsidiaryId = await storageService.getSubsidiaryInternalId(subsidiaryFilter);
+          const subsidiaryResult = await storageService.getSubsidiaryInternalId(subsidiaryFilter);
           
-          if (!subsidiaryId) {
+          if (!subsidiaryResult) {
             return res.status(404).json({ 
               error: 'Subsidiary not found',
               code: 'SUBSIDIARY_NOT_FOUND'
             });
           }
           
+          subsidiaryId = subsidiaryResult.subsidiaryId;
           console.log(`   Using subsidiary filter: subsidiary_internal_id=${subsidiaryId}`);
         }
         
@@ -385,30 +389,34 @@ function createApiRoutes(storageService, bigQueryService) {
         console.log(`   Using filters: ${filterDesc}`);
         console.log(`   Found ${customersInRegion.length} customers in ${districtGroups.length} districts`);
       } else if (hierarchy === 'subsidiary') {
-        // Get subsidiary internal ID
-        const subsidiaryId = await storageService.getSubsidiaryInternalId(actualId);
+        // Get subsidiary internal ID and name
+        const subsidiaryResult = await storageService.getSubsidiaryInternalId(actualId);
         
-        if (!subsidiaryId) {
+        if (!subsidiaryResult) {
           return res.status(404).json({ 
             error: 'Subsidiary not found',
             code: 'SUBSIDIARY_NOT_FOUND'
           });
         }
         
+        const { subsidiaryId, subsidiaryName } = subsidiaryResult;
+        selectedLabel = subsidiaryName; // Use the subsidiary name in the header
+        
         // Check for optional region filter
         let regionId = null;
         const regionFilter = req.query.regionFilter;
         
         if (regionFilter && regionFilter !== 'all') {
-          regionId = await storageService.getRegionInternalId(regionFilter);
+          const regionResult = await storageService.getRegionInternalId(regionFilter);
           
-          if (!regionId) {
+          if (!regionResult) {
             return res.status(404).json({ 
               error: 'Region not found',
               code: 'REGION_NOT_FOUND'
             });
           }
           
+          regionId = regionResult.regionId;
           console.log(`   📎 Applying region filter: ${regionFilter} (internal ID: ${regionId})`);
         }
         

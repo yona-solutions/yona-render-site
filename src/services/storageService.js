@@ -483,7 +483,10 @@ class StorageService {
     const regionConfig = configData[regionId];
     
     if (regionConfig && regionConfig.region_internal_id) {
-      return parseInt(regionConfig.region_internal_id);
+      return {
+        regionId: parseInt(regionConfig.region_internal_id),
+        regionName: regionConfig.label || regionId
+      };
     }
     
     return null;
@@ -501,7 +504,10 @@ class StorageService {
     const deptConfig = configData[departmentId];
     
     if (deptConfig && deptConfig.subsidiary_internal_id) {
-      return parseInt(deptConfig.subsidiary_internal_id);
+      return {
+        subsidiaryId: parseInt(deptConfig.subsidiary_internal_id),
+        subsidiaryName: deptConfig.label || departmentId
+      };
     }
     
     return null;
