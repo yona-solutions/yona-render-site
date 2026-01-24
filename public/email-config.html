@@ -2659,8 +2659,20 @@
     let currentScheduleForEmail = null;
     
     function sendScheduleEmail(scheduleId) {
+      console.log('📧 Opening send email modal for schedule ID:', scheduleId);
+      
       // Store the schedule ID for later use
       currentScheduleForEmail = scheduleId;
+      
+      // Verify schedule exists
+      const schedule = reportSchedules.find(s => s.id == scheduleId);
+      if (!schedule) {
+        console.error('❌ Schedule not found when opening modal!', scheduleId);
+        alert('Error: Schedule not found. Please refresh the page.');
+        return;
+      }
+      
+      console.log('   Schedule found:', schedule.template_name);
       
       // Open the send email modal
       document.getElementById('sendEmailModal').classList.add('active');
@@ -2679,6 +2691,10 @@
     async function confirmSendEmail() {
       const recipientEmail = document.getElementById('recipientEmail').value.trim();
       
+      console.log('✅ Confirming send email...');
+      console.log('   Recipient:', recipientEmail);
+      console.log('   Current schedule ID:', currentScheduleForEmail);
+      
       // Validate email format
       if (!recipientEmail) {
         alert('Please enter an email address');
@@ -2691,6 +2707,7 @@
       }
       
       if (!currentScheduleForEmail) {
+        console.error('❌ No schedule selected!');
         alert('Error: No schedule selected');
         closeSendEmailModal();
         return;
@@ -2699,16 +2716,28 @@
       // Close the modal
       closeSendEmailModal();
       
+      console.log('📤 Proceeding with send...');
+      
       // Proceed with sending
       await executeSendEmail(currentScheduleForEmail, recipientEmail);
     }
     
     async function executeSendEmail(scheduleId, recipientEmail) {
-      const schedule = reportSchedules.find(s => s.id === scheduleId);
+      console.log('🔍 Looking for schedule ID:', scheduleId, 'Type:', typeof scheduleId);
+      console.log('   Available schedules:', reportSchedules.map(s => ({ id: s.id, type: typeof s.id, name: s.template_name })));
+      
+      // Try to find schedule (handle both string and number IDs)
+      const schedule = reportSchedules.find(s => s.id == scheduleId); // Use == for loose comparison
+      
       if (!schedule) {
-        alert('Schedule not found');
+        console.error('❌ Schedule not found!');
+        console.error('   Searched for:', scheduleId);
+        console.error('   Available IDs:', reportSchedules.map(s => s.id));
+        alert('Schedule not found. Please refresh the page and try again.');
         return;
       }
+      
+      console.log('✅ Found schedule:', schedule.template_name);
 
       // Validate that required fields are set
       if (!schedule.template_type) {
