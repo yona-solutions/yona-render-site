@@ -2107,6 +2107,8 @@
     let newScheduleCounter = -1;  // Use negative IDs for new schedules
     
     function addNewScheduleRow() {
+      console.log('➕ Adding new schedule row...');
+      
       // Create a new temporary schedule
       const newSchedule = {
         id: newScheduleCounter--,  // Negative ID
@@ -2127,6 +2129,13 @@
       
       // Add to reportSchedules array
       reportSchedules.push(newSchedule);
+      
+      // Also add to filteredSchedules so it appears immediately
+      filteredSchedules.push(newSchedule);
+      
+      console.log('✅ New schedule added with ID:', newSchedule.id);
+      console.log('   Total schedules:', reportSchedules.length);
+      console.log('   Filtered schedules:', filteredSchedules.length);
       
       // Mark as having changes
       unsavedChanges.set(newSchedule.id, { ...newSchedule });
