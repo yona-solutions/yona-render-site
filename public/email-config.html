@@ -211,7 +211,8 @@
     table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 13px;
+      font-size: 12px;
+      table-layout: fixed;
     }
 
     thead {
@@ -222,18 +223,22 @@
 
     th {
       text-align: left;
-      padding: 12px 16px;
+      padding: 8px 10px;
       font-weight: 600;
       color: #4a5568;
-      font-size: 12px;
+      font-size: 11px;
       text-transform: uppercase;
-      letter-spacing: 0.05em;
+      letter-spacing: 0.03em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     td {
-      padding: 14px 16px;
+      padding: 8px 10px;
       border-bottom: 1px solid #e2e8f0;
       color: #2d3748;
+      vertical-align: middle;
     }
 
     tbody tr:hover {
@@ -460,10 +465,10 @@
     .icon-btn {
       background: none;
       border: none;
-      padding: 6px 10px;
+      padding: 4px 8px;
       cursor: pointer;
       border-radius: 4px;
-      font-size: 13px;
+      font-size: 14px;
       transition: all 0.15s ease;
       color: #718096;
     }
@@ -502,13 +507,23 @@
     /* Inline Editing Styles */
     .inline-input, .inline-select {
       width: 100%;
-      padding: 6px 10px;
+      padding: 5px 8px;
       border: 1px solid #e2e8f0;
-      border-radius: 4px;
-      font-size: 13px;
+      border-radius: 5px;
+      font-size: 12px;
       font-family: inherit;
       background: white;
       transition: all 0.15s ease;
+      color: #2d3748;
+      cursor: pointer;
+    }
+
+    .inline-select {
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%234a5568' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 6px center;
+      padding-right: 24px;
     }
 
     .inline-input:focus, .inline-select:focus {
@@ -517,16 +532,23 @@
       box-shadow: 0 0 0 2px rgba(90, 111, 216, 0.1);
     }
 
-    .inline-input:hover, .inline-select:hover {
+    .inline-input:hover:not(:disabled), .inline-select:hover:not(:disabled) {
       border-color: #cbd5e0;
+      background: #fafbfc;
+    }
+
+    .inline-input:disabled, .inline-select:disabled {
+      background: #f7fafc;
+      color: #a0aec0;
+      cursor: not-allowed;
     }
 
     /* Toggle Switch */
     .toggle-switch {
       position: relative;
       display: inline-block;
-      width: 44px;
-      height: 24px;
+      width: 38px;
+      height: 20px;
     }
 
     .toggle-switch input {
@@ -544,19 +566,20 @@
       bottom: 0;
       background-color: #cbd5e0;
       transition: 0.3s;
-      border-radius: 24px;
+      border-radius: 20px;
     }
 
     .toggle-slider:before {
       position: absolute;
       content: "";
-      height: 18px;
-      width: 18px;
+      height: 14px;
+      width: 14px;
       left: 3px;
       bottom: 3px;
       background-color: white;
       transition: 0.3s;
       border-radius: 50%;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
     }
 
     input:checked + .toggle-slider {
@@ -564,14 +587,14 @@
     }
 
     input:checked + .toggle-slider:before {
-      transform: translateX(20px);
+      transform: translateX(18px);
     }
 
     /* Saving Indicator */
     .saving-indicator {
       display: inline-block;
-      margin-left: 8px;
-      font-size: 11px;
+      margin-left: 6px;
+      font-size: 10px;
       color: #718096;
       font-style: italic;
     }
@@ -664,15 +687,15 @@
           <table id="reportSchedulesTable">
             <thead>
               <tr>
-                <th style="width: 180px;">Template Name</th>
-                <th style="width: 120px;">Template Type</th>
-                <th style="width: 110px;">Process</th>
-                <th style="width: 180px;">District</th>
-                <th style="width: 180px;">Region</th>
-                <th style="width: 180px;">Subsidiary</th>
-                <th style="width: 150px;">Email Group</th>
-                <th style="width: 80px;">Enabled</th>
-                <th style="width: 60px;">Actions</th>
+                <th style="width: 140px;">Template Name</th>
+                <th style="width: 100px;">Template Type</th>
+                <th style="width: 90px;">Process</th>
+                <th style="width: 140px;">District</th>
+                <th style="width: 140px;">Region</th>
+                <th style="width: 140px;">Subsidiary</th>
+                <th style="width: 130px;">Email Group</th>
+                <th style="width: 70px;">Enabled</th>
+                <th style="width: 50px;">Actions</th>
               </tr>
             </thead>
             <tbody id="reportSchedulesBody">
@@ -803,46 +826,72 @@
     async function loadHierarchyOptions() {
       try {
         // Load districts, regions, and subsidiaries in parallel
-        const [districts, regions, subsidiaries] = await Promise.all([
+        const [districtsData, regionsData, subsidiariesData] = await Promise.all([
           fetch('/api/storage/districts').then(r => r.json()),
           fetch('/api/storage/regions').then(r => r.json()),
           fetch('/api/storage/departments').then(r => r.json())
         ]);
 
-        // Filter districts (exclude ones with 'not available' tag)
-        districtOptions = Object.entries(districts)
-          .filter(([id, data]) => {
-            if (data.districtReportingExcluded) return false;
-            if (data.tags && data.tags.includes('not available')) return false;
-            return true;
-          })
-          .map(([id, data]) => ({
-            id: id,
-            label: data.label || id,
-            isTag: data.isDistrict || false,
-            tags: data.tags || []
-          }));
+        console.log('📊 Raw data loaded:', {
+          districtsData,
+          regionsData,
+          subsidiariesData
+        });
 
-        // Filter regions (exclude ones with displayExcluded)
-        regionOptions = Object.entries(regions)
-          .filter(([id, data]) => !data.displayExcluded)
-          .map(([id, data]) => ({
-            id: id,
-            label: data.label || id
-          }));
+        // Process districts - these come as an object with IDs as keys
+        districtOptions = [];
+        if (typeof districtsData === 'object' && districtsData !== null) {
+          districtOptions = Object.entries(districtsData)
+            .filter(([id, data]) => {
+              // Filter logic from P&L page
+              if (data.districtReportingExcluded) return false;
+              if (data.districtTags && data.districtTags.includes('not available')) return false;
+              if (data.tags && data.tags.includes('not available')) return false;
+              return true;
+            })
+            .map(([id, data]) => ({
+              id: id,
+              label: data.label || id,
+              isTag: data.isDistrict || false,
+              tags: data.districtTags || data.tags || []
+            }))
+            .sort((a, b) => a.label.localeCompare(b.label));
+        }
 
-        // Filter subsidiaries (exclude ones with displayExcluded)
-        subsidiaryOptions = Object.entries(subsidiaries)
-          .filter(([id, data]) => !data.displayExcluded)
-          .map(([id, data]) => ({
-            id: id,
-            label: data.label || id
-          }));
+        // Process regions
+        regionOptions = [];
+        if (typeof regionsData === 'object' && regionsData !== null) {
+          regionOptions = Object.entries(regionsData)
+            .filter(([id, data]) => !data.displayExcluded)
+            .map(([id, data]) => ({
+              id: id,
+              label: data.label || id
+            }))
+            .sort((a, b) => a.label.localeCompare(b.label));
+        }
+
+        // Process subsidiaries (departments)
+        subsidiaryOptions = [];
+        if (typeof subsidiariesData === 'object' && subsidiariesData !== null) {
+          subsidiaryOptions = Object.entries(subsidiariesData)
+            .filter(([id, data]) => !data.displayExcluded)
+            .map(([id, data]) => ({
+              id: id,
+              label: data.label || id
+            }))
+            .sort((a, b) => a.label.localeCompare(b.label));
+        }
 
         console.log('📊 Loaded hierarchy options:', {
           districts: districtOptions.length,
           regions: regionOptions.length,
           subsidiaries: subsidiaryOptions.length
+        });
+
+        console.log('📊 Sample options:', {
+          districts: districtOptions.slice(0, 3),
+          regions: regionOptions.slice(0, 3),
+          subsidiaries: subsidiaryOptions.slice(0, 3)
         });
       } catch (error) {
         console.error('Error loading hierarchy options:', error);
