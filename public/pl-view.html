@@ -1119,7 +1119,7 @@
     }
     
     // Initialize searchable selects and load data
-    document.addEventListener('DOMContentLoaded', () => {
+    document.addEventListener('DOMContentLoaded', async () => {
       // Initialize searchable select components
       monthSelect = new SearchableSelect('monthSelectWrapper');
       districtSelect = new SearchableSelect('districtSelectWrapper');
@@ -1137,10 +1137,83 @@
         // TODO: Refresh P&L data based on selected district
       };
       
+      // Check for URL parameters (for automated PDF download from email config)
+      const urlParams = new URLSearchParams(window.location.search);
+      const hierarchy = urlParams.get('hierarchy'); // district, region, subsidiary
+      const entityId = urlParams.get('entity'); // specific entity ID
+      const process = urlParams.get('process'); // standard, operational
+      const autoDownload = urlParams.get('autoDownload'); // true/false
+      
       // Load data
       loadAvailableDates();
-      loadHierarchyOptions();
+      await loadHierarchyOptions(hierarchy || 'district');
+      
+      // If URL parameters are provided, auto-configure and download
+      if (hierarchy && entityId && autoDownload === 'true') {
+        setTimeout(() => {
+          applyURLParameters(hierarchy, entityId, process);
+        }, 1500); // Wait for data to load
+      }
     });
+
+    // ============================================
+    // URL Parameter Handling for Auto-Download
+    // ============================================
+    
+    function applyURLParameters(hierarchy, entityId, process) {
+      console.log('🔗 Applying URL parameters:', { hierarchy, entityId, process });
+      
+      // Set hierarchy tab (capitalize first letter to match tab text)
+      const hierarchyCapitalized = hierarchy.charAt(0).toUpperCase() + hierarchy.slice(1);
+      const hierarchyTabs = Array.from(document.querySelectorAll('.tab'));
+      const hierarchyTab = hierarchyTabs.find(tab => tab.textContent === hierarchyCapitalized);
+      
+      if (hierarchyTab) {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        hierarchyTab.classList.add('active');
+        
+        // Update the dropdown label to match selected hierarchy
+        const hierarchyLabel = document.querySelector('.control-group:nth-child(3) .control-label');
+        if (hierarchyLabel) {
+          hierarchyLabel.textContent = hierarchyCapitalized;
+        }
+        
+        // Update the dropdown placeholder
+        if (districtSelect && districtSelect.input) {
+          districtSelect.input.setAttribute('placeholder', `Select ${hierarchy}...`);
+        }
+      }
+      
+      // Set process type (Standard/Operational)
+      if (process) {
+        const processBtn = document.querySelector(`.toggle-btn[data-type="${process}"]`);
+        if (processBtn) {
+          document.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active'));
+          processBtn.classList.add('active');
+        }
+      }
+      
+      // Set entity selection in the dropdown
+      if (districtSelect && entityId) {
+        // Find the entity in the current options
+        const options = districtSelect.options || [];
+        const option = options.find(opt => opt.value === entityId);
+        
+        if (option) {
+          districtSelect.setValue(entityId, option.label);
+          console.log('✅ Set entity to:', option.label);
+          
+          // Trigger PDF download after a short delay to ensure content is loaded
+          setTimeout(() => {
+            console.log('📥 Auto-downloading PDF...');
+            downloadPDF();
+          }, 1000);
+        } else {
+          console.warn('⚠️ Entity not found in dropdown options:', entityId);
+          alert(`Could not find the selected ${hierarchy} in the available options. Please select manually and try again.`);
+        }
+      }
+    }
 
     // ============================================
     // UI Event Handlers

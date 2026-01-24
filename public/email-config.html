@@ -867,15 +867,15 @@
           <table id="reportSchedulesTable">
             <thead>
               <tr>
-                <th style="width: 130px;">Template Name</th>
-                <th style="width: 90px;">Type</th>
-                <th style="width: 80px;">Process</th>
-                <th style="width: 130px;">District</th>
-                <th style="width: 110px;">Region</th>
-                <th style="width: 130px;">Subsidiary</th>
-                <th style="width: 120px;">Email Group</th>
-                <th style="width: 60px;">Enabled</th>
-                <th style="width: 45px;"></th>
+                <th style="width: 120px;">Template Name</th>
+                <th style="width: 85px;">Type</th>
+                <th style="width: 75px;">Process</th>
+                <th style="width: 120px;">District</th>
+                <th style="width: 100px;">Region</th>
+                <th style="width: 120px;">Subsidiary</th>
+                <th style="width: 110px;">Email Group</th>
+                <th style="width: 55px;">Enabled</th>
+                <th style="width: 65px;"></th>
               </tr>
             </thead>
             <tbody id="reportSchedulesBody">
@@ -1390,6 +1390,7 @@
             <!-- Actions -->
             <td>
               <div class="action-buttons">
+                <button class="icon-btn" onclick="downloadSchedulePDF(${schedule.id})" title="Download PDF">📥</button>
                 <button class="icon-btn danger" onclick="deleteReportSchedule(${schedule.id})" title="Delete">🗑️</button>
               </div>
             </td>
@@ -1733,6 +1734,51 @@
         console.error('Error deleting report schedule:', error);
         alert('Failed to delete report schedule: ' + error.message);
       }
+    }
+
+    // ============================================
+    // PDF Download Function
+    // ============================================
+    
+    function downloadSchedulePDF(scheduleId) {
+      const schedule = reportSchedules.find(s => s.id === scheduleId);
+      if (!schedule) {
+        alert('Schedule not found');
+        return;
+      }
+
+      // Validate that required fields are set
+      if (!schedule.template_type) {
+        alert('Please select a Template Type (District, Region, or Subsidiary)');
+        return;
+      }
+
+      if (!schedule.process) {
+        alert('Please select a Process (Standard or Operational)');
+        return;
+      }
+
+      // Build URL parameters
+      const params = new URLSearchParams();
+      params.set('hierarchy', schedule.template_type); // district, region, subsidiary
+      params.set('process', schedule.process); // standard, operational
+      params.set('autoDownload', 'true'); // Trigger auto-download
+
+      // Add entity ID based on template type
+      if (schedule.template_type === 'district' && schedule.district_id) {
+        params.set('entity', schedule.district_id);
+      } else if (schedule.template_type === 'region' && schedule.region_id) {
+        params.set('entity', schedule.region_id);
+      } else if (schedule.template_type === 'subsidiary' && schedule.subsidiary_id) {
+        params.set('entity', schedule.subsidiary_id);
+      } else {
+        alert(`Please select a ${schedule.template_type} before downloading`);
+        return;
+      }
+
+      // Open P&L page with parameters
+      const url = `/pl-view?${params.toString()}`;
+      window.open(url, '_blank');
     }
 
     // ============================================
