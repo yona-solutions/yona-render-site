@@ -1806,7 +1806,9 @@
           throw new Error(`Failed to fetch P&L data: ${dataResponse.status}`);
         }
         
-        const htmlContent = await dataResponse.text();
+        // Parse JSON response to extract HTML
+        const jsonData = await dataResponse.json();
+        const htmlContent = jsonData.html;
         console.log('✅ Received HTML content, length:', htmlContent.length);
         
         if (!htmlContent || !htmlContent.trim()) {
