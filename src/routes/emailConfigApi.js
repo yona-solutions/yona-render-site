@@ -7,6 +7,7 @@
 const express = require('express');
 const router = express.Router();
 const emailConfigService = require('../services/emailConfigService');
+const mockEmailData = require('../services/mockEmailData');
 
 // ============================================
 // Email Groups API
@@ -18,6 +19,12 @@ const emailConfigService = require('../services/emailConfigService');
  */
 router.get('/email-groups', async (req, res) => {
   try {
+    // Use mock data if database not available
+    if (!emailConfigService.isAvailable()) {
+      const groups = mockEmailData.getMockEmailGroups();
+      return res.json(groups);
+    }
+    
     const groups = await emailConfigService.getEmailGroups();
     res.json(groups);
   } catch (error) {
@@ -61,6 +68,13 @@ router.get('/email-groups/:id', async (req, res) => {
 router.get('/email-groups/:id/contacts', async (req, res) => {
   try {
     const { id } = req.params;
+    
+    // Use mock data if database not available
+    if (!emailConfigService.isAvailable()) {
+      const contacts = mockEmailData.getMockEmailGroupContacts(parseInt(id));
+      return res.json(contacts);
+    }
+    
     const contacts = await emailConfigService.getEmailGroupContacts(parseInt(id));
     res.json(contacts);
   } catch (error) {
@@ -104,6 +118,17 @@ router.post('/email-groups', async (req, res) => {
         error: 'Validation failed',
         message: `Invalid email addresses: ${invalidEmails.join(', ')}`
       });
+    }
+
+    // Use mock data if database not available
+    if (!emailConfigService.isAvailable()) {
+      const group = mockEmailData.createMockEmailGroup({
+        name: name.trim(),
+        description: description?.trim() || null,
+        emails
+      });
+      console.log(`✅ Created mock email group: ${group.name} (ID: ${group.id})`);
+      return res.status(201).json(group);
     }
 
     const group = await emailConfigService.createEmailGroup({
@@ -215,6 +240,17 @@ router.put('/email-groups/:id', async (req, res) => {
 router.delete('/email-groups/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    
+    // Use mock data if database not available
+    if (!emailConfigService.isAvailable()) {
+      const deleted = mockEmailData.deleteMockEmailGroup(parseInt(id));
+      if (!deleted) {
+        return res.status(404).json({ error: 'Email group not found' });
+      }
+      console.log(`✅ Deleted mock email group ID: ${id}`);
+      return res.status(204).send();
+    }
+    
     await emailConfigService.deleteEmailGroup(parseInt(id));
 
     console.log(`✅ Deleted email group ID: ${id}`);
@@ -253,6 +289,12 @@ router.delete('/email-groups/:id', async (req, res) => {
  */
 router.get('/report-schedules', async (req, res) => {
   try {
+    // Use mock data if database not available
+    if (!emailConfigService.isAvailable()) {
+      const schedules = mockEmailData.getMockReportSchedules();
+      return res.json(schedules);
+    }
+    
     const schedules = await emailConfigService.getReportSchedules();
     res.json(schedules);
   } catch (error) {
@@ -319,7 +361,10 @@ router.post('/report-schedules', async (req, res) => {
       entity_name,
       email_group_id,
       frequency,
-      status
+      status,
+      day_of_week,
+      day_of_month,
+      time_of_day
     } = req.body;
 
     // Validation
@@ -364,6 +409,24 @@ router.post('/report-schedules', async (req, res) => {
       });
     }
 
+    // Use mock data if database not available
+    if (!emailConfigService.isAvailable()) {
+      const schedule = mockEmailData.createMockReportSchedule({
+        report_type,
+        hierarchy,
+        entity_id,
+        entity_name,
+        email_group_id: parseInt(email_group_id),
+        frequency,
+        status: status || 'active',
+        day_of_week,
+        day_of_month,
+        time_of_day
+      });
+      console.log(`✅ Created mock report schedule: ${schedule.report_type} ${schedule.hierarchy} (ID: ${schedule.id})`);
+      return res.status(201).json(schedule);
+    }
+
     const schedule = await emailConfigService.createReportSchedule({
       report_type,
       hierarchy,
@@ -371,7 +434,10 @@ router.post('/report-schedules', async (req, res) => {
       entity_name,
       email_group_id: parseInt(email_group_id),
       frequency,
-      status: status || 'active'
+      status: status || 'active',
+      day_of_week,
+      day_of_month,
+      time_of_day
     });
 
     console.log(`✅ Created report schedule: ${schedule.report_type} ${schedule.hierarchy} (ID: ${schedule.id})`);
@@ -462,6 +528,17 @@ router.put('/report-schedules/:id', async (req, res) => {
 router.delete('/report-schedules/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    
+    // Use mock data if database not available
+    if (!emailConfigService.isAvailable()) {
+      const deleted = mockEmailData.deleteMockReportSchedule(parseInt(id));
+      if (!deleted) {
+        return res.status(404).json({ error: 'Report schedule not found' });
+      }
+      console.log(`✅ Deleted mock report schedule ID: ${id}`);
+      return res.status(204).send();
+    }
+    
     await emailConfigService.deleteReportSchedule(parseInt(id));
 
     console.log(`✅ Deleted report schedule ID: ${id}`);
