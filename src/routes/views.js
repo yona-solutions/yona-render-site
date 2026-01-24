@@ -46,6 +46,15 @@ function createViewRoutes() {
     res.sendFile(path.join(publicPath, 'dimension-config.html'));
   });
 
+  /**
+   * Email Configuration page
+   * 
+   * GET /email-config
+   */
+  router.get('/email-config', (req, res) => {
+    res.sendFile(path.join(publicPath, 'email-config.html'));
+  });
+
   // Future routes can be added here:
   // router.get('/reports', ...) 
   // router.get('/settings', ...)

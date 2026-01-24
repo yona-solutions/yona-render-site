@@ -1,0 +1,1180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SPHERE - Email Configuration</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+      display: flex;
+      min-height: 100vh;
+      background: #f8f9fa;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      width: 195px;
+      background: #ffffff;
+      border-right: 1px solid #dfe3e8;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 1px 0 0 rgba(0,0,0,0.02);
+    }
+
+    .logo {
+      padding: 18px 20px;
+      border-bottom: 1px solid #dfe3e8;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 19px;
+      font-weight: 600;
+      color: #1a202c;
+      letter-spacing: -0.3px;
+    }
+
+    .logo-icon {
+      width: 28px;
+      height: 28px;
+      background: linear-gradient(135deg, #3b5998 0%, #2d4373 100%);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 14px;
+      font-weight: bold;
+    }
+
+    .nav-menu {
+      flex: 1;
+      padding: 8px 0;
+    }
+
+    .nav-item {
+      padding: 11px 20px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      color: #4a5568;
+      font-size: 13.5px;
+      font-weight: 400;
+      border-left: 3px solid transparent;
+    }
+
+    .nav-item:hover:not(.disabled) {
+      background: #f7fafc;
+      color: #2d3748;
+    }
+
+    .nav-item.active {
+      background: #e6f0f8;
+      color: #2d4a68;
+      font-weight: 500;
+      border-left-color: #4a7c9e;
+    }
+
+    .nav-item.disabled {
+      color: #cbd5e0;
+      cursor: not-allowed;
+    }
+
+    /* Main Content */
+    .main-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: #f8f9fa;
+    }
+
+    /* Header */
+    .header {
+      background: white;
+      padding: 20px 35px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .header h1 {
+      font-size: 24px;
+      color: #1a202c;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .header p {
+      color: #718096;
+      font-size: 14px;
+    }
+
+    /* Content Area */
+    .content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 25px 35px;
+    }
+
+    /* Section Cards */
+    .section-card {
+      background: white;
+      border-radius: 8px;
+      padding: 24px;
+      margin-bottom: 24px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+      border: 1px solid #e2e8f0;
+    }
+
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .section-header h2 {
+      font-size: 18px;
+      color: #1a202c;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .section-header .subtitle {
+      font-size: 13px;
+      color: #718096;
+      font-weight: 400;
+      margin-top: 4px;
+    }
+
+    /* Buttons */
+    .btn {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn-primary {
+      background: #5a6fd8;
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: #4959c0;
+      box-shadow: 0 2px 4px rgba(90, 111, 216, 0.2);
+    }
+
+    .btn-secondary {
+      background: #e2e8f0;
+      color: #4a5568;
+    }
+
+    .btn-secondary:hover {
+      background: #cbd5e0;
+    }
+
+    .btn-danger {
+      background: #fc8181;
+      color: white;
+    }
+
+    .btn-danger:hover {
+      background: #f56565;
+    }
+
+    .btn-small {
+      padding: 4px 10px;
+      font-size: 12px;
+    }
+
+    /* Tables */
+    .table-container {
+      overflow-x: auto;
+      margin-top: 16px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    thead {
+      background: #f7fafc;
+      border-top: 1px solid #e2e8f0;
+      border-bottom: 2px solid #e2e8f0;
+    }
+
+    th {
+      text-align: left;
+      padding: 12px 16px;
+      font-weight: 600;
+      color: #4a5568;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    td {
+      padding: 14px 16px;
+      border-bottom: 1px solid #e2e8f0;
+      color: #2d3748;
+    }
+
+    tbody tr:hover {
+      background: #f7fafc;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 48px 24px;
+      color: #718096;
+    }
+
+    .empty-state-icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+      opacity: 0.3;
+    }
+
+    .empty-state h3 {
+      font-size: 16px;
+      margin-bottom: 8px;
+      color: #4a5568;
+    }
+
+    .empty-state p {
+      font-size: 13px;
+    }
+
+    /* Badge for email count */
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+      background: #e6f0f8;
+      color: #2d4a68;
+    }
+
+    /* Modal */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal.active {
+      display: flex;
+    }
+
+    .modal-content {
+      background: white;
+      border-radius: 8px;
+      padding: 0;
+      width: 90%;
+      max-width: 600px;
+      max-height: 90vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    }
+
+    .modal-header {
+      padding: 20px 24px;
+      border-bottom: 1px solid #e2e8f0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .modal-header h3 {
+      font-size: 18px;
+      color: #1a202c;
+      font-weight: 600;
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      font-size: 24px;
+      color: #718096;
+      cursor: pointer;
+      padding: 0;
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+      transition: all 0.15s ease;
+    }
+
+    .modal-close:hover {
+      background: #f7fafc;
+      color: #4a5568;
+    }
+
+    .modal-body {
+      padding: 24px;
+      overflow-y: auto;
+    }
+
+    .modal-footer {
+      padding: 16px 24px;
+      border-top: 1px solid #e2e8f0;
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+    }
+
+    /* Form Styles */
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      color: #4a5568;
+    }
+
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid #cbd5e0;
+      border-radius: 6px;
+      font-size: 13px;
+      font-family: inherit;
+      transition: all 0.15s ease;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+      outline: none;
+      border-color: #5a6fd8;
+      box-shadow: 0 0 0 3px rgba(90, 111, 216, 0.1);
+    }
+
+    .form-group textarea {
+      resize: vertical;
+      min-height: 80px;
+    }
+
+    .form-help {
+      font-size: 12px;
+      color: #718096;
+      margin-top: 4px;
+    }
+
+    /* Email List */
+    .email-list {
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 12px;
+      max-height: 200px;
+      overflow-y: auto;
+      background: #f7fafc;
+    }
+
+    .email-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 12px;
+      background: white;
+      border-radius: 4px;
+      margin-bottom: 8px;
+      border: 1px solid #e2e8f0;
+    }
+
+    .email-item:last-child {
+      margin-bottom: 0;
+    }
+
+    .email-item span {
+      font-size: 13px;
+      color: #2d3748;
+    }
+
+    .email-item button {
+      background: none;
+      border: none;
+      color: #fc8181;
+      cursor: pointer;
+      font-size: 16px;
+      padding: 4px 8px;
+      border-radius: 4px;
+      transition: all 0.15s ease;
+    }
+
+    .email-item button:hover {
+      background: #fff5f5;
+    }
+
+    .email-input-group {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .email-input-group input {
+      flex: 1;
+    }
+
+    /* Action Buttons in Table */
+    .action-buttons {
+      display: flex;
+      gap: 8px;
+    }
+
+    .icon-btn {
+      background: none;
+      border: none;
+      padding: 6px 10px;
+      cursor: pointer;
+      border-radius: 4px;
+      font-size: 13px;
+      transition: all 0.15s ease;
+      color: #718096;
+    }
+
+    .icon-btn:hover {
+      background: #e2e8f0;
+      color: #2d3748;
+    }
+
+    .icon-btn.danger:hover {
+      background: #fff5f5;
+      color: #f56565;
+    }
+
+    /* Loading State */
+    .loading {
+      text-align: center;
+      padding: 32px;
+      color: #718096;
+    }
+
+    .loading-spinner {
+      display: inline-block;
+      width: 24px;
+      height: 24px;
+      border: 3px solid #e2e8f0;
+      border-top-color: #5a6fd8;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="logo">
+      <div class="logo-icon">S</div>
+      <span>SPHERE</span>
+    </div>
+    
+    <nav class="nav-menu">
+      <div class="nav-item" onclick="window.location.href='/'">P&L View</div>
+      <div class="nav-item" onclick="window.location.href='/dimension-config'">Dimension Config</div>
+      <div class="nav-item active">Email Config</div>
+      <div class="nav-item disabled">User Management</div>
+    </nav>
+  </div>
+
+  <!-- Main Content -->
+  <div class="main-content">
+    <!-- Header -->
+    <div class="header">
+      <h1>📧 Email Configuration</h1>
+      <p>Configure automated report schedules and manage email distribution lists</p>
+    </div>
+
+    <!-- Content -->
+    <div class="content">
+      <!-- Email Groups Section -->
+      <div class="section-card">
+        <div class="section-header">
+          <div>
+            <h2>📮 Email Groups</h2>
+            <div class="subtitle">Manage distribution lists for automated reports</div>
+          </div>
+          <button class="btn btn-primary" onclick="openEmailGroupModal()">
+            ➕ New Email Group
+          </button>
+        </div>
+        
+        <div class="table-container">
+          <table id="emailGroupsTable">
+            <thead>
+              <tr>
+                <th>Group Name</th>
+                <th>Description</th>
+                <th>Email Count</th>
+                <th>Created</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="emailGroupsBody">
+              <tr>
+                <td colspan="5">
+                  <div class="loading">
+                    <div class="loading-spinner"></div>
+                    <p>Loading email groups...</p>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Report Schedules Section -->
+      <div class="section-card">
+        <div class="section-header">
+          <div>
+            <h2>📊 Report Schedules</h2>
+            <div class="subtitle">Configure automated P&L report delivery</div>
+          </div>
+          <button class="btn btn-primary" onclick="openReportScheduleModal()">
+            ➕ New Report Schedule
+          </button>
+        </div>
+        
+        <div class="table-container">
+          <table id="reportSchedulesTable">
+            <thead>
+              <tr>
+                <th>Report Type</th>
+                <th>Hierarchy</th>
+                <th>Entity</th>
+                <th>Email Group</th>
+                <th>Frequency</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="reportSchedulesBody">
+              <tr>
+                <td colspan="7">
+                  <div class="loading">
+                    <div class="loading-spinner"></div>
+                    <p>Loading report schedules...</p>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Email Group Modal -->
+  <div class="modal" id="emailGroupModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="emailGroupModalTitle">Create Email Group</h3>
+        <button class="modal-close" onclick="closeEmailGroupModal()">×</button>
+      </div>
+      <div class="modal-body">
+        <form id="emailGroupForm">
+          <input type="hidden" id="emailGroupId">
+          
+          <div class="form-group">
+            <label for="groupName">Group Name *</label>
+            <input type="text" id="groupName" required placeholder="e.g., District Managers">
+          </div>
+
+          <div class="form-group">
+            <label for="groupDescription">Description</label>
+            <textarea id="groupDescription" placeholder="Brief description of this email group"></textarea>
+          </div>
+
+          <div class="form-group">
+            <label>Email Addresses</label>
+            <div class="email-list" id="emailList">
+              <div class="empty-state" style="padding: 24px;">
+                <p>No emails added yet</p>
+              </div>
+            </div>
+            <div class="email-input-group">
+              <input type="email" id="newEmail" placeholder="Enter email address">
+              <button type="button" class="btn btn-secondary btn-small" onclick="addEmailToList()">Add</button>
+            </div>
+            <div class="form-help">Press Enter or click Add to include an email in this group</div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeEmailGroupModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveEmailGroup()">Save Email Group</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Report Schedule Modal -->
+  <div class="modal" id="reportScheduleModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="reportScheduleModalTitle">Create Report Schedule</h3>
+        <button class="modal-close" onclick="closeReportScheduleModal()">×</button>
+      </div>
+      <div class="modal-body">
+        <form id="reportScheduleForm">
+          <input type="hidden" id="scheduleId">
+          
+          <div class="form-group">
+            <label for="reportType">Report Type *</label>
+            <select id="reportType" required>
+              <option value="">Select report type...</option>
+              <option value="standard">Standard P&L</option>
+              <option value="operational">Operational P&L</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="hierarchy">Hierarchy Level *</label>
+            <select id="hierarchy" required onchange="loadEntitiesForHierarchy()">
+              <option value="">Select hierarchy...</option>
+              <option value="district">District</option>
+              <option value="region">Region</option>
+              <option value="subsidiary">Subsidiary</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="entityId">Entity *</label>
+            <select id="entityId" required disabled>
+              <option value="">Select hierarchy first...</option>
+            </select>
+            <div class="form-help">Select a hierarchy level to load available entities</div>
+          </div>
+
+          <div class="form-group">
+            <label for="emailGroupId">Email Group *</label>
+            <select id="emailGroupId" required>
+              <option value="">Select email group...</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="frequency">Frequency *</label>
+            <select id="frequency" required>
+              <option value="">Select frequency...</option>
+              <option value="monthly">Monthly</option>
+              <option value="weekly">Weekly</option>
+              <option value="daily">Daily</option>
+            </select>
+            <div class="form-help">How often this report should be sent</div>
+          </div>
+
+          <div class="form-group">
+            <label for="scheduleStatus">Status *</label>
+            <select id="scheduleStatus" required>
+              <option value="active">Active</option>
+              <option value="paused">Paused</option>
+            </select>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeReportScheduleModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveReportSchedule()">Save Schedule</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ============================================
+    // State Management
+    // ============================================
+    let emailGroups = [];
+    let reportSchedules = [];
+    let currentEmailList = [];
+    let editingEmailGroupId = null;
+    let editingScheduleId = null;
+
+    // ============================================
+    // Initialization
+    // ============================================
+    document.addEventListener('DOMContentLoaded', () => {
+      loadEmailGroups();
+      loadReportSchedules();
+      
+      // Allow adding email with Enter key
+      document.getElementById('newEmail').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          addEmailToList();
+        }
+      });
+    });
+
+    // ============================================
+    // API Calls
+    // ============================================
+    
+    async function loadEmailGroups() {
+      try {
+        const response = await fetch('/api/email-groups');
+        if (!response.ok) throw new Error('Failed to load email groups');
+        
+        emailGroups = await response.json();
+        renderEmailGroupsTable();
+      } catch (error) {
+        console.error('Error loading email groups:', error);
+        showEmptyState('emailGroupsBody', 'Failed to load email groups', '⚠️');
+      }
+    }
+
+    async function loadReportSchedules() {
+      try {
+        const response = await fetch('/api/report-schedules');
+        if (!response.ok) throw new Error('Failed to load report schedules');
+        
+        reportSchedules = await response.json();
+        renderReportSchedulesTable();
+      } catch (error) {
+        console.error('Error loading report schedules:', error);
+        showEmptyState('reportSchedulesBody', 'Failed to load report schedules', '⚠️');
+      }
+    }
+
+    async function loadEntitiesForHierarchy() {
+      const hierarchy = document.getElementById('hierarchy').value;
+      const entitySelect = document.getElementById('entityId');
+      
+      if (!hierarchy) {
+        entitySelect.disabled = true;
+        entitySelect.innerHTML = '<option value="">Select hierarchy first...</option>';
+        return;
+      }
+
+      try {
+        entitySelect.disabled = true;
+        entitySelect.innerHTML = '<option value="">Loading...</option>';
+        
+        const response = await fetch(`/api/storage/${hierarchy}s`);
+        if (!response.ok) throw new Error('Failed to load entities');
+        
+        const entities = await response.json();
+        
+        entitySelect.innerHTML = '<option value="">Select entity...</option>';
+        entities.forEach(entity => {
+          const option = document.createElement('option');
+          option.value = entity.id;
+          option.textContent = entity.label || entity.name;
+          entitySelect.appendChild(option);
+        });
+        
+        entitySelect.disabled = false;
+      } catch (error) {
+        console.error('Error loading entities:', error);
+        entitySelect.innerHTML = '<option value="">Error loading entities</option>';
+      }
+    }
+
+    // ============================================
+    // Render Functions
+    // ============================================
+    
+    function renderEmailGroupsTable() {
+      const tbody = document.getElementById('emailGroupsBody');
+      
+      if (emailGroups.length === 0) {
+        showEmptyState('emailGroupsBody', 'No email groups yet. Create one to get started!', '📮');
+        return;
+      }
+
+      tbody.innerHTML = emailGroups.map(group => `
+        <tr>
+          <td><strong>${escapeHtml(group.name)}</strong></td>
+          <td>${escapeHtml(group.description || '-')}</td>
+          <td><span class="badge">${group.email_count || 0} emails</span></td>
+          <td>${formatDate(group.created_at)}</td>
+          <td>
+            <div class="action-buttons">
+              <button class="icon-btn" onclick="editEmailGroup(${group.id})" title="Edit">✏️</button>
+              <button class="icon-btn danger" onclick="deleteEmailGroup(${group.id})" title="Delete">🗑️</button>
+            </div>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function renderReportSchedulesTable() {
+      const tbody = document.getElementById('reportSchedulesBody');
+      
+      if (reportSchedules.length === 0) {
+        showEmptyState('reportSchedulesBody', 'No report schedules yet. Create one to automate report delivery!', '📊');
+        return;
+      }
+
+      tbody.innerHTML = reportSchedules.map(schedule => {
+        const group = emailGroups.find(g => g.id === schedule.email_group_id);
+        const statusColor = schedule.status === 'active' ? '#48bb78' : '#ecc94b';
+        
+        return `
+          <tr>
+            <td>${escapeHtml(schedule.report_type)}</td>
+            <td>${escapeHtml(schedule.hierarchy)}</td>
+            <td>${escapeHtml(schedule.entity_name || schedule.entity_id)}</td>
+            <td>${escapeHtml(group?.name || 'Unknown')}</td>
+            <td>${escapeHtml(schedule.frequency)}</td>
+            <td><span class="badge" style="background: ${statusColor}; color: white;">${escapeHtml(schedule.status)}</span></td>
+            <td>
+              <div class="action-buttons">
+                <button class="icon-btn" onclick="editReportSchedule(${schedule.id})" title="Edit">✏️</button>
+                <button class="icon-btn danger" onclick="deleteReportSchedule(${schedule.id})" title="Delete">🗑️</button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function showEmptyState(tbodyId, message, icon) {
+      const tbody = document.getElementById(tbodyId);
+      const colSpan = tbody.closest('table').querySelectorAll('thead th').length;
+      
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="${colSpan}">
+            <div class="empty-state">
+              <div class="empty-state-icon">${icon}</div>
+              <h3>No Data</h3>
+              <p>${message}</p>
+            </div>
+          </td>
+        </tr>
+      `;
+    }
+
+    // ============================================
+    // Email Group Modal Functions
+    // ============================================
+    
+    function openEmailGroupModal() {
+      editingEmailGroupId = null;
+      currentEmailList = [];
+      
+      document.getElementById('emailGroupModalTitle').textContent = 'Create Email Group';
+      document.getElementById('emailGroupForm').reset();
+      document.getElementById('emailGroupId').value = '';
+      
+      renderEmailList();
+      document.getElementById('emailGroupModal').classList.add('active');
+    }
+
+    function closeEmailGroupModal() {
+      document.getElementById('emailGroupModal').classList.remove('active');
+    }
+
+    function editEmailGroup(id) {
+      const group = emailGroups.find(g => g.id === id);
+      if (!group) return;
+
+      editingEmailGroupId = id;
+      
+      document.getElementById('emailGroupModalTitle').textContent = 'Edit Email Group';
+      document.getElementById('emailGroupId').value = group.id;
+      document.getElementById('groupName').value = group.name;
+      document.getElementById('groupDescription').value = group.description || '';
+      
+      // Load emails for this group
+      fetch(`/api/email-groups/${id}/contacts`)
+        .then(r => r.json())
+        .then(contacts => {
+          currentEmailList = contacts.map(c => c.email);
+          renderEmailList();
+        });
+      
+      document.getElementById('emailGroupModal').classList.add('active');
+    }
+
+    async function saveEmailGroup() {
+      const name = document.getElementById('groupName').value.trim();
+      const description = document.getElementById('groupDescription').value.trim();
+      
+      if (!name) {
+        alert('Please enter a group name');
+        return;
+      }
+
+      if (currentEmailList.length === 0) {
+        alert('Please add at least one email address');
+        return;
+      }
+
+      const data = {
+        name,
+        description,
+        emails: currentEmailList
+      };
+
+      try {
+        const url = editingEmailGroupId 
+          ? `/api/email-groups/${editingEmailGroupId}`
+          : '/api/email-groups';
+        
+        const method = editingEmailGroupId ? 'PUT' : 'POST';
+        
+        const response = await fetch(url, {
+          method,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+
+        if (!response.ok) throw new Error('Failed to save email group');
+
+        closeEmailGroupModal();
+        loadEmailGroups();
+        loadReportSchedules(); // Refresh to update group names
+      } catch (error) {
+        console.error('Error saving email group:', error);
+        alert('Failed to save email group: ' + error.message);
+      }
+    }
+
+    async function deleteEmailGroup(id) {
+      if (!confirm('Are you sure you want to delete this email group? Any report schedules using this group will need to be updated.')) {
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/email-groups/${id}`, {
+          method: 'DELETE'
+        });
+
+        if (!response.ok) throw new Error('Failed to delete email group');
+
+        loadEmailGroups();
+        loadReportSchedules();
+      } catch (error) {
+        console.error('Error deleting email group:', error);
+        alert('Failed to delete email group: ' + error.message);
+      }
+    }
+
+    // ============================================
+    // Email List Functions
+    // ============================================
+    
+    function addEmailToList() {
+      const input = document.getElementById('newEmail');
+      const email = input.value.trim();
+      
+      if (!email) return;
+      
+      if (!isValidEmail(email)) {
+        alert('Please enter a valid email address');
+        return;
+      }
+
+      if (currentEmailList.includes(email)) {
+        alert('This email is already in the list');
+        return;
+      }
+
+      currentEmailList.push(email);
+      input.value = '';
+      renderEmailList();
+    }
+
+    function removeEmailFromList(email) {
+      currentEmailList = currentEmailList.filter(e => e !== email);
+      renderEmailList();
+    }
+
+    function renderEmailList() {
+      const container = document.getElementById('emailList');
+      
+      if (currentEmailList.length === 0) {
+        container.innerHTML = '<div class="empty-state" style="padding: 24px;"><p>No emails added yet</p></div>';
+        return;
+      }
+
+      container.innerHTML = currentEmailList.map(email => `
+        <div class="email-item">
+          <span>${escapeHtml(email)}</span>
+          <button onclick="removeEmailFromList('${escapeHtml(email)}')">×</button>
+        </div>
+      `).join('');
+    }
+
+    // ============================================
+    // Report Schedule Modal Functions
+    // ============================================
+    
+    function openReportScheduleModal() {
+      editingScheduleId = null;
+      
+      document.getElementById('reportScheduleModalTitle').textContent = 'Create Report Schedule';
+      document.getElementById('reportScheduleForm').reset();
+      document.getElementById('scheduleId').value = '';
+      document.getElementById('entityId').disabled = true;
+      
+      // Populate email groups dropdown
+      const groupSelect = document.getElementById('emailGroupId');
+      groupSelect.innerHTML = '<option value="">Select email group...</option>' +
+        emailGroups.map(g => `<option value="${g.id}">${escapeHtml(g.name)}</option>`).join('');
+      
+      document.getElementById('reportScheduleModal').classList.add('active');
+    }
+
+    function closeReportScheduleModal() {
+      document.getElementById('reportScheduleModal').classList.remove('active');
+    }
+
+    async function editReportSchedule(id) {
+      const schedule = reportSchedules.find(s => s.id === id);
+      if (!schedule) return;
+
+      editingScheduleId = id;
+      
+      document.getElementById('reportScheduleModalTitle').textContent = 'Edit Report Schedule';
+      document.getElementById('scheduleId').value = schedule.id;
+      document.getElementById('reportType').value = schedule.report_type;
+      document.getElementById('hierarchy').value = schedule.hierarchy;
+      document.getElementById('frequency').value = schedule.frequency;
+      document.getElementById('scheduleStatus').value = schedule.status;
+      
+      // Load entities for the hierarchy
+      await loadEntitiesForHierarchy();
+      document.getElementById('entityId').value = schedule.entity_id;
+      
+      // Populate email groups dropdown
+      const groupSelect = document.getElementById('emailGroupId');
+      groupSelect.innerHTML = '<option value="">Select email group...</option>' +
+        emailGroups.map(g => `<option value="${g.id}">${escapeHtml(g.name)}</option>`).join('');
+      groupSelect.value = schedule.email_group_id;
+      
+      document.getElementById('reportScheduleModal').classList.add('active');
+    }
+
+    async function saveReportSchedule() {
+      const reportType = document.getElementById('reportType').value;
+      const hierarchy = document.getElementById('hierarchy').value;
+      const entityId = document.getElementById('entityId').value;
+      const emailGroupId = document.getElementById('emailGroupId').value;
+      const frequency = document.getElementById('frequency').value;
+      const status = document.getElementById('scheduleStatus').value;
+      
+      if (!reportType || !hierarchy || !entityId || !emailGroupId || !frequency || !status) {
+        alert('Please fill in all required fields');
+        return;
+      }
+
+      const data = {
+        report_type: reportType,
+        hierarchy,
+        entity_id: entityId,
+        email_group_id: parseInt(emailGroupId),
+        frequency,
+        status
+      };
+
+      try {
+        const url = editingScheduleId 
+          ? `/api/report-schedules/${editingScheduleId}`
+          : '/api/report-schedules';
+        
+        const method = editingScheduleId ? 'PUT' : 'POST';
+        
+        const response = await fetch(url, {
+          method,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+
+        if (!response.ok) throw new Error('Failed to save report schedule');
+
+        closeReportScheduleModal();
+        loadReportSchedules();
+      } catch (error) {
+        console.error('Error saving report schedule:', error);
+        alert('Failed to save report schedule: ' + error.message);
+      }
+    }
+
+    async function deleteReportSchedule(id) {
+      if (!confirm('Are you sure you want to delete this report schedule?')) {
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/report-schedules/${id}`, {
+          method: 'DELETE'
+        });
+
+        if (!response.ok) throw new Error('Failed to delete report schedule');
+
+        loadReportSchedules();
+      } catch (error) {
+        console.error('Error deleting report schedule:', error);
+        alert('Failed to delete report schedule: ' + error.message);
+      }
+    }
+
+    // ============================================
+    // Utility Functions
+    // ============================================
+    
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    function isValidEmail(email) {
+      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    }
+
+    function formatDate(dateString) {
+      if (!dateString) return '-';
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'short', 
+        day: 'numeric' 
+      });
+    }
+  </script>
+</body>
+</html>
+
