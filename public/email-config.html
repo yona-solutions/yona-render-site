@@ -543,6 +543,148 @@
       cursor: not-allowed;
     }
 
+    /* Searchable Select Component */
+    .searchable-select {
+      position: relative;
+      width: 100%;
+    }
+
+    .searchable-select-trigger {
+      width: 100%;
+      padding: 5px 8px;
+      padding-right: 28px;
+      border: 1px solid #e2e8f0;
+      border-radius: 5px;
+      font-size: 12px;
+      background: white;
+      color: #2d3748;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-height: 30px;
+      text-align: left;
+    }
+
+    .searchable-select-trigger:hover:not(.disabled) {
+      border-color: #cbd5e0;
+      background: #fafbfc;
+    }
+
+    .searchable-select-trigger.open {
+      border-color: #5a6fd8;
+      box-shadow: 0 0 0 2px rgba(90, 111, 216, 0.1);
+    }
+
+    .searchable-select-trigger.disabled {
+      background: #f7fafc;
+      color: #a0aec0;
+      cursor: not-allowed;
+    }
+
+    .searchable-select-trigger .placeholder {
+      color: #a0aec0;
+    }
+
+    .searchable-select-arrow {
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 0;
+      height: 0;
+      border-left: 4px solid transparent;
+      border-right: 4px solid transparent;
+      border-top: 5px solid #718096;
+      transition: transform 0.2s ease;
+      pointer-events: none;
+    }
+
+    .searchable-select-trigger.open .searchable-select-arrow {
+      transform: translateY(-50%) rotate(180deg);
+    }
+
+    .searchable-select-dropdown {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      margin-top: 4px;
+      background: white;
+      border: 1px solid #cbd5e0;
+      border-radius: 6px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+      z-index: 1000;
+      max-height: 280px;
+      display: flex;
+      flex-direction: column;
+      opacity: 0;
+      transform: translateY(-10px);
+      pointer-events: none;
+      transition: all 0.2s ease;
+    }
+
+    .searchable-select-dropdown.open {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: all;
+    }
+
+    .searchable-select-search {
+      padding: 8px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .searchable-select-search input {
+      width: 100%;
+      padding: 6px 10px;
+      border: 1px solid #e2e8f0;
+      border-radius: 4px;
+      font-size: 12px;
+      transition: all 0.15s ease;
+    }
+
+    .searchable-select-search input:focus {
+      outline: none;
+      border-color: #5a6fd8;
+      box-shadow: 0 0 0 2px rgba(90, 111, 216, 0.1);
+    }
+
+    .searchable-select-options {
+      overflow-y: auto;
+      max-height: 220px;
+    }
+
+    .searchable-select-option {
+      padding: 7px 10px;
+      font-size: 12px;
+      color: #2d3748;
+      cursor: pointer;
+      transition: all 0.1s ease;
+    }
+
+    .searchable-select-option:hover {
+      background: #edf2f7;
+    }
+
+    .searchable-select-option.selected {
+      background: #e6f0f8;
+      color: #2d4a68;
+      font-weight: 500;
+    }
+
+    .searchable-select-option.empty {
+      color: #a0aec0;
+      text-align: center;
+      padding: 16px;
+      cursor: default;
+    }
+
+    .searchable-select-option.empty:hover {
+      background: transparent;
+    }
+
     /* Toggle Switch */
     .toggle-switch {
       position: relative;
@@ -904,6 +1046,141 @@
 
 
     // ============================================
+    // Searchable Select Component
+    // ============================================
+    
+    function createSearchableSelect(options, selectedValue, onChange, disabled = false, placeholder = 'Select...') {
+      const containerId = `searchable-select-${Math.random().toString(36).substr(2, 9)}`;
+      
+      // Find selected option
+      const selectedOption = options.find(opt => opt.id === selectedValue);
+      const displayText = selectedOption ? selectedOption.label : placeholder;
+      
+      // Create HTML
+      const html = `
+        <div class="searchable-select" data-container-id="${containerId}">
+          <div class="searchable-select-trigger ${disabled ? 'disabled' : ''}" data-trigger>
+            <span class="${selectedOption ? '' : 'placeholder'}">${escapeHtml(displayText)}</span>
+            <div class="searchable-select-arrow"></div>
+          </div>
+          <div class="searchable-select-dropdown" data-dropdown>
+            <div class="searchable-select-search">
+              <input type="text" placeholder="Search..." data-search>
+            </div>
+            <div class="searchable-select-options" data-options>
+              ${renderSearchableOptions(options, selectedValue)}
+            </div>
+          </div>
+        </div>
+      `;
+      
+      // Return object with HTML and setup function
+      return {
+        html,
+        setup: () => setupSearchableSelect(containerId, options, selectedValue, onChange, disabled)
+      };
+    }
+    
+    function renderSearchableOptions(options, selectedValue, searchQuery = '') {
+      const filtered = searchQuery
+        ? options.filter(opt => opt.label.toLowerCase().includes(searchQuery.toLowerCase()))
+        : options;
+      
+      if (filtered.length === 0) {
+        return '<div class="searchable-select-option empty">No options found</div>';
+      }
+      
+      return filtered.map(opt => `
+        <div class="searchable-select-option ${opt.id === selectedValue ? 'selected' : ''}" 
+             data-value="${escapeHtml(opt.id)}">
+          ${escapeHtml(opt.label)}
+        </div>
+      `).join('');
+    }
+    
+    function setupSearchableSelect(containerId, options, selectedValue, onChange, disabled) {
+      const container = document.querySelector(`[data-container-id="${containerId}"]`);
+      if (!container || disabled) return;
+      
+      const trigger = container.querySelector('[data-trigger]');
+      const dropdown = container.querySelector('[data-dropdown]');
+      const searchInput = container.querySelector('[data-search]');
+      const optionsContainer = container.querySelector('[data-options]');
+      
+      let isOpen = false;
+      
+      // Toggle dropdown
+      trigger.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (disabled) return;
+        
+        // Close other dropdowns
+        document.querySelectorAll('.searchable-select-trigger.open').forEach(t => {
+          if (t !== trigger) {
+            t.classList.remove('open');
+            t.nextElementSibling.classList.remove('open');
+          }
+        });
+        
+        isOpen = !isOpen;
+        trigger.classList.toggle('open', isOpen);
+        dropdown.classList.toggle('open', isOpen);
+        
+        if (isOpen) {
+          searchInput.value = '';
+          optionsContainer.innerHTML = renderSearchableOptions(options, selectedValue);
+          setupOptionListeners();
+          setTimeout(() => searchInput.focus(), 50);
+        }
+      });
+      
+      // Search functionality
+      searchInput.addEventListener('input', (e) => {
+        const query = e.target.value;
+        optionsContainer.innerHTML = renderSearchableOptions(options, selectedValue, query);
+        setupOptionListeners();
+      });
+      
+      // Prevent dropdown from closing when clicking inside
+      dropdown.addEventListener('click', (e) => {
+        e.stopPropagation();
+      });
+      
+      // Setup option click listeners
+      function setupOptionListeners() {
+        optionsContainer.querySelectorAll('.searchable-select-option:not(.empty)').forEach(option => {
+          option.addEventListener('click', () => {
+            const value = option.dataset.value;
+            const selectedOpt = options.find(o => o.id === value);
+            
+            // Update trigger text
+            trigger.querySelector('span').textContent = selectedOpt.label;
+            trigger.querySelector('span').classList.remove('placeholder');
+            
+            // Close dropdown
+            trigger.classList.remove('open');
+            dropdown.classList.remove('open');
+            isOpen = false;
+            
+            // Call onChange
+            onChange(value);
+          });
+        });
+      }
+      
+      setupOptionListeners();
+      
+      // Close on outside click
+      document.addEventListener('click', (e) => {
+        if (!container.contains(e.target) && isOpen) {
+          trigger.classList.remove('open');
+          dropdown.classList.remove('open');
+          isOpen = false;
+        }
+      });
+    }
+
+    // ============================================
     // Render Functions
     // ============================================
     
@@ -939,8 +1216,43 @@
         return;
       }
 
+      const setupFunctions = [];
+      
       tbody.innerHTML = reportSchedules.map(schedule => {
         const group = emailGroups.find(g => g.id === schedule.email_group_id);
+        
+        // Create searchable selects for hierarchy dropdowns
+        const districtSelect = createSearchableSelect(
+          districtOptions,
+          schedule.district_id || '',
+          (value) => updateScheduleField(schedule.id, 'district_id', value),
+          schedule.template_type !== 'district',
+          '—'
+        );
+        
+        const regionSelect = createSearchableSelect(
+          regionOptions,
+          schedule.region_id || '',
+          (value) => updateScheduleField(schedule.id, 'region_id', value),
+          schedule.template_type !== 'region',
+          '—'
+        );
+        
+        const subsidiarySelect = createSearchableSelect(
+          subsidiaryOptions,
+          schedule.subsidiary_id || '',
+          (value) => updateScheduleField(schedule.id, 'subsidiary_id', value),
+          schedule.template_type !== 'subsidiary',
+          '—'
+        );
+        
+        // Store setup functions to call after DOM is rendered
+        setupFunctions.push({
+          districtSetup: districtSelect.setup,
+          regionSetup: regionSelect.setup,
+          subsidiarySetup: subsidiarySelect.setup,
+          scheduleId: schedule.id
+        });
         
         return `
           <tr data-schedule-id="${schedule.id}">
@@ -981,51 +1293,18 @@
             </td>
             
             <!-- District -->
-            <td>
-              <select 
-                class="inline-select" 
-                onchange="updateScheduleField(${schedule.id}, 'district_id', this.value)"
-                ${schedule.template_type !== 'district' ? 'disabled style="background: #f7fafc;"' : ''}
-              >
-                <option value="">—</option>
-                ${districtOptions.map(opt => `
-                  <option value="${opt.id}" ${schedule.district_id === opt.id ? 'selected' : ''}>
-                    ${escapeHtml(opt.label)}${opt.isTag ? ' (tag)' : ''}
-                  </option>
-                `).join('')}
-              </select>
+            <td data-searchable-district-${schedule.id}>
+              ${districtSelect.html}
             </td>
             
             <!-- Region -->
-            <td>
-              <select 
-                class="inline-select" 
-                onchange="updateScheduleField(${schedule.id}, 'region_id', this.value)"
-                ${schedule.template_type !== 'region' ? 'disabled style="background: #f7fafc;"' : ''}
-              >
-                <option value="">—</option>
-                ${regionOptions.map(opt => `
-                  <option value="${opt.id}" ${schedule.region_id === opt.id ? 'selected' : ''}>
-                    ${escapeHtml(opt.label)}
-                  </option>
-                `).join('')}
-              </select>
+            <td data-searchable-region-${schedule.id}>
+              ${regionSelect.html}
             </td>
             
             <!-- Subsidiary -->
-            <td>
-              <select 
-                class="inline-select" 
-                onchange="updateScheduleField(${schedule.id}, 'subsidiary_id', this.value)"
-                ${schedule.template_type !== 'subsidiary' ? 'disabled style="background: #f7fafc;"' : ''}
-              >
-                <option value="">—</option>
-                ${subsidiaryOptions.map(opt => `
-                  <option value="${opt.id}" ${schedule.subsidiary_id === opt.id ? 'selected' : ''}>
-                    ${escapeHtml(opt.label)}
-                  </option>
-                `).join('')}
-              </select>
+            <td data-searchable-subsidiary-${schedule.id}>
+              ${subsidiarySelect.html}
             </td>
             
             <!-- Email Group -->
@@ -1064,6 +1343,15 @@
           </tr>
         `;
       }).join('');
+      
+      // Setup all searchable selects after DOM is rendered
+      setTimeout(() => {
+        setupFunctions.forEach(({ districtSetup, regionSetup, subsidiarySetup }) => {
+          districtSetup();
+          regionSetup();
+          subsidiarySetup();
+        });
+      }, 0);
     }
 
     function showEmptyState(tbodyId, message, icon) {
