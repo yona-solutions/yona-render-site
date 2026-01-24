@@ -114,6 +114,7 @@ function generateHeader(meta) {
         <div class="pnl-title">${entityName}</div>
         <div class="pnl-subtitle">Actual vs Budget</div>
         <div class="pnl-meta">${formattedMonth}</div>
+        <div class="pnl-meta">Regions: ${regionCount ?? '-'}</div>
         <div class="pnl-meta">Districts: ${districtCount ?? '-'}</div>
         <div class="pnl-meta">Facilities: ${facilityCount ?? '-'}</div>
       </div>
@@ -124,7 +125,7 @@ function generateHeader(meta) {
         <div class="pnl-title">${entityName}</div>
         <div class="pnl-subtitle">Yona Solutions</div>
         <div class="pnl-meta">${formattedMonth}</div>
-        <div class="pnl-meta">Districts: ${regionCount ?? '-'}</div>
+        <div class="pnl-meta">Districts: ${districtCount ?? '-'}</div>
         <div class="pnl-meta">Facilities: ${facilityCount ?? '-'}</div>
       </div>
     `;
@@ -361,6 +362,7 @@ async function generatePNLReport(monthData, ytdData, meta, accountConfig, childr
 
 module.exports = {
   generatePNLReport,
+  generateHeader,
   formatNumber,
   formatPercent,
   formatMonthLabel

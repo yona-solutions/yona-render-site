@@ -118,8 +118,15 @@ class BigQueryService {
       whereClause = 'customer_internal_id IN UNNEST(@customerIds)';
       queryParams.customerIds = customerIds;
     } else if (hierarchy === 'region' && regionId) {
+      // Region filtering - can optionally include subsidiary filter
       whereClause = 'region_internal_id = @regionId';
       queryParams.regionId = regionId;
+      
+      // Add subsidiary filter if provided (region + subsidiary combination)
+      if (subsidiaryId) {
+        whereClause += ' AND subsidiary_internal_id = @subsidiaryId';
+        queryParams.subsidiaryId = subsidiaryId;
+      }
     } else if (hierarchy === 'subsidiary' && subsidiaryId) {
       whereClause = 'subsidiary_internal_id = @subsidiaryId';
       queryParams.subsidiaryId = subsidiaryId;
@@ -239,6 +246,134 @@ class BigQueryService {
     }
 
     return result;
+  }
+
+  /**
+   * Get customers in a region from dim_customers table
+   * 
+   * Queries the dimension table to find all customers that belong to a specific region.
+   * Optionally filters by subsidiary as well.
+   * Returns customer details including customer_id (internal ID), display_name, and other metadata.
+   * 
+   * @param {number} regionInternalId - Region internal ID
+   * @param {number} subsidiaryInternalId - Optional subsidiary internal ID to filter by
+   * @returns {Promise<Array<Object>>} Array of customer objects with {customer_id, display_name, customer_code, start_date_est}
+   * @throws {Error} If BigQuery is not initialized or query fails
+   */
+  async getCustomersInRegion(regionInternalId, subsidiaryInternalId = null) {
+    if (!this.isAvailable()) {
+      throw new Error('BigQuery not initialized');
+    }
+
+    // Build WHERE clause based on whether subsidiary filter is provided
+    let whereClause = 'region_internal_id = @regionInternalId';
+    const params = { regionInternalId: regionInternalId };
+    
+    if (subsidiaryInternalId) {
+      whereClause += ' AND subsidiary_internal_id = @subsidiaryInternalId';
+      params.subsidiaryInternalId = subsidiaryInternalId;
+    }
+
+    const query = `
+      SELECT
+        customer_id,
+        customer_code,
+        display_name,
+        start_date_est,
+        region_internal_id,
+        subsidiary_internal_id
+      FROM \`yona-solutions-poc.${this.dataset}.dim_customers\`
+      WHERE ${whereClause}
+      ORDER BY customer_id
+    `;
+
+    const filterDesc = subsidiaryInternalId 
+      ? `region_internal_id=${regionInternalId} AND subsidiary_internal_id=${subsidiaryInternalId}`
+      : `region_internal_id=${regionInternalId}`;
+    console.log(`\n🔍 Querying dim_customers for ${filterDesc}`);
+
+    try {
+      const [rows] = await this.bigquery.query({
+        query: query,
+        location: 'US',
+        params: params
+      });
+
+      console.log(`✅ Found ${rows.length} customers matching filter`);
+      
+      return rows.map(row => ({
+        customer_internal_id: row.customer_id,
+        customer_code: row.customer_code,
+        label: row.display_name,
+        start_date_est: row.start_date_est ? row.start_date_est.value : null,
+        region_internal_id: row.region_internal_id,
+        subsidiary_internal_id: row.subsidiary_internal_id
+      }));
+    } catch (error) {
+      console.error('Error fetching customers from dim_customers:', error);
+      throw new Error(`Failed to fetch customers from BigQuery: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get all customers in a subsidiary (with optional region filter)
+   * @param {number} subsidiaryInternalId - The subsidiary_internal_id to filter by
+   * @param {number|null} regionInternalId - Optional region_internal_id to further filter
+   * @returns {Promise<Array>} Array of customer objects
+   */
+  async getCustomersInSubsidiary(subsidiaryInternalId, regionInternalId = null) {
+    if (!this.isAvailable()) {
+      throw new Error('BigQuery not initialized');
+    }
+
+    // Build WHERE clause based on whether region filter is provided
+    let whereClause = 'subsidiary_internal_id = @subsidiaryInternalId';
+    const params = { subsidiaryInternalId: subsidiaryInternalId };
+    
+    if (regionInternalId) {
+      whereClause += ' AND region_internal_id = @regionInternalId';
+      params.regionInternalId = regionInternalId;
+    }
+
+    const query = `
+      SELECT
+        customer_id,
+        customer_code,
+        display_name,
+        start_date_est,
+        region_internal_id,
+        subsidiary_internal_id
+      FROM \`yona-solutions-poc.${this.dataset}.dim_customers\`
+      WHERE ${whereClause}
+      ORDER BY customer_id
+    `;
+
+    const filterDesc = regionInternalId 
+      ? `subsidiary_internal_id=${subsidiaryInternalId} AND region_internal_id=${regionInternalId}`
+      : `subsidiary_internal_id=${subsidiaryInternalId}`;
+    console.log(`\n🔍 Querying dim_customers for ${filterDesc}`);
+
+    try {
+      const [rows] = await this.bigquery.query({
+        query: query,
+        location: 'US',
+        params: params
+      });
+
+      console.log(`✅ Found ${rows.length} customers matching filter`);
+      
+      return rows.map(row => ({
+        customer_internal_id: row.customer_id,
+        customer_code: row.customer_code,
+        label: row.display_name,
+        start_date_est: row.start_date_est ? row.start_date_est.value : null,
+        region_internal_id: row.region_internal_id,
+        subsidiary_internal_id: row.subsidiary_internal_id
+      }));
+    } catch (error) {
+      console.error('Error fetching customers from dim_customers:', error);
+      throw new Error(`Failed to fetch customers from BigQuery: ${error.message}`);
+    }
   }
 }
 

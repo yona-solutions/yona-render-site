@@ -91,6 +91,53 @@ function buildAccountTotals(data, scenario) {
 }
 
 /**
+ * Filters BigQuery data by specific customer IDs
+ * Returns a subset of the data containing only rows for the specified customers
+ * 
+ * @param {Object} data - BigQuery result data with Account, Scenario, Value, customer_internal_id arrays
+ * @param {Array<number>} customerIds - Array of customer internal IDs to include
+ * @returns {Object} Filtered data in the same array format
+ */
+function filterDataByCustomers(data, customerIds) {
+  if (!data?.Account || !data?.customer_internal_id) {
+    return {
+      Account: [],
+      Scenario: [],
+      Value: [],
+      customer_internal_id: [],
+      region_internal_id: [],
+      subsidiary_internal_id: []
+    };
+  }
+  
+  // Convert customerIds to Set for faster lookup
+  const customerIdSet = new Set(customerIds.map(id => Number(id)));
+  
+  const filtered = {
+    Account: [],
+    Scenario: [],
+    Value: [],
+    customer_internal_id: [],
+    region_internal_id: [],
+    subsidiary_internal_id: []
+  };
+  
+  for (let i = 0; i < data.Account.length; i++) {
+    const customerId = Number(data.customer_internal_id[i]);
+    if (customerIdSet.has(customerId)) {
+      filtered.Account.push(data.Account[i]);
+      filtered.Scenario.push(data.Scenario[i]);
+      filtered.Value.push(data.Value[i]);
+      filtered.customer_internal_id.push(data.customer_internal_id[i]);
+      filtered.region_internal_id.push(data.region_internal_id[i]);
+      filtered.subsidiary_internal_id.push(data.subsidiary_internal_id[i]);
+    }
+  }
+  
+  return filtered;
+}
+
+/**
  * Computes account rollups by aggregating child account values into parents
  * Respects displayExcluded and operationalExcluded flags
  * 
@@ -196,6 +243,7 @@ module.exports = {
   getSectionConfig,
   buildAccountTotals,
   computeRollups,
-  getDisplayableAccounts
+  getDisplayableAccounts,
+  filterDataByCustomers
 };
 

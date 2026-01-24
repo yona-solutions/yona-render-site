@@ -745,6 +745,34 @@
           </div>
         </div>
 
+        <!-- Subsidiary Filter (only visible when Region tab is active) -->
+        <div class="control-group" id="subsidiaryFilterGroup" style="display: none;">
+          <label class="control-label">Subsidiary</label>
+          <div class="searchable-select" id="subsidiaryFilterWrapper">
+            <input 
+              type="text" 
+              id="subsidiaryFilterInput" 
+              placeholder="Optional: Filter by subsidiary..." 
+              readonly
+            />
+            <div class="searchable-select-dropdown" id="subsidiaryFilterDropdown"></div>
+          </div>
+        </div>
+
+        <!-- Region Filter (only visible when Subsidiary tab is active) -->
+        <div class="control-group" id="regionFilterGroup" style="display: none;">
+          <label class="control-label">Region</label>
+          <div class="searchable-select" id="regionFilterWrapper">
+            <input 
+              type="text" 
+              id="regionFilterInput" 
+              placeholder="Optional: Filter by region..." 
+              readonly
+            />
+            <div class="searchable-select-dropdown" id="regionFilterDropdown"></div>
+          </div>
+        </div>
+
         <div class="action-buttons">
           <button class="btn btn-primary" onclick="refreshData()">Refresh Data</button>
           <button class="btn btn-secondary" onclick="downloadPDF()">Download PDF</button>
@@ -812,12 +840,12 @@
         });
       }
       
-      setOptions(options) {
+      setOptions(options, autoSelectFirst = true) {
         this.options = options;
         this.renderOptions();
         
-        // Select first option by default
-        if (options.length > 0) {
+        // Select first option by default (unless disabled)
+        if (autoSelectFirst && options.length > 0) {
           this.selectOption(options[0].value, options[0].label);
         }
       }
@@ -922,7 +950,7 @@
     // Initialize Page
     // ============================================
     
-    let monthSelect, districtSelect;
+    let monthSelect, districtSelect, subsidiaryFilterSelect;
     
     /**
      * Load available dates from BigQuery and populate the month dropdown
@@ -1025,11 +1053,77 @@
       }
     }
     
+    /**
+     * Load subsidiaries for the filter dropdown (when Region tab is active)
+     * Shows only leaf nodes (subsidiaries), no default selection
+     */
+    async function loadSubsidiariesForFilter() {
+      try {
+        console.log('📡 Fetching subsidiaries for filter dropdown...');
+        const response = await fetch('/api/storage/departments');
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch subsidiaries');
+        }
+        
+        const items = await response.json();
+        
+        // Map to dropdown options (leaf nodes only, already filtered by backend)
+        const options = items.map(item => ({
+          value: item.id,
+          label: item.label,
+          type: item.type
+        }));
+        
+        // Pass false to prevent auto-selecting the first option
+        subsidiaryFilterSelect.setOptions(options, false);
+        // No default selection - user must explicitly choose a subsidiary to filter
+        
+        console.log(`✅ Loaded ${items.length} subsidiaries (leaf nodes only)`);
+      } catch (error) {
+        console.error('Error loading subsidiaries for filter:', error);
+        // Fallback to empty (don't auto-select)
+        subsidiaryFilterSelect.setOptions([], false);
+      }
+    }
+    
+    async function loadRegionsForFilter() {
+      try {
+        console.log('📡 Fetching regions for filter dropdown...');
+        const response = await fetch('/api/storage/regions');
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch regions');
+        }
+        
+        const items = await response.json();
+        
+        // Map to dropdown options (leaf nodes only, already filtered by backend)
+        const options = items.map(item => ({
+          value: item.id,
+          label: item.label,
+          type: item.type
+        }));
+        
+        // Pass false to prevent auto-selecting the first option
+        regionFilterSelect.setOptions(options, false);
+        // No default selection - user must explicitly choose a region to filter
+        
+        console.log(`✅ Loaded ${items.length} regions (leaf nodes only)`);
+      } catch (error) {
+        console.error('Error loading regions for filter:', error);
+        // Fallback to empty (don't auto-select)
+        regionFilterSelect.setOptions([], false);
+      }
+    }
+    
     // Initialize searchable selects and load data
     document.addEventListener('DOMContentLoaded', () => {
       // Initialize searchable select components
       monthSelect = new SearchableSelect('monthSelectWrapper');
       districtSelect = new SearchableSelect('districtSelectWrapper');
+      subsidiaryFilterSelect = new SearchableSelect('subsidiaryFilterWrapper', [], false);
+      regionFilterSelect = new SearchableSelect('regionFilterWrapper', [], false);
       
       // Set up change handlers
       monthSelect.onChange = (value, label) => {
@@ -1092,6 +1186,32 @@
         
         // Update the dropdown placeholder
         districtSelect.input.setAttribute('placeholder', `Select ${hierarchyType}...`);
+        
+        // Show/hide subsidiary filter based on hierarchy type
+        const subsidiaryFilterGroup = document.getElementById('subsidiaryFilterGroup');
+        const regionFilterGroup = document.getElementById('regionFilterGroup');
+        
+        if (hierarchyType === 'region') {
+          subsidiaryFilterGroup.style.display = 'block';
+          regionFilterGroup.style.display = 'none';
+          // Load subsidiaries for the filter dropdown
+          loadSubsidiariesForFilter();
+          // Clear region filter selection
+          regionFilterSelect.selectOption(null, '');
+        } else if (hierarchyType === 'subsidiary') {
+          subsidiaryFilterGroup.style.display = 'none';
+          regionFilterGroup.style.display = 'block';
+          // Load regions for the filter dropdown
+          loadRegionsForFilter();
+          // Clear subsidiary filter selection
+          subsidiaryFilterSelect.selectOption(null, '');
+        } else {
+          subsidiaryFilterGroup.style.display = 'none';
+          regionFilterGroup.style.display = 'none';
+          // Clear both filter selections
+          subsidiaryFilterSelect.selectOption(null, '');
+          regionFilterSelect.selectOption(null, '');
+        }
         
         // Load the appropriate hierarchy data from API
         // Maps to: /api/storage/districts, /api/storage/regions, or /api/storage/departments
@@ -1157,7 +1277,28 @@
         document.getElementById('pnlContent').innerHTML = '<div style="text-align: center; padding: 40px;">Loading P&L report...</div>';
         
         // Fetch data from API
-        const url = `/api/pl/data?hierarchy=${hierarchy}&selectedId=${encodeURIComponent(selectedId)}&date=${selectedDate}`;
+        let url = `/api/pl/data?hierarchy=${hierarchy}&selectedId=${encodeURIComponent(selectedId)}&date=${selectedDate}`;
+        
+        // Add subsidiary filter if Region hierarchy and a subsidiary is selected
+        if (hierarchy === 'region' && subsidiaryFilterSelect && subsidiaryFilterSelect.selectedValue) {
+          const subsidiaryFilter = subsidiaryFilterSelect.selectedValue;
+          // Only add filter parameter if a subsidiary is actually selected (not empty)
+          if (subsidiaryFilter && subsidiaryFilter !== 'all') {
+            url += `&subsidiaryFilter=${encodeURIComponent(subsidiaryFilter)}`;
+            console.log(`   📎 Applying subsidiary filter: ${subsidiaryFilterSelect.selectedLabel || subsidiaryFilter}`);
+          }
+        }
+        
+        // Add region filter if Subsidiary hierarchy and a region is selected
+        if (hierarchy === 'subsidiary' && regionFilterSelect && regionFilterSelect.selectedValue) {
+          const regionFilter = regionFilterSelect.selectedValue;
+          // Only add filter parameter if a region is actually selected (not empty)
+          if (regionFilter && regionFilter !== 'all') {
+            url += `&regionFilter=${encodeURIComponent(regionFilter)}`;
+            console.log(`   📎 Applying region filter: ${regionFilterSelect.selectedLabel || regionFilter}`);
+          }
+        }
+        
         console.log(`📡 API Request: ${url}`);
         
         const response = await fetch(url);

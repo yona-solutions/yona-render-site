@@ -417,6 +417,114 @@ If hierarchy counts exceed 1000+ items, consider:
 
 ---
 
+## Multi-Level P&L Rendering
+
+The application generates hierarchical P&L reports with different structures based on the selected hierarchy type.
+
+### District View Structure
+
+```
+District Summary (aggregate)
+├── Facility 1 P&L
+├── Facility 2 P&L
+├── Facility 3 P&L
+└── ...
+```
+
+**Data Flow:**
+1. User selects a district from dropdown
+2. System looks up district in `customer_config.json`
+3. Finds all customers where `parent = districtId`
+4. Extracts `customer_internal_id` from each customer
+5. Queries BigQuery with `customer_internal_id IN UNNEST(@customerIds)`
+6. Generates:
+   - District aggregate P&L (all customers combined)
+   - Individual facility P&Ls (only facilities with revenue)
+
+**Implementation:** `getCustomersForDistrict()` in `storageService.js`
+
+---
+
+### Region View Structure
+
+```
+Region Summary (aggregate)
+├── District A Summary (aggregate)
+│   ├── Facility 1 P&L
+│   ├── Facility 2 P&L
+│   └── ...
+├── District B Summary (aggregate)
+│   ├── Facility 3 P&L
+│   ├── Facility 4 P&L
+│   └── ...
+└── ...
+```
+
+**Data Flow:**
+1. User selects a region from dropdown
+2. System looks up `region_internal_id` in `region_config.json`
+3. Queries BigQuery `dim_customers` table: `WHERE region_internal_id = @regionId`
+4. For each customer, looks up parent district in `customer_config.json`
+5. Groups customers by district (ordered by config file order)
+6. Generates:
+   - Region aggregate P&L (all customers in region)
+   - District aggregate P&Ls (customers grouped by district)
+   - Individual facility P&Ls (only facilities with revenue)
+
+**Key Difference from District View:**
+- **District → Customer mapping**: Stored in `customer_config.json` via `parent` field
+- **Region → Customer mapping**: Stored in BigQuery `dim_customers.region_internal_id` column
+
+**Implementation:**
+- `getCustomersInRegion()` in `bigQueryService.js` - queries dim_customers
+- `groupCustomersByDistrict()` in `storageService.js` - groups customers by parent district
+
+---
+
+### Subsidiary View Structure
+
+```
+Subsidiary Summary (aggregate only)
+```
+
+**Data Flow:**
+1. User selects a subsidiary from dropdown
+2. System looks up `subsidiary_internal_id` in `department_config.json`
+3. Queries BigQuery with `subsidiary_internal_id = @subsidiaryId`
+4. Generates single aggregate P&L
+
+**Note:** Currently single-level only. Could be enhanced to show region/district breakdowns.
+
+---
+
+### BigQuery Tables Used
+
+#### `fct_transactions_summary`
+- Transaction-level data with account, scenario, value
+- Columns: `customer_internal_id`, `region_internal_id`, `subsidiary_internal_id`, `account_internal_id`, `scenario`, `value`, `time_date`
+- Used for P&L data aggregation
+
+#### `dim_customers`
+- Customer dimension table
+- Columns: `customer_id`, `customer_code`, `display_name`, `region_internal_id`, `subsidiary_internal_id`, `start_date_est`
+- Used to find customers in a region
+
+---
+
+### Revenue Filtering
+
+**Facilities are only included if they have revenue (`Income > 0`):**
+
+```javascript
+if (Math.abs(incomeTotals.act) < 0.0001) {
+  return { noRevenue: true, html: '' };
+}
+```
+
+This prevents empty P&L reports from cluttering the output. Districts and regions always show their aggregate even if individual facilities are excluded.
+
+---
+
 ## Security Notes
 
 1. **GCP Credentials**: Service account key stored as environment variable
