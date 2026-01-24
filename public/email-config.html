@@ -777,12 +777,14 @@
     // Initialization
     // ============================================
     document.addEventListener('DOMContentLoaded', async () => {
-      // Load all data in parallel
+      // Load email groups and hierarchy options first
       await Promise.all([
         loadEmailGroups(),
-        loadHierarchyOptions(),
-        loadReportSchedules()
+        loadHierarchyOptions()
       ]);
+      
+      // THEN load and render report schedules (so dropdowns have data)
+      await loadReportSchedules();
       
       // Allow adding email with Enter key
       document.getElementById('newEmail').addEventListener('keypress', (e) => {
@@ -832,11 +834,10 @@
           fetch('/api/storage/departments').then(r => r.json())
         ]);
 
-        console.log('📊 Raw data loaded:', {
-          districtsData,
-          regionsData,
-          subsidiariesData
-        });
+        console.log('📊 Raw data loaded:');
+        console.log('  Districts:', Object.keys(districtsData || {}).length, 'items');
+        console.log('  Regions:', Object.keys(regionsData || {}).length, 'items');
+        console.log('  Subsidiaries:', Object.keys(subsidiariesData || {}).length, 'items');
 
         // Process districts - these come as an object with IDs as keys
         districtOptions = [];
@@ -882,17 +883,20 @@
             .sort((a, b) => a.label.localeCompare(b.label));
         }
 
-        console.log('📊 Loaded hierarchy options:', {
-          districts: districtOptions.length,
-          regions: regionOptions.length,
-          subsidiaries: subsidiaryOptions.length
-        });
+        console.log('📊 Loaded hierarchy options:');
+        console.log('  Districts:', districtOptions.length);
+        console.log('  Regions:', regionOptions.length);
+        console.log('  Subsidiaries:', subsidiaryOptions.length);
 
-        console.log('📊 Sample options:', {
-          districts: districtOptions.slice(0, 3),
-          regions: regionOptions.slice(0, 3),
-          subsidiaries: subsidiaryOptions.slice(0, 3)
-        });
+        if (districtOptions.length > 0) {
+          console.log('📊 Sample district options:', districtOptions.slice(0, 3).map(o => o.label));
+        }
+        if (regionOptions.length > 0) {
+          console.log('📊 Sample region options:', regionOptions.slice(0, 3).map(o => o.label));
+        }
+        if (subsidiaryOptions.length > 0) {
+          console.log('📊 Sample subsidiary options:', subsidiaryOptions.slice(0, 3).map(o => o.label));
+        }
       } catch (error) {
         console.error('Error loading hierarchy options:', error);
       }
