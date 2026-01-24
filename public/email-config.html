@@ -1776,8 +1776,8 @@
         return;
       }
 
-      // Open P&L page with parameters
-      const url = `/pl-view?${params.toString()}`;
+      // Open P&L page with parameters (root path serves pl-view.html)
+      const url = `/?${params.toString()}`;
       window.open(url, '_blank');
     }
 
