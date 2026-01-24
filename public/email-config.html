@@ -2713,13 +2713,17 @@
         return;
       }
       
+      // IMPORTANT: Store schedule ID in local variable BEFORE closing modal
+      // because closeSendEmailModal() sets currentScheduleForEmail to null!
+      const scheduleIdToSend = currentScheduleForEmail;
+      
       // Close the modal
       closeSendEmailModal();
       
-      console.log('📤 Proceeding with send...');
+      console.log('📤 Proceeding with send for schedule ID:', scheduleIdToSend);
       
-      // Proceed with sending
-      await executeSendEmail(currentScheduleForEmail, recipientEmail);
+      // Proceed with sending using the stored schedule ID
+      await executeSendEmail(scheduleIdToSend, recipientEmail);
     }
     
     async function executeSendEmail(scheduleId, recipientEmail) {
