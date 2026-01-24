@@ -13,6 +13,7 @@ const { initializeStorage, initializeBigQuery } = require('./config/gcp');
 const StorageService = require('./services/storageService');
 const BigQueryService = require('./services/bigQueryService');
 const emailConfigService = require('./services/emailConfigService');
+const emailService = require('./services/emailService');
 const createApiRoutes = require('./routes/api');
 const emailConfigApiRoutes = require('./routes/emailConfigApi');
 const createViewRoutes = require('./routes/views');
@@ -34,6 +35,9 @@ async function createApp() {
   
   const bigquery = initializeBigQuery();
   const bigQueryService = new BigQueryService(bigquery);
+
+  // Initialize email service (SendGrid)
+  emailService.initialize();
 
   // Initialize email config service (PostgreSQL)
   // Only initialize if DATABASE_URL is provided

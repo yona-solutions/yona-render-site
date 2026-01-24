@@ -488,6 +488,11 @@
       color: #f56565;
     }
 
+    .icon-btn.success:hover {
+      background: #f0fff4;
+      color: #48bb78;
+    }
+
     /* Loading State */
     .loading {
       text-align: center;
@@ -1593,6 +1598,7 @@
             <td>
               <div class="action-buttons">
                 <button class="icon-btn" onclick="downloadSchedulePDF(${schedule.id})" title="Download PDF">📥</button>
+                <button class="icon-btn success" onclick="sendScheduleEmail(${schedule.id})" title="Send Email">📧</button>
                 <button class="icon-btn danger" onclick="deleteReportSchedule(${schedule.id})" title="Delete">🗑️</button>
               </div>
             </td>
@@ -2613,6 +2619,110 @@
       document.getElementById('scheduleFilterInput').value = '';
       filteredSchedules = [...reportSchedules];
       renderReportSchedulesTable();
+    }
+
+    // ============================================
+    // Send Email Function
+    // ============================================
+    
+    async function sendScheduleEmail(scheduleId) {
+      const schedule = reportSchedules.find(s => s.id === scheduleId);
+      if (!schedule) {
+        alert('Schedule not found');
+        return;
+      }
+
+      // Validate that required fields are set
+      if (!schedule.template_type) {
+        alert('Please select a Template Type (District, Region, or Subsidiary)');
+        return;
+      }
+
+      if (!schedule.process) {
+        alert('Please select a Process (Standard or Operational)');
+        return;
+      }
+
+      // Get entity ID based on template type
+      let entityId, entityName;
+      if (schedule.template_type === 'district' && schedule.district_id) {
+        entityId = schedule.district_id;
+        entityName = schedule.district_name || 'District';
+      } else if (schedule.template_type === 'region' && schedule.region_id) {
+        entityId = schedule.region_id;
+        entityName = schedule.region_name || 'Region';
+      } else if (schedule.template_type === 'subsidiary' && schedule.subsidiary_id) {
+        entityId = schedule.subsidiary_id;
+        entityName = schedule.subsidiary_name || 'Subsidiary';
+      } else {
+        alert(`Please select a ${schedule.template_type} before sending email`);
+        return;
+      }
+
+      try {
+        console.log('📧 Starting email send for schedule:', schedule.template_name);
+        
+        // Show loading modal
+        showLoadingModal('Sending Email...');
+        
+        // Update loading steps for email
+        document.getElementById('step1').textContent = 'Validating configuration';
+        document.getElementById('step2').textContent = 'Generating PDF';
+        document.getElementById('step3').textContent = 'Preparing email';
+        document.getElementById('step4').textContent = 'Sending to recipients';
+        document.getElementById('step5').textContent = 'Email sent!';
+        
+        // Step 1: Validating
+        updateLoadingStep(1);
+        
+        // Step 2: Call backend to generate and send email
+        updateLoadingStep(2);
+        console.log('   Calling send-email API...');
+        
+        const response = await fetch(`/api/report-schedules/${scheduleId}/send-email`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Failed to send email');
+        }
+        
+        const result = await response.json();
+        
+        // Complete all steps
+        updateLoadingStep(5);
+        completeAllSteps();
+        document.getElementById('loadingMessage').textContent = 'Email Sent!';
+        
+        console.log('✅ Email sent successfully:', result);
+        
+        // Hide modal after showing success
+        setTimeout(() => {
+          hideLoadingModal();
+          alert(`Email sent successfully to ${result.recipient}!\\n\\nSubject: ${result.subject}`);
+          
+          // Reset loading steps back to original
+          document.getElementById('step1').textContent = 'Fetching available dates';
+          document.getElementById('step2').textContent = 'Loading P&L data';
+          document.getElementById('step3').textContent = 'Processing report';
+          document.getElementById('step4').textContent = 'Converting to PDF';
+          document.getElementById('step5').textContent = 'Downloading file';
+        }, 1500);
+        
+      } catch (error) {
+        console.error('❌ Error sending email:', error);
+        hideLoadingModal();
+        alert('Failed to send email: ' + error.message);
+        
+        // Reset loading steps
+        document.getElementById('step1').textContent = 'Fetching available dates';
+        document.getElementById('step2').textContent = 'Loading P&L data';
+        document.getElementById('step3').textContent = 'Processing report';
+        document.getElementById('step4').textContent = 'Converting to PDF';
+        document.getElementById('step5').textContent = 'Downloading file';
+      }
     }
 
     // ============================================

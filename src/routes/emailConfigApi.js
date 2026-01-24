@@ -8,6 +8,8 @@ const express = require('express');
 const router = express.Router();
 const emailConfigService = require('../services/emailConfigService');
 const mockEmailData = require('../services/mockEmailData');
+const emailService = require('../services/emailService');
+const bigQueryService = require('../services/bigQueryService');
 
 // ============================================
 // Email Groups API
@@ -582,6 +584,248 @@ router.get('/email-config/health', async (req, res) => {
     });
   }
 });
+
+// ============================================
+// Send Email API
+// ============================================
+
+/**
+ * POST /api/report-schedules/:id/send-email
+ * Generate PDF and send email for a report schedule
+ */
+router.post('/report-schedules/:id/send-email', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Check if email service is available
+    if (!emailService.isAvailable()) {
+      return res.status(503).json({
+        error: 'Email service not configured',
+        message: 'SendGrid API key not configured. Please add SENDGRID_API_KEY to environment variables.'
+      });
+    }
+
+    // Get report schedule
+    let schedule;
+    if (!emailConfigService.isAvailable()) {
+      schedule = mockEmailData.getMockReportSchedule(parseInt(id));
+    } else {
+      schedule = await emailConfigService.getReportSchedule(parseInt(id));
+    }
+
+    if (!schedule) {
+      return res.status(404).json({
+        error: 'Report schedule not found'
+      });
+    }
+
+    // Validate schedule configuration
+    if (!schedule.template_type) {
+      return res.status(400).json({
+        error: 'Invalid schedule configuration',
+        message: 'Template type is required'
+      });
+    }
+
+    if (!schedule.process) {
+      return res.status(400).json({
+        error: 'Invalid schedule configuration',
+        message: 'Process (standard/operational) is required'
+      });
+    }
+
+    // Get entity ID based on template type
+    let entityId, entityName;
+    if (schedule.template_type === 'district' && schedule.district_id) {
+      entityId = schedule.district_id;
+      entityName = schedule.district_name || 'District';
+    } else if (schedule.template_type === 'region' && schedule.region_id) {
+      entityId = schedule.region_id;
+      entityName = schedule.region_name || 'Region';
+    } else if (schedule.template_type === 'subsidiary' && schedule.subsidiary_id) {
+      entityId = schedule.subsidiary_id;
+      entityName = schedule.subsidiary_name || 'Subsidiary';
+    } else {
+      return res.status(400).json({
+        error: 'Invalid schedule configuration',
+        message: `Please select a ${schedule.template_type} before sending email`
+      });
+    }
+
+    console.log(`📧 Generating and sending email for schedule: ${schedule.template_name}`);
+
+    // Get latest available date
+    const datesResponse = await fetch('http://localhost:' + (process.env.PORT || 3000) + '/api/pl/dates');
+    const dates = await datesResponse.json();
+    
+    if (!dates || dates.length === 0) {
+      return res.status(400).json({
+        error: 'No P&L data available',
+        message: 'Cannot generate report: no data available'
+      });
+    }
+
+    const latestDate = dates[0].time || dates[0].formatted;
+    console.log(`   Using date: ${latestDate}`);
+
+    // Fetch P&L data
+    const dataUrl = `http://localhost:${process.env.PORT || 3000}/api/pl/data?hierarchy=${schedule.template_type}&selectedId=${encodeURIComponent(entityId)}&date=${latestDate}&process=${schedule.process}`;
+    console.log(`   Fetching data from: ${dataUrl}`);
+    
+    const dataResponse = await fetch(dataUrl);
+    
+    if (!dataResponse.ok) {
+      throw new Error(`Failed to fetch P&L data: ${dataResponse.status}`);
+    }
+    
+    const jsonData = await dataResponse.json();
+    const htmlContent = jsonData.html;
+    
+    if (!htmlContent || !htmlContent.trim()) {
+      return res.status(400).json({
+        error: 'No report data available',
+        message: 'Cannot generate PDF: no data for selected configuration'
+      });
+    }
+
+    console.log(`   HTML content length: ${htmlContent.length}`);
+
+    // Parse and filter HTML (reuse logic from download)
+    const parser = new (require('jsdom').JSDOM)(htmlContent).window.DOMParser;
+    const doc = new parser().parseFromString(`<div id="root">${htmlContent}</div>`, "text/html");
+    const root = doc.getElementById("root");
+    
+    // Helper function to check if a report has non-zero income
+    function hasNonZeroIncome(container) {
+      const table = container.querySelector("table");
+      if (!table) return false;
+      
+      const rows = Array.from(table.querySelectorAll("tr"));
+      for (const row of rows) {
+        const cells = Array.from(row.querySelectorAll("td"));
+        if (cells.length > 0 && cells[0].textContent.trim() === "Income") {
+          if (cells.length > 1) {
+            const valueText = cells[1].textContent.trim();
+            const numValue = parseAccountingToNumber(valueText);
+            return numValue !== 0;
+          }
+        }
+      }
+      return false;
+    }
+    
+    function parseAccountingToNumber(str) {
+      if (!str || str === "—" || str === "-") return 0;
+      let cleaned = str.replace(/[$,\s]/g, "");
+      if (cleaned.startsWith("(") && cleaned.endsWith(")")) {
+        cleaned = "-" + cleaned.slice(1, -1);
+      }
+      const num = parseFloat(cleaned);
+      return isNaN(num) ? 0 : num;
+    }
+    
+    // Filter pages
+    const kept = [];
+    root.querySelectorAll(".pnl-report-container").forEach(container => {
+      if (hasNonZeroIncome(container)) {
+        kept.push(container.outerHTML);
+      }
+    });
+    
+    const filteredHtmlContent = kept.length ? kept.join("\n") : 
+      (root.querySelector(".pnl-report-container")?.outerHTML || htmlContent);
+    
+    console.log(`   Filtered to ${kept.length} reports with non-zero income`);
+
+    // Build complete PDF HTML (reuse from download logic)
+    const fullHTML = buildPDFHTML(filteredHtmlContent);
+    
+    console.log(`   Generating PDF...`);
+    
+    // Convert to PDF using PDFShift
+    const pdfResponse = await fetch('https://api.pdfshift.io/v3/convert/pdf', {
+      method: 'POST',
+      headers: {
+        'X-API-Key': 'sk_3df748acf1ce265988e07e04544b6452ece1b20e',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        source: fullHTML,
+        landscape: false,
+        use_print: true,
+        margin: { top: 10, bottom: 10, left: 10, right: 10 }
+      })
+    });
+    
+    if (!pdfResponse.ok) {
+      throw new Error(`PDF generation failed: ${pdfResponse.status}`);
+    }
+    
+    const pdfBuffer = Buffer.from(await pdfResponse.arrayBuffer());
+    console.log(`   PDF generated: ${(pdfBuffer.length / 1024).toFixed(1)} KB`);
+
+    // Get recipient email (hardcoded for now)
+    const recipientEmail = process.env.RECIPIENT_EMAIL || 'eaadler9@gmail.com';
+
+    // Send email with PDF attachment
+    const result = await emailService.sendPDFEmail(schedule, pdfBuffer, recipientEmail, latestDate);
+
+    console.log(`✅ Email sent successfully`);
+
+    res.json({
+      success: true,
+      message: `Email sent successfully to ${result.recipient}`,
+      recipient: result.recipient,
+      subject: result.subject,
+      filename: result.filename
+    });
+
+  } catch (error) {
+    console.error('❌ Error sending email:', error);
+    res.status(500).json({
+      error: 'Failed to send email',
+      message: error.message
+    });
+  }
+});
+
+// Helper function to build PDF HTML
+function buildPDFHTML(content) {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>P&L Report</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif; padding: 20px; background: white; font-size: 11px; }
+    .pnl-report-container { page-break-after: always; margin-bottom: 40px; }
+    .pnl-report-container:last-child { page-break-after: auto; }
+    .pnl-report-header { margin-bottom: 15px; }
+    .pnl-title { font-size: 18px; font-weight: 600; color: #1a202c; margin-bottom: 4px; }
+    .pnl-subtitle { font-size: 13px; color: #4a5568; margin-bottom: 2px; }
+    .pnl-meta { font-size: 11px; color: #718096; }
+    .pnl-divider { border: none; border-top: 2px solid #e2e8f0; margin: 12px 0; }
+    .pnl-report-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+    .pnl-report-table thead th { background: #f7fafc; padding: 8px; text-align: left; font-weight: 600; color: #2d3748; border-bottom: 2px solid #cbd5e0; font-size: 10px; }
+    .pnl-report-table td { padding: 6px 8px; border-bottom: 1px solid #e2e8f0; vertical-align: top; }
+    .pnl-report-table td:first-child { white-space: normal; word-wrap: break-word; max-width: 140px; }
+    .pnl-report-table td:not(:first-child) { text-align: right; white-space: nowrap; }
+    .pnl-report-table td:empty::after { content: '—'; color: #cbd5e0; }
+    .pnl-report-table tr:hover { background: #f7fafc; }
+    @media print {
+      body { padding: 10px; }
+      .pnl-report-container { page-break-after: always; margin-bottom: 0; }
+      .pnl-report-container:last-child { page-break-after: auto; }
+    }
+  </style>
+</head>
+<body>
+  ${content}
+</body>
+</html>`;
+}
 
 module.exports = router;
 
