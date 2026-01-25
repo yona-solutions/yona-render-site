@@ -318,6 +318,58 @@
       vertical-align: middle;
       margin-left: 2px;
       cursor: help;
+      position: relative;
+    }
+
+    /* Custom instant tooltip */
+    .inline-icon[data-tooltip]::after {
+      content: attr(data-tooltip);
+      position: absolute;
+      bottom: 100%;
+      left: 50%;
+      transform: translateX(-50%) translateY(-4px);
+      background: rgba(0, 0, 0, 0.9);
+      color: white;
+      padding: 6px 10px;
+      border-radius: 4px;
+      font-size: 12px;
+      white-space: nowrap;
+      max-width: 300px;
+      white-space: normal;
+      width: max-content;
+      max-width: 300px;
+      z-index: 10000;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.1s ease-in-out;
+      font-weight: normal;
+      line-height: 1.4;
+      text-align: left;
+    }
+
+    .inline-icon[data-tooltip]:hover::after {
+      opacity: 1;
+      transition-delay: 0s;
+    }
+
+    /* Tooltip arrow */
+    .inline-icon[data-tooltip]::before {
+      content: '';
+      position: absolute;
+      bottom: 100%;
+      left: 50%;
+      transform: translateX(-50%) translateY(4px);
+      border: 4px solid transparent;
+      border-top-color: rgba(0, 0, 0, 0.9);
+      z-index: 10001;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.1s ease-in-out;
+    }
+
+    .inline-icon[data-tooltip]:hover::before {
+      opacity: 1;
+      transition-delay: 0s;
     }
 
     .tag {
@@ -1361,7 +1413,7 @@
         mappedIcon.innerHTML = 'Ⓜ️';
         mappedIcon.style.color = '#2196F3';
         mappedIcon.style.fontWeight = 'bold';
-        mappedIcon.title = 'Mapped to NetSuite: This item is mapped to the corresponding NetSuite dimension (required for P&L reporting)';
+        mappedIcon.setAttribute('data-tooltip', 'Mapped to NetSuite: This item is mapped to the corresponding NetSuite dimension (required for P&L reporting)');
         label.appendChild(mappedIcon);
       }
       
@@ -1370,7 +1422,7 @@
         const icon = document.createElement('span');
         icon.className = 'inline-icon';
         icon.innerHTML = '🙈';
-        icon.title = 'Display Excluded: Hidden from P&L display, but values are still included in totals';
+        icon.setAttribute('data-tooltip', 'Display Excluded: Hidden from P&L display, but values are still included in totals');
         icon.style.opacity = '0.7';
         label.appendChild(icon);
       }
@@ -1379,7 +1431,7 @@
         const icon = document.createElement('span');
         icon.className = 'inline-icon';
         icon.innerHTML = '☰';
-        icon.title = 'Double Lines: Adds a visual separator line above this account in P&L reports';
+        icon.setAttribute('data-tooltip', 'Double Lines: Adds a visual separator line above this account in P&L reports');
         icon.style.color = '#9C27B0';
         icon.style.fontWeight = 'bold';
         label.appendChild(icon);
@@ -1389,7 +1441,7 @@
         const icon = document.createElement('span');
         icon.className = 'inline-icon';
         icon.innerHTML = '⊘';
-        icon.title = 'Operational Excluded: When P&L type is "Operational", this account is completely excluded (not displayed and not included in totals). Still shows in "Standard" view.';
+        icon.setAttribute('data-tooltip', 'Operational Excluded: When P&L type is "Operational", this account is completely excluded (not displayed and not included in totals). Still shows in "Standard" view.');
         icon.style.color = '#FF6F00';
         icon.style.fontWeight = 'bold';
         label.appendChild(icon);
@@ -1399,7 +1451,7 @@
         const icon = document.createElement('span');
         icon.className = 'inline-icon';
         icon.innerHTML = '⊖';
-        icon.title = 'District Reporting Excluded: This customer is excluded from district-level reporting rollups';
+        icon.setAttribute('data-tooltip', 'District Reporting Excluded: This customer is excluded from district-level reporting rollups');
         icon.style.color = '#D32F2F';
         icon.style.fontWeight = 'bold';
         label.appendChild(icon);
