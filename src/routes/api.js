@@ -1402,11 +1402,28 @@ function createApiRoutes(storageService, bigQueryService) {
         !mappedCustomerIds.has(customer.customer_id)
       );
       
-      // Sort by start_date_est descending (most recent first)
+      // Sort by start_date_est descending (most recent first), nulls at bottom
       unmappedCustomers.sort((a, b) => {
-        const dateA = a.start_date_est ? new Date(a.start_date_est) : new Date(0);
-        const dateB = b.start_date_est ? new Date(b.start_date_est) : new Date(0);
-        return dateB - dateA; // Descending order
+        // Extract date values (handle BigQuery DATE type {value: "YYYY-MM-DD"})
+        let dateValueA = a.start_date_est;
+        let dateValueB = b.start_date_est;
+        
+        if (dateValueA && typeof dateValueA === 'object' && dateValueA.value) {
+          dateValueA = dateValueA.value;
+        }
+        if (dateValueB && typeof dateValueB === 'object' && dateValueB.value) {
+          dateValueB = dateValueB.value;
+        }
+        
+        // Nulls go to bottom
+        if (!dateValueA && !dateValueB) return 0;
+        if (!dateValueA) return 1;  // a goes after b
+        if (!dateValueB) return -1; // b goes after a
+        
+        // Both have dates - sort descending (most recent first)
+        const dateA = new Date(dateValueA);
+        const dateB = new Date(dateValueB);
+        return dateB - dateA;
       });
       
       res.json({
