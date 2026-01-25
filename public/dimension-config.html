@@ -1909,91 +1909,191 @@
         return;
       }
       
-      // Create list
-      const ul = document.createElement('ul');
-      ul.style.listStyle = 'none';
-      ul.style.padding = '0';
+      // Create header with stats
+      const header = document.createElement('div');
+      header.style.padding = '16px 20px';
+      header.style.background = 'linear-gradient(135deg, #FFF3E0 0%, #FFE0B2 100%)';
+      header.style.borderBottom = '2px solid #FFB74D';
+      header.style.marginBottom = '0';
+      header.style.display = 'flex';
+      header.style.alignItems = 'center';
+      header.style.gap = '20px';
+      header.style.flexWrap = 'wrap';
       
-      items.forEach(item => {
-        const li = document.createElement('li');
-        li.style.padding = '10px 20px';
-        li.style.borderBottom = '1px solid #f0f0f0';
-        li.style.display = 'flex';
-        li.style.alignItems = 'center';
-        li.style.gap = '12px';
+      const title = document.createElement('h3');
+      title.style.margin = '0';
+      title.style.color = '#E65100';
+      title.style.fontSize = '16px';
+      title.style.fontWeight = '600';
+      title.textContent = type === 'accounts' ? '⚠️ Unmapped Accounts' : '⚠️ Unmapped Customers';
+      header.appendChild(title);
+      
+      const statBadge = (label, value, color) => {
+        const badge = document.createElement('div');
+        badge.style.display = 'inline-flex';
+        badge.style.alignItems = 'center';
+        badge.style.gap = '6px';
+        badge.style.padding = '6px 12px';
+        badge.style.background = 'white';
+        badge.style.borderRadius = '6px';
+        badge.style.fontSize = '13px';
+        badge.style.fontWeight = '500';
+        badge.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
+        
+        const labelSpan = document.createElement('span');
+        labelSpan.textContent = label;
+        labelSpan.style.color = '#666';
+        
+        const valueSpan = document.createElement('span');
+        valueSpan.textContent = value;
+        valueSpan.style.color = color;
+        valueSpan.style.fontWeight = '600';
+        
+        badge.appendChild(labelSpan);
+        badge.appendChild(valueSpan);
+        return badge;
+      };
+      
+      header.appendChild(statBadge('Total:', stats.total, '#2196F3'));
+      header.appendChild(statBadge('Mapped:', stats.mapped, '#4CAF50'));
+      header.appendChild(statBadge('Unmapped:', stats.unmapped, '#FF5722'));
+      
+      container.appendChild(header);
+      
+      // Create table
+      const table = document.createElement('table');
+      table.style.width = '100%';
+      table.style.borderCollapse = 'collapse';
+      table.style.background = 'white';
+      
+      // Table header
+      const thead = document.createElement('thead');
+      const headerRow = document.createElement('tr');
+      headerRow.style.background = '#f8f9fa';
+      headerRow.style.borderBottom = '2px solid #e0e0e0';
+      
+      const createHeaderCell = (text, minWidth) => {
+        const th = document.createElement('th');
+        th.textContent = text;
+        th.style.padding = '12px 16px';
+        th.style.textAlign = 'left';
+        th.style.fontSize = '12px';
+        th.style.fontWeight = '600';
+        th.style.color = '#555';
+        th.style.textTransform = 'uppercase';
+        th.style.letterSpacing = '0.5px';
+        if (minWidth) th.style.minWidth = minWidth;
+        return th;
+      };
+      
+      if (type === 'accounts') {
+        headerRow.appendChild(createHeaderCell('ID', '80px'));
+        headerRow.appendChild(createHeaderCell('Account #', '120px'));
+        headerRow.appendChild(createHeaderCell('Account Name'));
+        headerRow.appendChild(createHeaderCell('Type', '140px'));
+      } else {
+        headerRow.appendChild(createHeaderCell('ID', '80px'));
+        headerRow.appendChild(createHeaderCell('Code', '100px'));
+        headerRow.appendChild(createHeaderCell('Customer Name'));
+        headerRow.appendChild(createHeaderCell('Start Date', '120px'));
+      }
+      
+      thead.appendChild(headerRow);
+      table.appendChild(thead);
+      
+      // Table body
+      const tbody = document.createElement('tbody');
+      
+      items.forEach((item, index) => {
+        const row = document.createElement('tr');
+        row.style.borderBottom = '1px solid #f0f0f0';
+        row.style.transition = 'background 0.15s';
+        
+        // Hover effect
+        row.onmouseenter = () => row.style.background = '#f8f9fa';
+        row.onmouseleave = () => row.style.background = index % 2 === 0 ? 'white' : '#fafafa';
+        row.style.background = index % 2 === 0 ? 'white' : '#fafafa';
+        
+        const createCell = (content, options = {}) => {
+          const td = document.createElement('td');
+          td.style.padding = '12px 16px';
+          td.style.fontSize = '13px';
+          td.style.color = options.color || '#333';
+          td.style.fontWeight = options.bold ? '600' : '400';
+          td.style.fontFamily = options.mono ? 'monospace' : 'inherit';
+          
+          if (typeof content === 'string') {
+            td.textContent = content;
+          } else {
+            td.appendChild(content);
+          }
+          
+          return td;
+        };
         
         if (type === 'accounts') {
-          // Render account
-          const idSpan = document.createElement('span');
-          idSpan.textContent = `ID: ${item.account_id}`;
-          idSpan.style.fontWeight = 'bold';
-          idSpan.style.color = '#2196F3';
-          idSpan.style.minWidth = '80px';
+          // ID column
+          row.appendChild(createCell(item.account_id.toString(), { color: '#2196F3', bold: true }));
           
-          const numberSpan = document.createElement('span');
-          numberSpan.textContent = item.account_number || 'N/A';
-          numberSpan.style.fontFamily = 'monospace';
-          numberSpan.style.color = '#666';
-          numberSpan.style.minWidth = '100px';
+          // Account number
+          row.appendChild(createCell(item.account_number || 'N/A', { mono: true, color: '#666' }));
           
-          const nameSpan = document.createElement('span');
-          nameSpan.textContent = item.display_name || item.account_name || 'Unnamed';
-          nameSpan.style.flex = '1';
+          // Account name
+          row.appendChild(createCell(item.display_name || item.account_name || 'Unnamed'));
           
-          const typeSpan = document.createElement('span');
-          typeSpan.textContent = item.account_type || '';
-          typeSpan.style.fontSize = '11px';
-          typeSpan.style.padding = '2px 8px';
-          typeSpan.style.background = '#f0f0f0';
-          typeSpan.style.borderRadius = '3px';
-          typeSpan.style.color = '#666';
+          // Type badge
+          const typeBadge = document.createElement('span');
+          typeBadge.textContent = item.account_type || 'N/A';
+          typeBadge.style.display = 'inline-block';
+          typeBadge.style.padding = '4px 10px';
+          typeBadge.style.background = '#e3f2fd';
+          typeBadge.style.color = '#1565c0';
+          typeBadge.style.borderRadius = '4px';
+          typeBadge.style.fontSize = '11px';
+          typeBadge.style.fontWeight = '500';
+          typeBadge.style.fontFamily = 'monospace';
+          row.appendChild(createCell(typeBadge));
           
-          li.appendChild(idSpan);
-          li.appendChild(numberSpan);
-          li.appendChild(nameSpan);
-          li.appendChild(typeSpan);
-        } else if (type === 'customers') {
-          // Render customer
-          const idSpan = document.createElement('span');
-          idSpan.textContent = `ID: ${item.customer_id}`;
-          idSpan.style.fontWeight = 'bold';
-          idSpan.style.color = '#2196F3';
-          idSpan.style.minWidth = '80px';
+        } else {
+          // ID column
+          row.appendChild(createCell(item.customer_id.toString(), { color: '#2196F3', bold: true }));
           
-          const codeSpan = document.createElement('span');
-          codeSpan.textContent = item.customer_code || 'N/A';
-          codeSpan.style.fontFamily = 'monospace';
-          codeSpan.style.color = '#666';
-          codeSpan.style.minWidth = '100px';
+          // Customer code
+          row.appendChild(createCell(item.customer_code || 'N/A', { mono: true, color: '#666' }));
           
-          const nameSpan = document.createElement('span');
-          nameSpan.textContent = item.display_name || 'Unnamed';
-          nameSpan.style.flex = '1';
+          // Customer name
+          row.appendChild(createCell(item.display_name || 'Unnamed'));
           
-          if (item.start_date_est) {
-            const dateSpan = document.createElement('span');
-            const date = new Date(item.start_date_est);
-            dateSpan.textContent = `Start: ${date.toLocaleDateString()}`;
-            dateSpan.style.fontSize = '11px';
-            dateSpan.style.padding = '2px 8px';
-            dateSpan.style.background = '#e8f5e9';
-            dateSpan.style.borderRadius = '3px';
-            dateSpan.style.color = '#2e7d32';
-            li.appendChild(idSpan);
-            li.appendChild(codeSpan);
-            li.appendChild(nameSpan);
-            li.appendChild(dateSpan);
+          // Start date
+          let dateValue = item.start_date_est;
+          // Handle BigQuery DATE type which comes as {value: "YYYY-MM-DD"}
+          if (dateValue && typeof dateValue === 'object' && dateValue.value) {
+            dateValue = dateValue.value;
+          }
+          
+          if (dateValue) {
+            const dateBadge = document.createElement('span');
+            const date = new Date(dateValue);
+            dateBadge.textContent = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            dateBadge.style.display = 'inline-block';
+            dateBadge.style.padding = '4px 10px';
+            dateBadge.style.background = '#e8f5e9';
+            dateBadge.style.color = '#2e7d32';
+            dateBadge.style.borderRadius = '4px';
+            dateBadge.style.fontSize = '12px';
+            dateBadge.style.fontWeight = '500';
+            row.appendChild(createCell(dateBadge));
           } else {
-            li.appendChild(idSpan);
-            li.appendChild(codeSpan);
-            li.appendChild(nameSpan);
+            row.appendChild(createCell('—', { color: '#999' }));
           }
         }
         
-        ul.appendChild(li);
+        tbody.appendChild(row);
       });
       
-      container.appendChild(ul);
+      table.appendChild(tbody);
+      container.appendChild(table);
+      
       container.style.display = 'block';
       hideLoadingState();
       
