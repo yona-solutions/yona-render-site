@@ -275,6 +275,28 @@
       background: #1976D2;
     }
 
+    .btn-add-child {
+      width: 20px;
+      height: 20px;
+      border-radius: 3px;
+      border: none;
+      background: #4CAF50;
+      color: white;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      font-weight: bold;
+      padding: 0;
+      margin-right: 4px;
+      transition: background 0.15s;
+    }
+
+    .btn-add-child:hover {
+      background: #45a049;
+    }
+
     li.dragging {
       opacity: 0.5;
     }
@@ -888,6 +910,7 @@
 
       <button class="btn" onclick="expandAll()">Expand All</button>
       <button class="btn" onclick="collapseAll()">Collapse All</button>
+      <button class="btn" style="background: #4CAF50; color: white;" onclick="addRootItem()">+ Add Root Item</button>
       <button class="btn" onclick="refreshDimensions()">Refresh</button>
 
       <div class="stats">
@@ -1534,6 +1557,17 @@
         actionsDiv.appendChild(dragHandle);
       }
       
+      // Add "+" button to create new child
+      const addBtn = document.createElement('button');
+      addBtn.className = 'btn-add-child';
+      addBtn.innerHTML = '+';
+      addBtn.title = 'Add child item';
+      addBtn.onclick = (e) => {
+        e.stopPropagation();
+        addNewChild(node);
+      };
+      actionsDiv.appendChild(addBtn);
+      
       const editBtn = document.createElement('button');
       editBtn.className = 'btn-edit';
       editBtn.innerHTML = '✏️';
@@ -1883,6 +1917,115 @@
         }
       });
     });
+
+    // Add Root Item Function
+    function addRootItem() {
+      const dimension = AppState.currentDimension;
+      const configData = AppState.dimensions[dimension];
+      
+      // Generate unique ID (timestamp-based)
+      const timestamp = Date.now();
+      const randomSuffix = Math.floor(Math.random() * 1000);
+      const newId = `new_${timestamp}_${randomSuffix}`;
+      
+      // Determine label based on dimension
+      let labelPrefix = 'New Item';
+      if (dimension === 'account') labelPrefix = 'New Account';
+      else if (dimension === 'customer') labelPrefix = 'New Customer';
+      else if (dimension === 'department') labelPrefix = 'New Subsidiary';
+      else if (dimension === 'region') labelPrefix = 'New Region';
+      else if (dimension === 'vendor') labelPrefix = 'New Vendor';
+      
+      // Create new root node with default properties
+      const newNode = {
+        id: newId,
+        label: labelPrefix,
+        parent: null, // Root level
+        order: 999999 // Place at end by default
+      };
+      
+      // Add dimension-specific defaults
+      if (dimension === 'customer') {
+        newNode.isDistrict = false;
+        newNode.districtReportingExcluded = false;
+        newNode.districtTags = [];
+        newNode.customerTags = [];
+      } else if (dimension === 'account') {
+        newNode.displayExcluded = false;
+        newNode.operationalExcluded = false;
+        newNode.doubleLines = false;
+      } else if (dimension === 'department') {
+        newNode.tags = [];
+      } else if (dimension === 'region') {
+        newNode.tags = [];
+      }
+      
+      // Add to config data
+      configData[newId] = newNode;
+      
+      // Re-render the tree
+      const tree = buildTree(AppState.dimensions[dimension]);
+      renderTree(tree, AppState.searchQuery);
+      
+      // Open edit sidebar for the new node
+      openEditSidebar(newNode);
+    }
+
+    // Add New Child Function
+    function addNewChild(parentNode) {
+      const dimension = AppState.currentDimension;
+      const configData = AppState.dimensions[dimension];
+      
+      // Generate unique ID (timestamp-based)
+      const timestamp = Date.now();
+      const randomSuffix = Math.floor(Math.random() * 1000);
+      const newId = `new_${timestamp}_${randomSuffix}`;
+      
+      // Determine label based on dimension
+      let labelPrefix = 'New Item';
+      if (dimension === 'account') labelPrefix = 'New Account';
+      else if (dimension === 'customer') labelPrefix = 'New Customer';
+      else if (dimension === 'department') labelPrefix = 'New Subsidiary';
+      else if (dimension === 'region') labelPrefix = 'New Region';
+      else if (dimension === 'vendor') labelPrefix = 'New Vendor';
+      
+      // Create new node with default properties
+      const newNode = {
+        id: newId,
+        label: labelPrefix,
+        parent: parentNode.id,
+        order: 999999 // Place at end by default
+      };
+      
+      // Add dimension-specific defaults
+      if (dimension === 'customer') {
+        newNode.isDistrict = false;
+        newNode.districtReportingExcluded = false;
+        newNode.districtTags = [];
+        newNode.customerTags = [];
+      } else if (dimension === 'account') {
+        newNode.displayExcluded = false;
+        newNode.operationalExcluded = false;
+        newNode.doubleLines = false;
+      } else if (dimension === 'department') {
+        newNode.tags = [];
+      } else if (dimension === 'region') {
+        newNode.tags = [];
+      }
+      
+      // Add to config data
+      configData[newId] = newNode;
+      
+      // Expand the parent node so the new child is visible
+      AppState.expandedNodes.add(parentNode.id);
+      
+      // Re-render the tree
+      const tree = buildTree(AppState.dimensions[dimension]);
+      renderTree(tree, AppState.searchQuery);
+      
+      // Open edit sidebar for the new node
+      openEditSidebar(newNode);
+    }
 
     // Edit Sidebar Functions
     async function openEditSidebar(node) {
