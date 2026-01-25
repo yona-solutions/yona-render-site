@@ -656,21 +656,22 @@ function createApiRoutes(storageService, bigQueryService) {
         console.log(`   ✅ Retrieved data for all customers. Now filtering in memory...`);
         
         // 3. Generate district summaries and facility P&Ls by filtering the data in memory
-        console.log(`   Generating P&Ls for ${queryParams.districtGroups.length} districts...`);
+        console.log(`   Generating P&Ls for ${queryParams.districtGroups.length} groups (tags + districts)...`);
         let totalFacilityCount = 0;
-        let totalDistrictCount = 0; // Track districts with revenue
+        let totalDistrictCount = 0; // Track districts/tags with revenue
         
         for (const districtGroup of queryParams.districtGroups) {
           const districtCustomerIds = districtGroup.customers.map(c => c.customer_internal_id);
           
-          // 3a. Filter data for this district (in memory, no BigQuery call)
-          console.log(`   - District: ${districtGroup.districtLabel} (${districtCustomerIds.length} customers)`);
+          // 3a. Filter data for this district/tag (in memory, no BigQuery call)
+          const groupType = districtGroup.isTag ? 'District Tag' : 'District';
+          console.log(`   - ${groupType}: ${districtGroup.districtLabel} (${districtCustomerIds.length} customers)`);
           const districtData = accountService.filterDataByCustomers(allCustomersData, districtCustomerIds);
           const districtYtdData = accountService.filterDataByCustomers(allCustomersYtdData, districtCustomerIds);
           
           // Create district meta with placeholder facility count (will be corrected after processing)
           const districtMeta = {
-            typeLabel: 'District',
+            typeLabel: groupType,
             entityName: districtGroup.districtLabel,
             monthLabel: date,
             facilityCount: 0, // Will be updated with actual count
