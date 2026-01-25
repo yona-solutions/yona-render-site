@@ -932,7 +932,7 @@
 
       <button class="btn" onclick="expandAll()">Expand All</button>
       <button class="btn" onclick="collapseAll()">Collapse All</button>
-      <button class="btn" style="background: #607D8B; color: white;" onclick="addRootItem()">+ Add Root Item</button>
+      <button id="addRootItemBtn" class="btn" style="background: #607D8B; color: white;" onclick="addRootItem()">+ Add Root Item</button>
       <button class="btn" onclick="refreshDimensions()">Refresh</button>
 
       <div class="stats">
@@ -1579,16 +1579,18 @@
         actionsDiv.appendChild(dragHandle);
       }
       
-      // Add "+" button to create new child
-      const addBtn = document.createElement('button');
-      addBtn.className = 'btn-add-child';
-      addBtn.innerHTML = '+';
-      addBtn.title = 'Add child item';
-      addBtn.onclick = (e) => {
-        e.stopPropagation();
-        addNewChild(node);
-      };
-      actionsDiv.appendChild(addBtn);
+      // Add "+" button to create new child (not for region and vendor)
+      if (AppState.currentDimension !== 'region' && AppState.currentDimension !== 'vendor') {
+        const addBtn = document.createElement('button');
+        addBtn.className = 'btn-add-child';
+        addBtn.innerHTML = '+';
+        addBtn.title = 'Add child item';
+        addBtn.onclick = (e) => {
+          e.stopPropagation();
+          addNewChild(node);
+        };
+        actionsDiv.appendChild(addBtn);
+      }
       
       const editBtn = document.createElement('button');
       editBtn.className = 'btn-edit';
@@ -1842,6 +1844,17 @@
       AppState.currentDimension = dimensionType;
       showLoadingState();
       
+      // Show/hide "Add Root Item" button based on dimension
+      const addRootBtn = document.getElementById('addRootItemBtn');
+      if (addRootBtn) {
+        // Hide for region and vendor, show for all others
+        if (dimensionType === 'region' || dimensionType === 'vendor') {
+          addRootBtn.style.display = 'none';
+        } else {
+          addRootBtn.style.display = 'inline-block';
+        }
+      }
+      
       try {
         if (!AppState.dimensions[dimensionType]) {
           await loadDimension(dimensionType);
@@ -1954,6 +1967,12 @@
     // Add Root Item Function
     function addRootItem() {
       const dimension = AppState.currentDimension;
+      
+      // Don't allow adding root items for region and vendor
+      if (dimension === 'region' || dimension === 'vendor') {
+        return;
+      }
+      
       const configData = AppState.dimensions[dimension];
       
       // Generate unique ID (timestamp-based)
@@ -2069,6 +2088,12 @@
     // Add New Child Function
     function addNewChild(parentNode) {
       const dimension = AppState.currentDimension;
+      
+      // Don't allow adding children for region and vendor
+      if (dimension === 'region' || dimension === 'vendor') {
+        return;
+      }
+      
       const configData = AppState.dimensions[dimension];
       
       // Generate unique ID (timestamp-based)
