@@ -297,6 +297,28 @@
       background: #45a049;
     }
 
+    .btn-delete {
+      width: 20px;
+      height: 20px;
+      border-radius: 3px;
+      border: none;
+      background: #f44336;
+      color: white;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      font-weight: bold;
+      padding: 0;
+      margin-left: 4px;
+      transition: background 0.15s;
+    }
+
+    .btn-delete:hover {
+      background: #d32f2f;
+    }
+
     li.dragging {
       opacity: 0.5;
     }
@@ -1576,8 +1598,19 @@
         e.stopPropagation();
         openEditSidebar(node);
       };
-      
       actionsDiv.appendChild(editBtn);
+      
+      // Add delete button
+      const deleteBtn = document.createElement('button');
+      deleteBtn.className = 'btn-delete';
+      deleteBtn.innerHTML = '🗑️';
+      deleteBtn.title = 'Delete';
+      deleteBtn.onclick = (e) => {
+        e.stopPropagation();
+        deleteItem(node);
+      };
+      actionsDiv.appendChild(deleteBtn);
+      
       div.appendChild(actionsDiv);
       
       li.appendChild(div);
@@ -1969,6 +2002,68 @@
       
       // Open edit sidebar for the new node
       openEditSidebar(newNode);
+    }
+
+    // Delete Item Function
+    async function deleteItem(node) {
+      const dimension = AppState.currentDimension;
+      const configData = AppState.dimensions[dimension];
+      
+      // Check if node has children
+      const hasChildren = node.children && node.children.length > 0;
+      
+      // Confirmation message
+      let confirmMessage = `Are you sure you want to delete "${node.label || node.id}"?`;
+      if (hasChildren) {
+        confirmMessage = `"${node.label || node.id}" has ${node.children.length} child item(s).\n\nDeleting this item will also delete all its children.\n\nAre you sure you want to continue?`;
+      }
+      
+      if (!confirm(confirmMessage)) {
+        return; // User cancelled
+      }
+      
+      // Function to recursively delete node and its children
+      function deleteNodeAndChildren(nodeToDelete) {
+        // Delete all children first
+        if (nodeToDelete.children && nodeToDelete.children.length > 0) {
+          nodeToDelete.children.forEach(child => {
+            deleteNodeAndChildren(child);
+          });
+        }
+        
+        // Delete the node itself
+        delete configData[nodeToDelete.id];
+      }
+      
+      // Delete the node and all its children
+      deleteNodeAndChildren(node);
+      
+      // Close edit sidebar if this node was being edited
+      if (AppState.editingNode && AppState.editingNode.id === node.id) {
+        closeEditSidebar();
+      }
+      
+      // Re-render the tree
+      const tree = buildTree(AppState.dimensions[dimension]);
+      renderTree(tree, AppState.searchQuery);
+      
+      // Save to server
+      try {
+        const response = await fetch(`/api/config/${dimension}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(configData)
+        });
+        
+        if (!response.ok) {
+          throw new Error('Failed to save after deletion');
+        }
+        
+        console.log(`Successfully deleted ${node.label || node.id}`);
+      } catch (error) {
+        console.error('Error saving after deletion:', error);
+        alert('Item deleted locally but failed to save to server. Please refresh and try again.');
+      }
     }
 
     // Add New Child Function
