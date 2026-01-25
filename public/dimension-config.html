@@ -1360,7 +1360,7 @@
         mappedIcon.innerHTML = 'Ⓜ️';
         mappedIcon.style.color = '#2196F3';
         mappedIcon.style.fontWeight = 'bold';
-        mappedIcon.title = 'Mapped to NetSuite';
+        mappedIcon.title = 'Mapped to NetSuite: This item is mapped to the corresponding NetSuite dimension (required for P&L reporting)';
         label.appendChild(mappedIcon);
       }
       
@@ -1369,7 +1369,7 @@
         const icon = document.createElement('span');
         icon.className = 'inline-icon';
         icon.innerHTML = '🙈';
-        icon.title = 'Display Excluded';
+        icon.title = 'Display Excluded: Hidden from P&L display, but values are still included in totals';
         icon.style.opacity = '0.7';
         label.appendChild(icon);
       }
@@ -1378,7 +1378,7 @@
         const icon = document.createElement('span');
         icon.className = 'inline-icon';
         icon.innerHTML = '☰';
-        icon.title = 'Double Lines';
+        icon.title = 'Double Lines: Adds a visual separator line above this account in P&L reports';
         icon.style.color = '#9C27B0';
         icon.style.fontWeight = 'bold';
         label.appendChild(icon);
@@ -1388,7 +1388,7 @@
         const icon = document.createElement('span');
         icon.className = 'inline-icon';
         icon.innerHTML = '⊘';
-        icon.title = 'Operational Excluded';
+        icon.title = 'Operational Excluded: When P&L type is "Operational", this account is completely excluded (not displayed and not included in totals). Still shows in "Standard" view.';
         icon.style.color = '#FF6F00';
         icon.style.fontWeight = 'bold';
         label.appendChild(icon);
@@ -1398,7 +1398,7 @@
         const icon = document.createElement('span');
         icon.className = 'inline-icon';
         icon.innerHTML = '⊖';
-        icon.title = 'District Reporting Excluded';
+        icon.title = 'District Reporting Excluded: This customer is excluded from district-level reporting rollups';
         icon.style.color = '#D32F2F';
         icon.style.fontWeight = 'bold';
         label.appendChild(icon);
