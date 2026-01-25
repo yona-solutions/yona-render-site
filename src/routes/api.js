@@ -1334,6 +1334,97 @@ function createApiRoutes(storageService, bigQueryService) {
   });
 
   /**
+   * Get unmapped accounts (accounts in BigQuery not in config)
+   * 
+   * GET /api/bq/unmapped-accounts
+   */
+  router.get('/bq/unmapped-accounts', async (req, res) => {
+    try {
+      // Fetch all accounts from BigQuery
+      const allAccounts = await bigQueryService.getAllAccounts();
+      
+      // Fetch account config
+      const accountConfig = await storageService.getAccounts();
+      
+      // Create a set of mapped account IDs from config
+      const mappedAccountIds = new Set();
+      Object.values(accountConfig).forEach(account => {
+        if (account.account_internal_id) {
+          mappedAccountIds.add(account.account_internal_id);
+        }
+      });
+      
+      // Filter to only unmapped accounts
+      const unmappedAccounts = allAccounts.filter(account => 
+        !mappedAccountIds.has(account.account_id)
+      );
+      
+      res.json({
+        total: allAccounts.length,
+        mapped: mappedAccountIds.size,
+        unmapped: unmappedAccounts.length,
+        accounts: unmappedAccounts
+      });
+    } catch (error) {
+      console.error('Error fetching unmapped accounts:', error);
+      res.status(500).json({
+        error: 'Failed to fetch unmapped accounts',
+        message: error.message
+      });
+    }
+  });
+
+  /**
+   * Get unmapped customers (customers in BigQuery not in config)
+   * Sorted by start_date_est descending (most recent first)
+   * 
+   * GET /api/bq/unmapped-customers
+   */
+  router.get('/bq/unmapped-customers', async (req, res) => {
+    try {
+      // Fetch all customers from BigQuery
+      const allCustomers = await bigQueryService.getAllCustomers();
+      
+      // Fetch customer config
+      const customerConfig = await storageService.getCustomers();
+      
+      // Create a set of mapped customer IDs from config
+      const mappedCustomerIds = new Set();
+      Object.values(customerConfig).forEach(customer => {
+        if (customer.customer_internal_id || customer.customer_id) {
+          const customerId = customer.customer_internal_id || customer.customer_id;
+          mappedCustomerIds.add(customerId);
+        }
+      });
+      
+      // Filter to only unmapped customers
+      let unmappedCustomers = allCustomers.filter(customer => 
+        !mappedCustomerIds.has(customer.customer_id)
+      );
+      
+      // Sort by start_date_est descending (most recent first)
+      unmappedCustomers.sort((a, b) => {
+        const dateA = a.start_date_est ? new Date(a.start_date_est) : new Date(0);
+        const dateB = b.start_date_est ? new Date(b.start_date_est) : new Date(0);
+        return dateB - dateA; // Descending order
+      });
+      
+      res.json({
+        total: allCustomers.length,
+        mapped: mappedCustomerIds.size,
+        unmapped: unmappedCustomers.length,
+        customers: unmappedCustomers
+      });
+    } catch (error) {
+      console.error('Error fetching unmapped customers:', error);
+      res.status(500).json({
+        error: 'Failed to fetch unmapped customers',
+        message: error.message
+      });
+    }
+  });
+
+  /**
    * Test endpoint: Read data from Google Sheets
    * 
    * GET /api/sheets/test?spreadsheetId=xxx&range=Sheet1!A1:Z100

@@ -126,6 +126,23 @@
       font-weight: 600;
     }
 
+    /* Unmapped tabs styling */
+    .tab.unmapped-tab {
+      background: linear-gradient(135deg, #FFF3E0 0%, #FFE0B2 100%);
+      color: #E65100;
+      border: 1px solid #FFB74D;
+    }
+
+    .tab.unmapped-tab:hover:not(.active) {
+      background: linear-gradient(135deg, #FFE0B2 0%, #FFCC80 100%);
+    }
+
+    .tab.unmapped-tab.active {
+      background: linear-gradient(135deg, #FFB74D 0%, #FFA726 100%);
+      color: white;
+      font-weight: 600;
+    }
+
     /* Controls */
     .controls {
       background: white;
@@ -918,6 +935,8 @@
       <button class="tab" data-dimension="department">Departments</button>
       <button class="tab" data-dimension="region">Regions</button>
       <button class="tab" data-dimension="vendor">Vendors</button>
+      <button class="tab unmapped-tab" data-dimension="unmapped-accounts">⚠️ Unmapped Accounts</button>
+      <button class="tab unmapped-tab" data-dimension="unmapped-customers">⚠️ Unmapped Customers</button>
     </div>
 
     <!-- Controls -->
@@ -1579,8 +1598,9 @@
         actionsDiv.appendChild(dragHandle);
       }
       
-      // Add "+" button to create new child (not for region and vendor)
-      if (AppState.currentDimension !== 'region' && AppState.currentDimension !== 'vendor') {
+      // Add "+" button to create new child (not for region, vendor, and unmapped tabs)
+      if (AppState.currentDimension !== 'region' && AppState.currentDimension !== 'vendor' &&
+          AppState.currentDimension !== 'unmapped-accounts' && AppState.currentDimension !== 'unmapped-customers') {
         const addBtn = document.createElement('button');
         addBtn.className = 'btn-add-child';
         addBtn.innerHTML = '+';
@@ -1840,6 +1860,147 @@
       document.getElementById('treeRoot').style.display = 'none';
     }
 
+    // Load and render unmapped accounts
+    async function loadAndRenderUnmappedAccounts() {
+      try {
+        const response = await fetch('/api/bq/unmapped-accounts');
+        if (!response.ok) throw new Error('Failed to load unmapped accounts');
+        const data = await response.json();
+        
+        renderUnmappedList(data.accounts, 'accounts', {
+          total: data.total,
+          mapped: data.mapped,
+          unmapped: data.unmapped
+        });
+      } catch (error) {
+        showErrorState(error.message);
+      }
+    }
+
+    // Load and render unmapped customers
+    async function loadAndRenderUnmappedCustomers() {
+      try {
+        const response = await fetch('/api/bq/unmapped-customers');
+        if (!response.ok) throw new Error('Failed to load unmapped customers');
+        const data = await response.json();
+        
+        renderUnmappedList(data.customers, 'customers', {
+          total: data.total,
+          mapped: data.mapped,
+          unmapped: data.unmapped
+        });
+      } catch (error) {
+        showErrorState(error.message);
+      }
+    }
+
+    // Render unmapped items as a flat list
+    function renderUnmappedList(items, type, stats) {
+      const container = document.getElementById('treeRoot');
+      container.innerHTML = '';
+      
+      if (!items || items.length === 0) {
+        container.innerHTML = '<div class="empty-state">🎉 All items are mapped! No unmapped items found.</div>';
+        container.style.display = 'block';
+        hideLoadingState();
+        
+        document.getElementById('totalCount').textContent = stats.total;
+        document.getElementById('visibleCount').textContent = 0;
+        return;
+      }
+      
+      // Create list
+      const ul = document.createElement('ul');
+      ul.style.listStyle = 'none';
+      ul.style.padding = '0';
+      
+      items.forEach(item => {
+        const li = document.createElement('li');
+        li.style.padding = '10px 20px';
+        li.style.borderBottom = '1px solid #f0f0f0';
+        li.style.display = 'flex';
+        li.style.alignItems = 'center';
+        li.style.gap = '12px';
+        
+        if (type === 'accounts') {
+          // Render account
+          const idSpan = document.createElement('span');
+          idSpan.textContent = `ID: ${item.account_id}`;
+          idSpan.style.fontWeight = 'bold';
+          idSpan.style.color = '#2196F3';
+          idSpan.style.minWidth = '80px';
+          
+          const numberSpan = document.createElement('span');
+          numberSpan.textContent = item.account_number || 'N/A';
+          numberSpan.style.fontFamily = 'monospace';
+          numberSpan.style.color = '#666';
+          numberSpan.style.minWidth = '100px';
+          
+          const nameSpan = document.createElement('span');
+          nameSpan.textContent = item.display_name || item.account_name || 'Unnamed';
+          nameSpan.style.flex = '1';
+          
+          const typeSpan = document.createElement('span');
+          typeSpan.textContent = item.account_type || '';
+          typeSpan.style.fontSize = '11px';
+          typeSpan.style.padding = '2px 8px';
+          typeSpan.style.background = '#f0f0f0';
+          typeSpan.style.borderRadius = '3px';
+          typeSpan.style.color = '#666';
+          
+          li.appendChild(idSpan);
+          li.appendChild(numberSpan);
+          li.appendChild(nameSpan);
+          li.appendChild(typeSpan);
+        } else if (type === 'customers') {
+          // Render customer
+          const idSpan = document.createElement('span');
+          idSpan.textContent = `ID: ${item.customer_id}`;
+          idSpan.style.fontWeight = 'bold';
+          idSpan.style.color = '#2196F3';
+          idSpan.style.minWidth = '80px';
+          
+          const codeSpan = document.createElement('span');
+          codeSpan.textContent = item.customer_code || 'N/A';
+          codeSpan.style.fontFamily = 'monospace';
+          codeSpan.style.color = '#666';
+          codeSpan.style.minWidth = '100px';
+          
+          const nameSpan = document.createElement('span');
+          nameSpan.textContent = item.display_name || 'Unnamed';
+          nameSpan.style.flex = '1';
+          
+          if (item.start_date_est) {
+            const dateSpan = document.createElement('span');
+            const date = new Date(item.start_date_est);
+            dateSpan.textContent = `Start: ${date.toLocaleDateString()}`;
+            dateSpan.style.fontSize = '11px';
+            dateSpan.style.padding = '2px 8px';
+            dateSpan.style.background = '#e8f5e9';
+            dateSpan.style.borderRadius = '3px';
+            dateSpan.style.color = '#2e7d32';
+            li.appendChild(idSpan);
+            li.appendChild(codeSpan);
+            li.appendChild(nameSpan);
+            li.appendChild(dateSpan);
+          } else {
+            li.appendChild(idSpan);
+            li.appendChild(codeSpan);
+            li.appendChild(nameSpan);
+          }
+        }
+        
+        ul.appendChild(li);
+      });
+      
+      container.appendChild(ul);
+      container.style.display = 'block';
+      hideLoadingState();
+      
+      document.getElementById('totalCount').textContent = stats.total;
+      document.getElementById('visibleCount').textContent = items.length;
+    }
+
     async function switchDimension(dimensionType) {
       AppState.currentDimension = dimensionType;
       showLoadingState();
@@ -1847,8 +2008,9 @@
       // Show/hide "Add Root Item" button based on dimension
       const addRootBtn = document.getElementById('addRootItemBtn');
       if (addRootBtn) {
-        // Hide for region and vendor, show for all others
-        if (dimensionType === 'region' || dimensionType === 'vendor') {
+        // Hide for region, vendor, and unmapped tabs
+        if (dimensionType === 'region' || dimensionType === 'vendor' || 
+            dimensionType === 'unmapped-accounts' || dimensionType === 'unmapped-customers') {
           addRootBtn.style.display = 'none';
         } else {
           addRootBtn.style.display = 'inline-block';
@@ -1856,21 +2018,29 @@
       }
       
       try {
-        if (!AppState.dimensions[dimensionType]) {
-          await loadDimension(dimensionType);
-        }
-        
-        // Auto-expand all on initial load
-        if (!AppState.trees[dimensionType]) {
-          const data = AppState.dimensions[dimensionType];
-          if (data) {
-            for (const id of Object.keys(data)) {
-              AppState.expandedNodes.add(id);
+        // Handle unmapped tabs differently
+        if (dimensionType === 'unmapped-accounts') {
+          await loadAndRenderUnmappedAccounts();
+        } else if (dimensionType === 'unmapped-customers') {
+          await loadAndRenderUnmappedCustomers();
+        } else {
+          // Standard dimension loading
+          if (!AppState.dimensions[dimensionType]) {
+            await loadDimension(dimensionType);
+          }
+          
+          // Auto-expand all on initial load
+          if (!AppState.trees[dimensionType]) {
+            const data = AppState.dimensions[dimensionType];
+            if (data) {
+              for (const id of Object.keys(data)) {
+                AppState.expandedNodes.add(id);
+              }
             }
           }
+          
+          renderCurrentDimension();
         }
-        
-        renderCurrentDimension();
       } catch (error) {
         showErrorState(error.message);
       }
@@ -1968,8 +2138,9 @@
     function addRootItem() {
       const dimension = AppState.currentDimension;
       
-      // Don't allow adding root items for region and vendor
-      if (dimension === 'region' || dimension === 'vendor') {
+      // Don't allow adding root items for region, vendor, and unmapped tabs
+      if (dimension === 'region' || dimension === 'vendor' || 
+          dimension === 'unmapped-accounts' || dimension === 'unmapped-customers') {
         return;
       }
       
@@ -2089,8 +2260,9 @@
     function addNewChild(parentNode) {
       const dimension = AppState.currentDimension;
       
-      // Don't allow adding children for region and vendor
-      if (dimension === 'region' || dimension === 'vendor') {
+      // Don't allow adding children for region, vendor, and unmapped tabs
+      if (dimension === 'region' || dimension === 'vendor' || 
+          dimension === 'unmapped-accounts' || dimension === 'unmapped-customers') {
         return;
       }
       

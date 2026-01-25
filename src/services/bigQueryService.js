@@ -554,6 +554,86 @@ class BigQueryService {
       throw new Error(`Failed to fetch subsidiaries: ${error.message}`);
     }
   }
+
+  /**
+   * Get all accounts from BigQuery dim_accounts table
+   * 
+   * @returns {Promise<Array>} Array of all accounts
+   * @throws {Error} If BigQuery is not initialized or query fails
+   */
+  async getAllAccounts() {
+    if (!this.isAvailable()) {
+      throw new Error('BigQuery not initialized');
+    }
+
+    const query = `
+      SELECT
+        account_id,
+        account_number,
+        display_name,
+        account_name,
+        full_account_name,
+        account_type,
+        display_name_with_id,
+        parent_account_name,
+        parent_id,
+        root_or_parent_id,
+        is_root_account
+      FROM \`${this.dataset}.dim_accounts\`
+      WHERE account_id IS NOT NULL
+      ORDER BY account_number
+    `;
+
+    try {
+      const [rows] = await this.bigquery.query({
+        query: query,
+        location: 'US'
+      });
+      
+      return rows;
+    } catch (error) {
+      console.error('Error fetching all accounts from BigQuery:', error);
+      throw new Error(`Failed to fetch all accounts: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get all customers from BigQuery dim_customers table
+   * 
+   * @returns {Promise<Array>} Array of all customers
+   * @throws {Error} If BigQuery is not initialized or query fails
+   */
+  async getAllCustomers() {
+    if (!this.isAvailable()) {
+      throw new Error('BigQuery not initialized');
+    }
+
+    const query = `
+      SELECT
+        customer_id,
+        customer_code,
+        display_name,
+        start_date_est,
+        region_internal_id,
+        subsidiary_internal_id,
+        display_name_with_id
+      FROM \`${this.dataset}.dim_customers\`
+      WHERE customer_id IS NOT NULL
+      ORDER BY customer_code
+    `;
+
+    try {
+      const [rows] = await this.bigquery.query({
+        query: query,
+        location: 'US'
+      });
+      
+      return rows;
+    } catch (error) {
+      console.error('Error fetching all customers from BigQuery:', error);
+      throw new Error(`Failed to fetch all customers: ${error.message}`);
+    }
+  }
 }
 
 module.exports = BigQueryService;
