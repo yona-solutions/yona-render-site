@@ -65,6 +65,34 @@ function formatMonthLabel(isoDate) {
 }
 
 /**
+ * Formats a date string to MM/DD/YYYY format
+ * 
+ * @param {string} dateStr - Date in ISO format (YYYY-MM-DD) or other format
+ * @returns {string} Formatted date as MM/DD/YYYY
+ */
+function formatStartDate(dateStr) {
+  if (!dateStr) return '';
+  
+  try {
+    // Handle various date formats
+    const date = new Date(dateStr);
+    
+    // Check if valid date
+    if (isNaN(date.getTime())) {
+      return dateStr; // Return original if can't parse
+    }
+    
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const year = date.getFullYear();
+    
+    return `${month}/${day}/${year}`;
+  } catch (e) {
+    return dateStr; // Return original if error
+  }
+}
+
+/**
  * Generates the HTML header for a P&L report
  * Header varies based on entity type (Subsidiary, Region, District, Facility)
  * 
@@ -87,16 +115,19 @@ function generateHeader(meta) {
   
   const formattedMonth = formatMonthLabel(monthLabel);
   
+  // Census data is only shown for individual facilities, not for rollups
   let censusHtml = '';
-  if (actualCensus != null) {
-    censusHtml += `<div class="meta">Census Actual: ${Math.round(Number(actualCensus))}</div>`;
-  }
-  if (budgetCensus != null) {
-    censusHtml += `<div class="meta">Census Budget: ${Math.round(Number(budgetCensus))}</div>`;
+  if (typeLabel === 'Facility') {
+    if (actualCensus != null) {
+      censusHtml += `<div class="pnl-meta">Census Actual: ${Math.round(Number(actualCensus))}</div>`;
+    }
+    if (budgetCensus != null) {
+      censusHtml += `<div class="pnl-meta">Census Budget: ${Math.round(Number(budgetCensus))}</div>`;
+    }
   }
   
   if (typeLabel === 'Facility') {
-    let startDateHtml = startDateEst ? `<div class="meta">Start Date: ${startDateEst}</div>` : '';
+    let startDateHtml = startDateEst ? `<div class="pnl-meta">Start Date: ${formatStartDate(startDateEst)}</div>` : '';
     
     return `
       <div class="pnl-report-header">
@@ -119,6 +150,18 @@ function generateHeader(meta) {
         <div class="pnl-meta">Facilities: ${facilityCount ?? '-'}</div>
       </div>
     `;
+  } else if (typeLabel === 'Subsidiary Tag') {
+    return `
+      <div class="pnl-report-header">
+        <div class="pnl-title">${entityName}</div>
+        <div class="pnl-subtitle">Actual vs Budget</div>
+        <div class="pnl-meta">${formattedMonth}</div>
+        <div class="pnl-meta">Regions: ${regionCount ?? '-'}</div>
+        <div class="pnl-meta">Districts: ${districtCount ?? '-'}</div>
+        <div class="pnl-meta">Facilities: ${facilityCount ?? '-'}</div>
+        <div class="pnl-meta">Type: Subsidiary Tag</div>
+      </div>
+    `;
   } else if (typeLabel === 'Region') {
     return `
       <div class="pnl-report-header">
@@ -137,7 +180,16 @@ function generateHeader(meta) {
         <div class="pnl-meta">${formattedMonth}</div>
         <div class="pnl-meta">Facilities: ${facilityCount ?? '-'}</div>
         <div class="pnl-meta">Type: District</div>
-        ${censusHtml}
+      </div>
+    `;
+  } else if (typeLabel === 'District Tag') {
+    return `
+      <div class="pnl-report-header">
+        <div class="pnl-title">${entityName}</div>
+        <div class="pnl-subtitle">Yona Solutions</div>
+        <div class="pnl-meta">${formattedMonth}</div>
+        <div class="pnl-meta">Facilities: ${facilityCount ?? '-'}</div>
+        <div class="pnl-meta">Type: District Tag</div>
       </div>
     `;
   }
@@ -315,6 +367,13 @@ async function generatePNLReport(monthData, ytdData, meta, accountConfig, childr
   for (const section of Object.keys(sectionConfig)) {
     const accounts = sectionConfig[section].accounts || [];
     
+    // Sort section accounts by their order field from the config
+    const sortedAccounts = accounts.slice().sort((a, b) => {
+      const orderA = labelToConfig[a]?.order ?? 0;
+      const orderB = labelToConfig[b]?.order ?? 0;
+      return orderA - orderB;
+    });
+    
     rowsHtml += `
       <tr>
         <td colspan="12" style="font-weight:700; text-decoration:underline; text-transform:uppercase; padding-top: 12px;">
@@ -323,7 +382,7 @@ async function generatePNLReport(monthData, ytdData, meta, accountConfig, childr
       </tr>
     `;
     
-    accounts.forEach(acct => {
+    sortedAccounts.forEach(acct => {
       rowsHtml += renderAccountRows(
         acct, 1, labelToConfig, childrenMap, valMonthAct, valMonthBud,
         valYtdAct, valYtdBud, incomeTotals, isOperational, sectionAccounts

@@ -26,12 +26,22 @@ const SECTION_CONFIG = {
 
 /**
  * Builds a map of parent account LABELS to their children LABELS
+ * Children are sorted by their order field from the configuration
  * 
  * @param {Object} accountConfig - The account configuration object
- * @returns {Object} Map of parentLabel -> [childLabel, childLabel, ...]
+ * @returns {Object} Map of parentLabel -> [childLabel, childLabel, ...] (sorted by order)
  */
 function buildChildrenMap(accountConfig) {
   const childrenMap = {};
+  
+  // Build a label -> config map for quick lookups
+  const labelToConfig = {};
+  for (const configId in accountConfig) {
+    const config = accountConfig[configId];
+    if (config.label) {
+      labelToConfig[config.label] = config;
+    }
+  }
   
   for (const configId in accountConfig) {
     const config = accountConfig[configId];
@@ -50,6 +60,15 @@ function buildChildrenMap(accountConfig) {
         childrenMap[parentLabel].push(childLabel);
       }
     }
+  }
+  
+  // Sort all children arrays by the order field
+  for (const parentLabel in childrenMap) {
+    childrenMap[parentLabel].sort((a, b) => {
+      const orderA = labelToConfig[a]?.order ?? 0;
+      const orderB = labelToConfig[b]?.order ?? 0;
+      return orderA - orderB;
+    });
   }
   
   return childrenMap;

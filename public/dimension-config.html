@@ -823,7 +823,73 @@
         <div id="customerTagsList" style="display: flex; flex-wrap: wrap; gap: 4px;"></div>
       </div>
 
-      <div class="field-group">
+      <!-- Region Mapping Section -->
+      <div id="regionMappingSection" class="field-group" style="display: none;">
+        <label class="field-label">Map to BigQuery Region</label>
+        <div class="custom-select-wrapper">
+          <input 
+            type="text" 
+            id="editRegionMapping" 
+            class="custom-select-input" 
+            placeholder="(No region mapped)"
+            readonly
+          />
+          <div class="custom-select-dropdown" id="editRegionMappingDropdown"></div>
+        </div>
+        <div id="regionMappingHint" class="field-hint" style="display: none;"></div>
+      </div>
+
+      <!-- Region Tags Section -->
+      <div id="regionTagsSection" class="field-group" style="display: none;">
+        <label class="field-label">Region Tags</label>
+        <div style="display: flex; gap: 6px; margin-bottom: 8px;">
+          <input 
+            type="text" 
+            id="newRegionTag" 
+            class="field-input" 
+            placeholder="Add region tag..."
+            style="flex: 1;"
+            onkeypress="if(event.key === 'Enter') { event.preventDefault(); addRegionTag(); }"
+          />
+          <button class="btn" onclick="addRegionTag()" style="padding: 6px 12px;">Add</button>
+        </div>
+        <div id="regionTagsList" style="display: flex; flex-wrap: wrap; gap: 4px;"></div>
+      </div>
+
+      <!-- Department/Subsidiary Mapping Section -->
+      <div id="departmentMappingSection" class="field-group" style="display: none;">
+        <label class="field-label">Map to BigQuery Subsidiary</label>
+        <div class="custom-select-wrapper">
+          <input 
+            type="text" 
+            id="editDepartmentMapping" 
+            class="custom-select-input" 
+            placeholder="(No subsidiary mapped)"
+            readonly
+          />
+          <div class="custom-select-dropdown" id="editDepartmentMappingDropdown"></div>
+        </div>
+        <div id="departmentMappingHint" class="field-hint" style="display: none;"></div>
+      </div>
+
+      <!-- Department Tags Section -->
+      <div id="departmentTagsSection" class="field-group" style="display: none;">
+        <label class="field-label">Subsidiary Tags</label>
+        <div style="display: flex; gap: 6px; margin-bottom: 8px;">
+          <input 
+            type="text" 
+            id="newDepartmentTag" 
+            class="field-input" 
+            placeholder="Add subsidiary tag..."
+            style="flex: 1;"
+            onkeypress="if(event.key === 'Enter') { event.preventDefault(); addDepartmentTag(); }"
+          />
+          <button class="btn" onclick="addDepartmentTag()" style="padding: 6px 12px;">Add</button>
+        </div>
+        <div id="departmentTagsList" style="display: flex; flex-wrap: wrap; gap: 4px;"></div>
+      </div>
+
+      <div id="parentSection" class="field-group">
         <label class="field-label">Parent</label>
         <div class="custom-select-wrapper">
           <input 
@@ -1464,6 +1530,8 @@
       // Show/hide sections based on dimension type
       const isAccountTab = AppState.currentDimension === 'account';
       const isCustomerTab = AppState.currentDimension === 'customer';
+      const isRegionTab = AppState.currentDimension === 'region';
+      const isDepartmentTab = AppState.currentDimension === 'department';
       
       document.getElementById('accountMappingSection').style.display = isAccountTab ? 'block' : 'none';
       document.getElementById('accountCheckboxesSection').style.display = isAccountTab ? 'block' : 'none';
@@ -1473,6 +1541,15 @@
       document.getElementById('customerStartDateSection').style.display = isCustomerTab ? 'block' : 'none';
       document.getElementById('districtTagsSection').style.display = isCustomerTab ? 'block' : 'none';
       document.getElementById('customerTagsSection').style.display = isCustomerTab ? 'block' : 'none';
+      
+      document.getElementById('regionMappingSection').style.display = isRegionTab ? 'block' : 'none';
+      document.getElementById('regionTagsSection').style.display = isRegionTab ? 'block' : 'none';
+      
+      document.getElementById('departmentMappingSection').style.display = isDepartmentTab ? 'block' : 'none';
+      document.getElementById('departmentTagsSection').style.display = isDepartmentTab ? 'block' : 'none';
+      
+      // Hide parent section for department tab (subsidiaries are managed in BigQuery)
+      document.getElementById('parentSection').style.display = isDepartmentTab ? 'none' : 'block';
       
       if (isAccountTab) {
         // Populate account mapping dropdown (async)
@@ -1514,8 +1591,26 @@
         };
       }
       
-      // Populate parent dropdown
-      populateParentDropdown(node);
+      if (isRegionTab) {
+        // Populate region mapping dropdown (async)
+        await populateRegionMappingDropdown(node);
+        
+        // Populate tags
+        populateRegionTags(node.tags || []);
+      }
+      
+      if (isDepartmentTab) {
+        // Populate department mapping dropdown (async)
+        await populateDepartmentMappingDropdown(node);
+        
+        // Populate tags
+        populateDepartmentTags(node.tags || []);
+      }
+      
+      // Populate parent dropdown (except for department/subsidiary)
+      if (!isDepartmentTab) {
+        populateParentDropdown(node);
+      }
       
       // Show sidebar
       document.getElementById('editSidebar').classList.add('open');
@@ -1557,8 +1652,10 @@
       // Update label
       configData[nodeId].label = newLabel;
       
-      // Update parent
-      configData[nodeId].parent = newParent;
+      // Update parent (except for department/subsidiary which is managed in BigQuery)
+      if (dimension !== 'department') {
+        configData[nodeId].parent = newParent;
+      }
 
       // For Account tab, update account-specific fields
       if (dimension === 'account') {
@@ -1606,6 +1703,36 @@
         // Get tags from the editing node (which were updated by add/remove functions)
         configData[nodeId].districtTags = node.districtTags || [];
         configData[nodeId].customerTags = node.customerTags || [];
+      }
+
+      // For Region tab, update region-specific fields
+      if (dimension === 'region') {
+        const regionMappingInput = document.getElementById('editRegionMapping');
+        const regionMappingValue = regionMappingInput.dataset.selectedValue;
+        
+        if (regionMappingValue) {
+          configData[nodeId].region_internal_id = parseInt(regionMappingValue);
+        } else {
+          delete configData[nodeId].region_internal_id;
+        }
+
+        // Save tags
+        configData[nodeId].tags = node.tags || [];
+      }
+
+      // For Department tab, update department-specific fields
+      if (dimension === 'department') {
+        const departmentMappingInput = document.getElementById('editDepartmentMapping');
+        const departmentMappingValue = departmentMappingInput.dataset.selectedValue;
+        
+        if (departmentMappingValue) {
+          configData[nodeId].subsidiary_internal_id = parseInt(departmentMappingValue);
+        } else {
+          delete configData[nodeId].subsidiary_internal_id;
+        }
+
+        // Save tags
+        configData[nodeId].tags = node.tags || [];
       }
 
       // Save to backend
@@ -1756,6 +1883,116 @@
       populateCustomerTags(newTags);
     }
 
+    // Region tag management functions
+    function populateRegionTags(tags) {
+      const container = document.getElementById('regionTagsList');
+      container.innerHTML = '';
+      
+      tags.forEach(tag => {
+        const tagSpan = document.createElement('span');
+        tagSpan.style.cssText = 'font-size: 10px; padding: 4px 8px; border-radius: 12px; background-color: #e3f2fd; color: #0d47a1; display: inline-flex; align-items: center; gap: 4px;';
+        
+        const tagText = document.createTextNode(`R:${tag} `);
+        tagSpan.appendChild(tagText);
+        
+        const closeBtn = document.createElement('span');
+        closeBtn.style.cssText = 'cursor: pointer; font-weight: bold;';
+        closeBtn.textContent = '×';
+        closeBtn.onclick = () => removeRegionTag(tag);
+        
+        tagSpan.appendChild(closeBtn);
+        container.appendChild(tagSpan);
+      });
+    }
+    
+    function addRegionTag() {
+      const input = document.getElementById('newRegionTag');
+      const tag = input.value.trim();
+      
+      if (!tag) return;
+      
+      const node = AppState.editingNode;
+      if (!node) return;
+      
+      const currentTags = node.tags || [];
+      if (currentTags.includes(tag)) {
+        alert('This tag already exists');
+        return;
+      }
+      
+      const newTags = [...currentTags, tag];
+      node.tags = newTags;
+      
+      populateRegionTags(newTags);
+      input.value = '';
+    }
+    
+    function removeRegionTag(tagToRemove) {
+      const node = AppState.editingNode;
+      if (!node) return;
+      
+      const currentTags = node.tags || [];
+      const newTags = currentTags.filter(t => t !== tagToRemove);
+      node.tags = newTags;
+      
+      populateRegionTags(newTags);
+    }
+
+    // Department/Subsidiary tag management functions
+    function populateDepartmentTags(tags) {
+      const container = document.getElementById('departmentTagsList');
+      container.innerHTML = '';
+      
+      tags.forEach(tag => {
+        const tagSpan = document.createElement('span');
+        tagSpan.style.cssText = 'font-size: 10px; padding: 4px 8px; border-radius: 12px; background-color: #fff3e0; color: #e65100; display: inline-flex; align-items: center; gap: 4px;';
+        
+        const tagText = document.createTextNode(`S:${tag} `);
+        tagSpan.appendChild(tagText);
+        
+        const closeBtn = document.createElement('span');
+        closeBtn.style.cssText = 'cursor: pointer; font-weight: bold;';
+        closeBtn.textContent = '×';
+        closeBtn.onclick = () => removeDepartmentTag(tag);
+        
+        tagSpan.appendChild(closeBtn);
+        container.appendChild(tagSpan);
+      });
+    }
+    
+    function addDepartmentTag() {
+      const input = document.getElementById('newDepartmentTag');
+      const tag = input.value.trim();
+      
+      if (!tag) return;
+      
+      const node = AppState.editingNode;
+      if (!node) return;
+      
+      const currentTags = node.tags || [];
+      if (currentTags.includes(tag)) {
+        alert('This tag already exists');
+        return;
+      }
+      
+      const newTags = [...currentTags, tag];
+      node.tags = newTags;
+      
+      populateDepartmentTags(newTags);
+      input.value = '';
+    }
+    
+    function removeDepartmentTag(tagToRemove) {
+      const node = AppState.editingNode;
+      if (!node) return;
+      
+      const currentTags = node.tags || [];
+      const newTags = currentTags.filter(t => t !== tagToRemove);
+      node.tags = newTags;
+      
+      populateDepartmentTags(newTags);
+    }
+
     // Customer mapping dropdown
     async function populateCustomerMappingDropdown(node) {
       const input = document.getElementById('editCustomerMapping');
@@ -1870,6 +2107,205 @@
         const errorOption = document.createElement('div');
         errorOption.className = 'custom-select-no-results';
         errorOption.textContent = 'Error loading customers';
+        dropdown.appendChild(errorOption);
+      }
+    }
+
+    // Region mapping dropdown
+    async function populateRegionMappingDropdown(node) {
+      const input = document.getElementById('editRegionMapping');
+      const dropdown = document.getElementById('editRegionMappingDropdown');
+      const hint = document.getElementById('regionMappingHint');
+      
+      dropdown.innerHTML = '';
+      
+      const loadingOption = document.createElement('div');
+      loadingOption.className = 'custom-select-no-results';
+      loadingOption.textContent = 'Loading regions...';
+      dropdown.appendChild(loadingOption);
+      
+      try {
+        const response = await fetch('/api/bq/regions');
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        const regions = await response.json();
+        
+        dropdown.innerHTML = '';
+        
+        const noMapOption = document.createElement('div');
+        noMapOption.className = 'custom-select-option';
+        noMapOption.textContent = '(No region mapped)';
+        noMapOption.dataset.value = '';
+        dropdown.appendChild(noMapOption);
+        
+        const currentData = AppState.dimensions[AppState.currentDimension];
+        const mappedRegionIds = new Set();
+        
+        for (const [itemId, itemData] of Object.entries(currentData)) {
+          if (itemId !== node.id && itemData.region_internal_id) {
+            mappedRegionIds.add(parseInt(itemData.region_internal_id));
+          }
+        }
+        
+        let selectedText = '';
+        const nodeRegionId = node.region_internal_id;
+        
+        regions.forEach(region => {
+          const option = document.createElement('div');
+          option.className = 'custom-select-option';
+          const baseText = `Region ${region.region_internal_id}`;
+          option.textContent = baseText;
+          option.dataset.value = region.region_internal_id;
+          option.dataset.displayName = `Region ${region.region_internal_id}`;
+          
+          const isCurrentSelection = nodeRegionId && parseInt(nodeRegionId) === parseInt(region.region_internal_id);
+          const isAlreadyMapped = mappedRegionIds.has(parseInt(region.region_internal_id));
+          
+          if (isAlreadyMapped) {
+            option.classList.add('disabled');
+            option.textContent += ' (already mapped)';
+          }
+          
+          if (isCurrentSelection) {
+            option.classList.add('selected');
+            selectedText = baseText;
+          }
+          
+          dropdown.appendChild(option);
+        });
+        
+        if (nodeRegionId && selectedText) {
+          input.value = selectedText;
+          input.dataset.selectedValue = nodeRegionId;
+          hint.textContent = `Mapped to region ID: ${nodeRegionId}`;
+          hint.style.display = 'block';
+        } else {
+          input.value = '';
+          input.dataset.selectedValue = '';
+          noMapOption.classList.add('selected');
+          hint.style.display = 'none';
+        }
+        
+        input.setAttribute('readonly', 'readonly');
+        
+        setupCustomDropdown(input, dropdown, (value, text, displayName) => {
+          input.value = text;
+          input.dataset.selectedValue = value;
+          if (value) {
+            hint.textContent = `Mapped to region ID: ${value}`;
+            hint.style.display = 'block';
+          } else {
+            hint.style.display = 'none';
+          }
+        });
+      } catch (error) {
+        console.error('Error loading regions:', error);
+        dropdown.innerHTML = '';
+        const errorOption = document.createElement('div');
+        errorOption.className = 'custom-select-no-results';
+        errorOption.textContent = 'Error loading regions';
+        dropdown.appendChild(errorOption);
+      }
+    }
+
+    // Department/Subsidiary mapping dropdown
+    async function populateDepartmentMappingDropdown(node) {
+      const input = document.getElementById('editDepartmentMapping');
+      const dropdown = document.getElementById('editDepartmentMappingDropdown');
+      const hint = document.getElementById('departmentMappingHint');
+      
+      dropdown.innerHTML = '';
+      
+      const loadingOption = document.createElement('div');
+      loadingOption.className = 'custom-select-no-results';
+      loadingOption.textContent = 'Loading subsidiaries...';
+      dropdown.appendChild(loadingOption);
+      
+      try {
+        const response = await fetch('/api/bq/subsidiaries');
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        const subsidiaries = await response.json();
+        
+        dropdown.innerHTML = '';
+        
+        const noMapOption = document.createElement('div');
+        noMapOption.className = 'custom-select-option';
+        noMapOption.textContent = '(No subsidiary mapped)';
+        noMapOption.dataset.value = '';
+        dropdown.appendChild(noMapOption);
+        
+        const currentData = AppState.dimensions[AppState.currentDimension];
+        const mappedSubsidiaryIds = new Set();
+        
+        for (const [itemId, itemData] of Object.entries(currentData)) {
+          if (itemId !== node.id && itemData.subsidiary_internal_id) {
+            mappedSubsidiaryIds.add(parseInt(itemData.subsidiary_internal_id));
+          }
+        }
+        
+        let selectedText = '';
+        const nodeSubsidiaryId = node.subsidiary_internal_id;
+        
+        subsidiaries.forEach(subsidiary => {
+          const option = document.createElement('div');
+          option.className = 'custom-select-option';
+          const baseText = subsidiary.display_name_with_id || `${subsidiary.display_name} (${subsidiary.subsidiary_id})`;
+          option.textContent = baseText;
+          option.dataset.value = subsidiary.subsidiary_id;
+          option.dataset.displayName = subsidiary.display_name;
+          
+          const isCurrentSelection = nodeSubsidiaryId && parseInt(nodeSubsidiaryId) === parseInt(subsidiary.subsidiary_id);
+          const isAlreadyMapped = mappedSubsidiaryIds.has(parseInt(subsidiary.subsidiary_id));
+          
+          if (isAlreadyMapped) {
+            option.classList.add('disabled');
+            option.textContent += ' (already mapped)';
+          }
+          
+          if (isCurrentSelection) {
+            option.classList.add('selected');
+            selectedText = baseText;
+          }
+          
+          dropdown.appendChild(option);
+        });
+        
+        if (nodeSubsidiaryId && selectedText) {
+          input.value = selectedText;
+          input.dataset.selectedValue = nodeSubsidiaryId;
+          input.dataset.selectedDisplayName = subsidiaries.find(s => parseInt(s.subsidiary_id) === parseInt(nodeSubsidiaryId))?.display_name || '';
+          hint.textContent = `Mapped to subsidiary ID: ${nodeSubsidiaryId}`;
+          hint.style.display = 'block';
+        } else {
+          input.value = '';
+          input.dataset.selectedValue = '';
+          input.dataset.selectedDisplayName = '';
+          noMapOption.classList.add('selected');
+          hint.style.display = 'none';
+        }
+        
+        input.setAttribute('readonly', 'readonly');
+        
+        setupCustomDropdown(input, dropdown, (value, text, displayName) => {
+          input.value = text;
+          input.dataset.selectedValue = value;
+          input.dataset.selectedDisplayName = displayName || '';
+          if (value) {
+            hint.textContent = `Mapped to subsidiary ID: ${value}`;
+            hint.style.display = 'block';
+          } else {
+            hint.style.display = 'none';
+          }
+        });
+      } catch (error) {
+        console.error('Error loading subsidiaries:', error);
+        dropdown.innerHTML = '';
+        const errorOption = document.createElement('div');
+        errorOption.className = 'custom-select-no-results';
+        errorOption.textContent = 'Error loading subsidiaries';
         dropdown.appendChild(errorOption);
       }
     }

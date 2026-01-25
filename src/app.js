@@ -14,6 +14,7 @@ const StorageService = require('./services/storageService');
 const BigQueryService = require('./services/bigQueryService');
 const emailConfigService = require('./services/emailConfigService');
 const emailService = require('./services/emailService');
+const googleSheetsService = require('./services/googleSheetsService');
 const createApiRoutes = require('./routes/api');
 const emailConfigApiRoutes = require('./routes/emailConfigApi');
 const createViewRoutes = require('./routes/views');
@@ -38,6 +39,9 @@ async function createApp() {
 
   // Initialize email service (SendGrid)
   emailService.initialize();
+
+  // Initialize Google Sheets service
+  googleSheetsService.initialize();
 
   // Initialize email config service (PostgreSQL)
   // Only initialize if DATABASE_URL is provided

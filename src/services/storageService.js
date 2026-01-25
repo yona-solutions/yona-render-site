@@ -455,10 +455,22 @@ class StorageService {
       if (config.parent && districtIdsToSearch.includes(config.parent)) {
         if (config.customer_internal_id && !seenIds.has(config.customer_internal_id)) {
           seenIds.add(config.customer_internal_id);
+          
+          // Extract customer_code from label (format: "CODE - Name")
+          let customerCode = config.customer_code;
+          if (!customerCode && config.label) {
+            const parts = config.label.split(' - ');
+            if (parts.length > 0) {
+              customerCode = parts[0].trim();
+            }
+          }
+          
           customers.push({
             customer_internal_id: config.customer_internal_id,
+            customer_code: customerCode,
             label: config.label,
-            configId: id
+            configId: id,
+            start_date_est: config.start_date_est
           });
         }
       }
@@ -495,22 +507,57 @@ class StorageService {
   /**
    * Get subsidiary internal ID from department configuration
    * 
-   * @param {string} departmentId - Department/subsidiary ID
-   * @returns {Promise<number|null>} Subsidiary internal ID or null if not found
+   * Handles both direct subsidiary selection and tag-based selection:
+   * - Direct subsidiary: Returns single subsidiary_internal_id
+   * - Tag selection: Returns array of all subsidiary_internal_ids that have the specified tag
+   * 
+   * @param {string} departmentId - Department/subsidiary ID or tag ID (prefixed with "tag_")
+   * @returns {Promise<Object|null>} Object with subsidiaryIds (array), subsidiaryName, and isTag flag
    * @throws {Error} If storage is not initialized or file cannot be parsed
    */
   async getSubsidiaryInternalId(departmentId) {
     const configData = await this.getFileAsJson('department_config.json');
-    const deptConfig = configData[departmentId];
     
-    if (deptConfig && deptConfig.subsidiary_internal_id) {
+    // Check if this is a tag selection (IDs starting with "tag_" are tags)
+    const isTag = departmentId.startsWith('tag_');
+    const searchValue = isTag ? departmentId.substring(4) : departmentId;
+    
+    if (isTag) {
+      // Tag selection: Find all departments/subsidiaries with this tag
+      const subsidiaryIds = [];
+      
+      for (const [id, config] of Object.entries(configData)) {
+        if (config.subsidiary_internal_id && !config.displayExcluded) {
+          const tags = config.tags || [];
+          if (tags.includes(searchValue)) {
+            subsidiaryIds.push(parseInt(config.subsidiary_internal_id));
+          }
+        }
+      }
+      
+      if (subsidiaryIds.length === 0) {
+        return null;
+      }
+      
       return {
-        subsidiaryId: parseInt(deptConfig.subsidiary_internal_id),
-        subsidiaryName: deptConfig.label || departmentId
+        subsidiaryIds: subsidiaryIds, // Array of IDs
+        subsidiaryName: searchValue, // Tag name
+        isTag: true
       };
+    } else {
+      // Direct subsidiary selection
+      const deptConfig = configData[departmentId];
+      
+      if (deptConfig && deptConfig.subsidiary_internal_id) {
+        return {
+          subsidiaryIds: [parseInt(deptConfig.subsidiary_internal_id)], // Single ID in array for consistency
+          subsidiaryName: deptConfig.label || departmentId,
+          isTag: false
+        };
+      }
+      
+      return null;
     }
-    
-    return null;
   }
 
   /**

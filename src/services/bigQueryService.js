@@ -128,8 +128,17 @@ class BigQueryService {
         queryParams.subsidiaryId = subsidiaryId;
       }
     } else if (hierarchy === 'subsidiary' && subsidiaryId) {
-      whereClause = 'subsidiary_internal_id = @subsidiaryId';
-      queryParams.subsidiaryId = subsidiaryId;
+      // Handle both single subsidiary ID and array of IDs (for subsidiary tags)
+      const subsidiaryIds = Array.isArray(subsidiaryId) ? subsidiaryId : [subsidiaryId];
+      
+      if (subsidiaryIds.length === 1) {
+        whereClause = 'subsidiary_internal_id = @subsidiaryId';
+        queryParams.subsidiaryId = subsidiaryIds[0];
+      } else {
+        // Multiple subsidiaries (tag) - use IN clause
+        whereClause = 'subsidiary_internal_id IN UNNEST(@subsidiaryIds)';
+        queryParams.subsidiaryIds = subsidiaryIds;
+      }
     } else {
       throw new Error(`Invalid hierarchy parameters: ${hierarchy}`);
     }
@@ -316,8 +325,8 @@ class BigQueryService {
   }
 
   /**
-   * Get all customers in a subsidiary (with optional region filter)
-   * @param {number} subsidiaryInternalId - The subsidiary_internal_id to filter by
+   * Get all customers in a subsidiary or subsidiaries (with optional region filter)
+   * @param {number|Array<number>} subsidiaryInternalId - Single subsidiary_internal_id or array of IDs
    * @param {number|null} regionInternalId - Optional region_internal_id to further filter
    * @returns {Promise<Array>} Array of customer objects
    */
@@ -326,9 +335,21 @@ class BigQueryService {
       throw new Error('BigQuery not initialized');
     }
 
-    // Build WHERE clause based on whether region filter is provided
-    let whereClause = 'subsidiary_internal_id = @subsidiaryInternalId';
-    const params = { subsidiaryInternalId: subsidiaryInternalId };
+    // Handle both single ID and array of IDs
+    const subsidiaryIds = Array.isArray(subsidiaryInternalId) ? subsidiaryInternalId : [subsidiaryInternalId];
+    
+    // Build WHERE clause based on number of subsidiaries and region filter
+    let whereClause;
+    const params = {};
+    
+    if (subsidiaryIds.length === 1) {
+      whereClause = 'subsidiary_internal_id = @subsidiaryInternalId';
+      params.subsidiaryInternalId = subsidiaryIds[0];
+    } else {
+      // Multiple subsidiaries - use IN clause
+      whereClause = 'subsidiary_internal_id IN UNNEST(@subsidiaryInternalIds)';
+      params.subsidiaryInternalIds = subsidiaryIds;
+    }
     
     if (regionInternalId) {
       whereClause += ' AND region_internal_id = @regionInternalId';
@@ -349,8 +370,8 @@ class BigQueryService {
     `;
 
     const filterDesc = regionInternalId 
-      ? `subsidiary_internal_id=${subsidiaryInternalId} AND region_internal_id=${regionInternalId}`
-      : `subsidiary_internal_id=${subsidiaryInternalId}`;
+      ? `subsidiary_internal_id IN [${subsidiaryIds.join(', ')}] AND region_internal_id=${regionInternalId}`
+      : `subsidiary_internal_id IN [${subsidiaryIds.join(', ')}]`;
     console.log(`\n🔍 Querying dim_customers for ${filterDesc}`);
 
     try {
@@ -455,6 +476,82 @@ class BigQueryService {
     } catch (error) {
       console.error('Error fetching customers from BigQuery:', error);
       throw new Error(`Failed to fetch customers: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get all unique regions from BigQuery dim_customers
+   * 
+   * @returns {Promise<Array<{region_internal_id: number}>>} Array of unique region IDs
+   * @throws {Error} If BigQuery is not initialized or query fails
+   */
+  async getRegions() {
+    if (!this.isAvailable()) {
+      throw new Error('BigQuery not initialized');
+    }
+
+    const query = `
+      SELECT DISTINCT
+        region_internal_id
+      FROM \`${this.dataset}.dim_customers\`
+      WHERE region_internal_id IS NOT NULL
+      ORDER BY region_internal_id
+    `;
+
+    try {
+      const [rows] = await this.bigquery.query({
+        query: query,
+        location: 'US'
+      });
+      
+      return rows.map(row => ({
+        region_internal_id: row.region_internal_id
+      }));
+    } catch (error) {
+      console.error('Error fetching regions from BigQuery:', error);
+      throw new Error(`Failed to fetch regions: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get all subsidiaries from BigQuery dim_subsidiaries table
+   * 
+   * @returns {Promise<Array<{subsidiary_id: number, display_name: string, display_name_with_id: string}>>} Array of subsidiaries
+   * @throws {Error} If BigQuery is not initialized or query fails
+   */
+  async getSubsidiaries() {
+    if (!this.isAvailable()) {
+      throw new Error('BigQuery not initialized');
+    }
+
+    const query = `
+      SELECT
+        subsidiary_id,
+        display_name,
+        display_name_with_id,
+        subsidiary_hierarchy,
+        is_leaf_subsidiary
+      FROM \`${this.dataset}.dim_subsidiaries\`
+      WHERE subsidiary_id IS NOT NULL
+      ORDER BY display_name
+    `;
+
+    try {
+      const [rows] = await this.bigquery.query({
+        query: query,
+        location: 'US'
+      });
+      
+      return rows.map(row => ({
+        subsidiary_id: row.subsidiary_id,
+        display_name: row.display_name,
+        display_name_with_id: row.display_name_with_id,
+        subsidiary_hierarchy: row.subsidiary_hierarchy,
+        is_leaf_subsidiary: row.is_leaf_subsidiary
+      }));
+    } catch (error) {
+      console.error('Error fetching subsidiaries from BigQuery:', error);
+      throw new Error(`Failed to fetch subsidiaries: ${error.message}`);
     }
   }
 }

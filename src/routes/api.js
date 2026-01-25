@@ -11,6 +11,8 @@ const express = require('express');
 const router = express.Router();
 const accountService = require('../services/accountService');
 const pnlRenderService = require('../services/pnlRenderService');
+const googleSheetsService = require('../services/googleSheetsService');
+const censusService = require('../services/censusService');
 
 /**
  * Configure API routes
@@ -249,7 +251,7 @@ function createApiRoutes(storageService, bigQueryService) {
    */
   router.get('/pl/data', async (req, res) => {
     try {
-      const { hierarchy, selectedId, date } = req.query;
+      const { hierarchy, selectedId, date, plType } = req.query;
 
       // Validate required parameters
       if (!hierarchy || !selectedId || !date) {
@@ -259,6 +261,10 @@ function createApiRoutes(storageService, bigQueryService) {
           required: ['hierarchy', 'selectedId', 'date']
         });
       }
+      
+      // Get P&L Type (Standard or Operational), default to Standard
+      const reportPlType = plType === 'operational' ? 'Operational' : 'Standard';
+      console.log(`   📊 P&L Type: ${reportPlType}`);
 
       // Validate hierarchy type
       if (!['district', 'region', 'subsidiary'].includes(hierarchy)) {
@@ -389,7 +395,8 @@ function createApiRoutes(storageService, bigQueryService) {
         console.log(`   Using filters: ${filterDesc}`);
         console.log(`   Found ${customersInRegion.length} customers in ${districtGroups.length} districts`);
       } else if (hierarchy === 'subsidiary') {
-        // Get subsidiary internal ID and name
+        // Get subsidiary internal ID(s) and name
+        // Handles both single subsidiaries and subsidiary tags (multiple subsidiaries)
         const subsidiaryResult = await storageService.getSubsidiaryInternalId(actualId);
         
         if (!subsidiaryResult) {
@@ -399,8 +406,8 @@ function createApiRoutes(storageService, bigQueryService) {
           });
         }
         
-        const { subsidiaryId, subsidiaryName } = subsidiaryResult;
-        selectedLabel = subsidiaryName; // Use the subsidiary name in the header
+        const { subsidiaryIds, subsidiaryName, isTag } = subsidiaryResult;
+        selectedLabel = subsidiaryName; // Use the subsidiary name or tag name in the header
         
         // Check for optional region filter
         let regionId = null;
@@ -420,21 +427,26 @@ function createApiRoutes(storageService, bigQueryService) {
           console.log(`   📎 Applying region filter: ${regionFilter} (internal ID: ${regionId})`);
         }
         
-        // Get customers in subsidiary from dim_customers
+        // Get customers in subsidiary/subsidiaries from dim_customers
+        // For tags, this will fetch customers from ALL subsidiaries with that tag
         console.log(`   Fetching customers from dim_customers...`);
-        const customersInSubsidiary = await bigQueryService.getCustomersInSubsidiary(subsidiaryId, regionId);
+        const customersInSubsidiary = await bigQueryService.getCustomersInSubsidiary(subsidiaryIds, regionId);
         
         // Group customers by region, then by district
         const regionGroups = await storageService.groupCustomersByRegionAndDistrict(customersInSubsidiary);
         
-        queryParams.subsidiaryId = subsidiaryId;
+        // For BigQuery queries, pass the array of subsidiary IDs
+        // Single subsidiaries will have array length of 1, tags will have multiple
+        queryParams.subsidiaryId = subsidiaryIds.length === 1 ? subsidiaryIds[0] : subsidiaryIds;
         queryParams.regionGroups = regionGroups;
+        queryParams.isTag = isTag; // Store whether this is a tag for header generation
         
         const filterDesc = regionId 
-          ? `subsidiary_internal_id=${subsidiaryId} AND region_internal_id=${regionId}`
-          : `subsidiary_internal_id=${subsidiaryId}`;
+          ? `subsidiary_internal_id IN [${subsidiaryIds.join(', ')}] AND region_internal_id=${regionId}`
+          : `subsidiary_internal_id IN [${subsidiaryIds.join(', ')}]`;
         console.log(`   Using filters: ${filterDesc}`);
         console.log(`   Found ${customersInSubsidiary.length} customers in ${regionGroups.length} regions`);
+        console.log(`   ${isTag ? 'Tag' : 'Single subsidiary'}: ${subsidiaryName}`);
       }
 
       // ============================================
@@ -475,12 +487,13 @@ function createApiRoutes(storageService, bigQueryService) {
         const districtData = await bigQueryService.getPLData({ ...queryParams, ytd: false });
         const districtYtdData = await bigQueryService.getPLData({ ...queryParams, ytd: true });
         
+        // District summaries don't show census (only individual facilities do)
         const districtMeta = {
           typeLabel: queryParams.isTag ? 'District Tag' : 'District',
           entityName: selectedLabel,
           monthLabel: date,
           facilityCount: 0, // Will be updated after processing
-          plType: 'Standard'
+          plType: reportPlType
         };
         
         console.log('   Generating district summary P&L (header will be updated with actual counts)...');
@@ -522,12 +535,29 @@ function createApiRoutes(storageService, bigQueryService) {
           const facilityMonthData = accountService.filterDataByCustomers(allCustomersMonthData, [customer.customer_internal_id]);
           const facilityYtdData = accountService.filterDataByCustomers(allCustomersYtdData, [customer.customer_internal_id]);
           
+          // Fetch census data for this facility
+          let census = { actual: null, budget: null };
+          if (censusService.isAvailable() && customer.customer_code) {
+            try {
+              console.log(`   📊 Fetching census for ${customer.customer_code}, date: ${date}`);
+              census = await censusService.getCensusForCustomer(customer.customer_code, date);
+              console.log(`   ✅ Census: Actual=${census.actual}, Budget=${census.budget}`);
+            } catch (error) {
+              console.warn(`   ⚠️  Could not fetch census for ${customer.customer_code}:`, error.message);
+            }
+          } else {
+            console.log(`   ⚠️  Census service not available or no customer_code. Available: ${censusService.isAvailable()}, Code: ${customer.customer_code}`);
+          }
+          
           const facilityMeta = {
             typeLabel: 'Facility',
             entityName: customer.label,
             monthLabel: date,
             parentDistrict: selectedLabel,
-            plType: 'Standard'
+            plType: reportPlType,
+            actualCensus: census.actual,
+            budgetCensus: census.budget,
+            startDateEst: customer.start_date_est
           };
           
           const facilityResult = await pnlRenderService.generatePNLReport(
@@ -584,13 +614,14 @@ function createApiRoutes(storageService, bigQueryService) {
         const regionData = await bigQueryService.getPLData({ ...queryParams, ytd: false });
         const regionYtdData = await bigQueryService.getPLData({ ...queryParams, ytd: true });
         
+        // Region summaries don't show census (only individual facilities do)
         const regionMeta = {
           typeLabel: 'Region',
           entityName: selectedLabel,
           monthLabel: date,
           districtCount: 0, // Will be updated after processing
           facilityCount: 0, // Will be updated after processing
-          plType: 'Standard'
+          plType: reportPlType
         };
         
         console.log('   Generating region summary P&L (header will be updated with actual counts)...');
@@ -643,7 +674,7 @@ function createApiRoutes(storageService, bigQueryService) {
             entityName: districtGroup.districtLabel,
             monthLabel: date,
             facilityCount: 0, // Will be updated with actual count
-            plType: 'Standard'
+            plType: reportPlType
           };
           
           const districtResult = await pnlRenderService.generatePNLReport(
@@ -667,12 +698,25 @@ function createApiRoutes(storageService, bigQueryService) {
               const facilityData = accountService.filterDataByCustomers(allCustomersData, [customer.customer_internal_id]);
               const facilityYtdData = accountService.filterDataByCustomers(allCustomersYtdData, [customer.customer_internal_id]);
               
+              // Fetch census data for this facility
+              let census = { actual: null, budget: null };
+              if (censusService.isAvailable() && customer.customer_code) {
+                try {
+                  census = await censusService.getCensusForCustomer(customer.customer_code, date);
+                } catch (error) {
+                  console.warn(`   ⚠️  Could not fetch census for ${customer.customer_code}:`, error.message);
+                }
+              }
+              
               const facilityMeta = {
                 typeLabel: 'Facility',
                 entityName: customer.label,
                 monthLabel: date,
                 parentDistrict: districtGroup.districtLabel,
-                plType: 'Standard'
+                plType: reportPlType,
+                actualCensus: census.actual,
+                budgetCensus: census.budget,
+                startDateEst: customer.start_date_est
               };
               
               const facilityResult = await pnlRenderService.generatePNLReport(
@@ -817,11 +861,12 @@ function createApiRoutes(storageService, bigQueryService) {
         let totalDistrictCount = 0;
         let totalFacilityCount = 0;
         
+        // Subsidiary summaries don't show census (only individual facilities do)
         const subsidiaryMeta = {
-          typeLabel: 'Subsidiary',
+          typeLabel: queryParams.isTag ? 'Subsidiary Tag' : 'Subsidiary',
           entityName: selectedLabel,
           monthLabel: date,
-          plType: 'Standard',
+          plType: reportPlType,
           regionCount: 0,  // Will be updated after processing
           districtCount: 0,
           facilityCount: 0
@@ -867,12 +912,12 @@ function createApiRoutes(storageService, bigQueryService) {
           const regionMonthData = accountService.filterDataByCustomers(allCustomersMonthData, regionCustomerIds);
           const regionYtdData = accountService.filterDataByCustomers(allCustomersYtdData, regionCustomerIds);
           
-          // Generate region summary
+          // Region summaries don't show census (only individual facilities do)
           const regionMeta = {
             typeLabel: 'Region',
             entityName: region.regionLabel,
             monthLabel: date,
-            plType: 'Standard',
+            plType: reportPlType,
             districtCount: 0,  // Will be updated
             facilityCount: 0
           };
@@ -913,7 +958,7 @@ function createApiRoutes(storageService, bigQueryService) {
               typeLabel: 'District',
               entityName: district.districtLabel,
               monthLabel: date,
-              plType: 'Standard',
+              plType: reportPlType,
               facilityCount: 0  // Will be updated
             };
             
@@ -942,11 +987,24 @@ function createApiRoutes(storageService, bigQueryService) {
               const facilityMonthData = accountService.filterDataByCustomers(allCustomersMonthData, [customer.customer_internal_id]);
               const facilityYtdData = accountService.filterDataByCustomers(allCustomersYtdData, [customer.customer_internal_id]);
               
+              // Fetch census data for this facility
+              let census = { actual: null, budget: null };
+              if (censusService.isAvailable() && customer.customer_code) {
+                try {
+                  census = await censusService.getCensusForCustomer(customer.customer_code, date);
+                } catch (error) {
+                  console.warn(`   ⚠️  Could not fetch census for ${customer.customer_code}:`, error.message);
+                }
+              }
+              
               const facilityMeta = {
                 typeLabel: 'Facility',
                 entityName: customer.label,
                 monthLabel: date,
-                plType: 'Standard'
+                plType: reportPlType,
+                actualCensus: census.actual,
+                budgetCensus: census.budget,
+                startDateEst: customer.start_date_est
               };
               
               const facilityResult = await pnlRenderService.generatePNLReport(
@@ -1235,6 +1293,205 @@ function createApiRoutes(storageService, bigQueryService) {
       res.status(500).json({ 
         error: 'Failed to save configuration',
         code: 'CONFIG_SAVE_ERROR'
+      });
+    }
+  });
+
+  /**
+   * Get all unique regions from BigQuery (for mapping dropdown)
+   * 
+   * GET /api/bq/regions
+   */
+  router.get('/bq/regions', async (req, res) => {
+    try {
+      const regions = await bigQueryService.getRegions();
+      res.json(regions);
+    } catch (error) {
+      console.error('Error fetching regions:', error);
+      res.status(500).json({
+        error: 'Failed to fetch regions',
+        message: error.message
+      });
+    }
+  });
+
+  /**
+   * Get all unique subsidiaries from BigQuery (for mapping dropdown)
+   * 
+   * GET /api/bq/subsidiaries
+   */
+  router.get('/bq/subsidiaries', async (req, res) => {
+    try {
+      const subsidiaries = await bigQueryService.getSubsidiaries();
+      res.json(subsidiaries);
+    } catch (error) {
+      console.error('Error fetching subsidiaries:', error);
+      res.status(500).json({
+        error: 'Failed to fetch subsidiaries',
+        message: error.message
+      });
+    }
+  });
+
+  /**
+   * Test endpoint: Read data from Google Sheets
+   * 
+   * GET /api/sheets/test?spreadsheetId=xxx&range=Sheet1!A1:Z100
+   * 
+   * Example:
+   * GET /api/sheets/test?spreadsheetId=1P4uAVda140WUwGf6L5-oJqklhqHhWGUJ3XPawYa4GpE&range=Sheet1!A1:Z100
+   */
+  router.get('/sheets/test', async (req, res) => {
+    try {
+      if (!googleSheetsService.isAvailable()) {
+        return res.status(503).json({
+          error: 'Google Sheets service not available',
+          message: 'Service not initialized properly'
+        });
+      }
+
+      const { spreadsheetId, range } = req.query;
+
+      if (!spreadsheetId || !range) {
+        return res.status(400).json({
+          error: 'Missing required parameters',
+          required: ['spreadsheetId', 'range'],
+          example: '/api/sheets/test?spreadsheetId=1P4uAVda140WUwGf6L5-oJqklhqHhWGUJ3XPawYa4GpE&range=Sheet1!A1:Z100'
+        });
+      }
+
+      const rows = await googleSheetsService.readRange(spreadsheetId, range);
+      
+      // Convert to objects if first row looks like headers
+      const hasHeaders = rows.length > 0 && rows[0].every(cell => typeof cell === 'string');
+      const data = hasHeaders ? googleSheetsService.rowsToObjects(rows) : rows;
+
+      res.json({
+        success: true,
+        spreadsheetId,
+        range,
+        rowCount: rows.length,
+        hasHeaders,
+        data
+      });
+
+    } catch (error) {
+      console.error('Error reading Google Sheet:', error);
+      res.status(500).json({
+        error: 'Failed to read from Google Sheet',
+        message: error.message
+      });
+    }
+  });
+
+  /**
+   * Get Google Sheet info
+   * 
+   * GET /api/sheets/info?spreadsheetId=xxx
+   */
+  router.get('/sheets/info', async (req, res) => {
+    try {
+      if (!googleSheetsService.isAvailable()) {
+        return res.status(503).json({
+          error: 'Google Sheets service not available'
+        });
+      }
+
+      const { spreadsheetId } = req.query;
+
+      if (!spreadsheetId) {
+        return res.status(400).json({
+          error: 'Missing spreadsheetId parameter'
+        });
+      }
+
+      const info = await googleSheetsService.getSpreadsheetInfo(spreadsheetId);
+      
+      res.json({
+        success: true,
+        ...info
+      });
+
+    } catch (error) {
+      console.error('Error getting sheet info:', error);
+      res.status(500).json({
+        error: 'Failed to get sheet info',
+        message: error.message
+      });
+    }
+  });
+
+  /**
+   * Test endpoint: Get all census data
+   * 
+   * GET /api/census/all?refresh=true
+   */
+  router.get('/census/all', async (req, res) => {
+    try {
+      if (!censusService.isAvailable()) {
+        return res.status(503).json({
+          error: 'Census service not available',
+          message: 'Google Sheets service not initialized'
+        });
+      }
+
+      const forceRefresh = req.query.refresh === 'true';
+      const data = await censusService.fetchCensusData(forceRefresh);
+
+      res.json({
+        success: true,
+        count: data.length,
+        customers: [...new Set(data.map(r => r.customerCode))].length,
+        types: [...new Set(data.map(r => r.type))],
+        data
+      });
+
+    } catch (error) {
+      console.error('Error fetching census data:', error);
+      res.status(500).json({
+        error: 'Failed to fetch census data',
+        message: error.message
+      });
+    }
+  });
+
+  /**
+   * Test endpoint: Get census for specific customer and month
+   * 
+   * GET /api/census/customer?customerCode=ARM51&month=2025-01-01
+   */
+  router.get('/census/customer', async (req, res) => {
+    try {
+      if (!censusService.isAvailable()) {
+        return res.status(503).json({
+          error: 'Census service not available'
+        });
+      }
+
+      const { customerCode, month } = req.query;
+
+      if (!customerCode || !month) {
+        return res.status(400).json({
+          error: 'Missing required parameters',
+          required: ['customerCode', 'month'],
+          example: '/api/census/customer?customerCode=ARM51&month=2025-01-01'
+        });
+      }
+
+      const census = await censusService.getCensusForCustomer(customerCode, month);
+
+      res.json({
+        success: true,
+        customerCode,
+        month,
+        census
+      });
+
+    } catch (error) {
+      console.error('Error fetching census:', error);
+      res.status(500).json({
+        error: 'Failed to fetch census',
+        message: error.message
       });
     }
   });

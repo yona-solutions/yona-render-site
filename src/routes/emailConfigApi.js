@@ -687,7 +687,7 @@ router.post('/report-schedules/:id/send-email', async (req, res) => {
     console.log(`   Using date: ${latestDate}`);
 
     // Fetch P&L data
-    const dataUrl = `http://localhost:${process.env.PORT || 3000}/api/pl/data?hierarchy=${schedule.template_type}&selectedId=${encodeURIComponent(entityId)}&date=${latestDate}&process=${schedule.process}`;
+    const dataUrl = `http://localhost:${process.env.PORT || 3000}/api/pl/data?hierarchy=${schedule.template_type}&selectedId=${encodeURIComponent(entityId)}&date=${latestDate}&plType=${schedule.process}`;
     console.log(`   Fetching data from: ${dataUrl}`);
     
     const dataResponse = await fetch(dataUrl);
