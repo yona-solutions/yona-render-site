@@ -309,10 +309,14 @@
 
     /* Inline icons and tags */
     .inline-icon {
-      width: 12px;
-      height: 12px;
-      display: inline-block;
+      width: 14px;
+      height: 14px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
       flex-shrink: 0;
+      vertical-align: middle;
+      margin-left: 2px;
     }
 
     .tag {
@@ -330,6 +334,11 @@
     .tag-customer {
       background-color: #e8f5e9;
       color: #1b5e20;
+    }
+
+    .tag-subsidiary {
+      background-color: #fff3e0;
+      color: #e65100;
     }
 
     .tag-generic {
@@ -653,6 +662,139 @@
       cursor: pointer;
       accent-color: #4a7c9e;
     }
+
+    /* Legend Modal */
+    .legend-modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .legend-modal.open {
+      display: flex;
+    }
+
+    .legend-modal-content {
+      background: white;
+      border-radius: 8px;
+      width: 90%;
+      max-width: 600px;
+      max-height: 80vh;
+      overflow-y: auto;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .legend-modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 20px;
+      border-bottom: 1px solid #e0e0e0;
+      background: linear-gradient(135deg, #4a7c9e 0%, #3d6a8a 100%);
+      border-radius: 8px 8px 0 0;
+    }
+
+    .legend-modal-header h2 {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 600;
+      color: white;
+    }
+
+    .legend-close-btn {
+      background: none;
+      border: none;
+      font-size: 24px;
+      cursor: pointer;
+      color: white;
+      padding: 0;
+      width: 30px;
+      height: 30px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+      transition: background 0.2s;
+    }
+
+    .legend-close-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .legend-modal-body {
+      padding: 20px;
+    }
+
+    .legend-section {
+      margin-bottom: 24px;
+    }
+
+    .legend-section:last-child {
+      margin-bottom: 0;
+    }
+
+    .legend-section h3 {
+      font-size: 14px;
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid #e0e0e0;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      padding: 8px 0;
+      gap: 12px;
+    }
+
+    .legend-icon {
+      min-width: 30px;
+      text-align: center;
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+
+    .legend-description {
+      flex: 1;
+    }
+
+    .legend-description strong {
+      display: block;
+      font-size: 13px;
+      color: #333;
+      margin-bottom: 2px;
+    }
+
+    .legend-description span {
+      font-size: 12px;
+      color: #666;
+    }
+
+    .btn-legend {
+      background: linear-gradient(135deg, #4a7c9e 0%, #3d6a8a 100%);
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 4px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-left: 8px;
+    }
+
+    .btn-legend:hover {
+      background: linear-gradient(135deg, #3d6a8a 0%, #2d4a68 100%);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    }
   </style>
 </head>
 <body>
@@ -699,6 +841,8 @@
         <span>Total: <strong id="totalCount">0</strong></span>
         <span>Visible: <strong id="visibleCount">0</strong></span>
       </div>
+
+      <button class="btn-legend" onclick="openLegendModal()">📖 Legend</button>
     </div>
 
     <!-- Tree Content -->
@@ -825,7 +969,7 @@
 
       <!-- Region Mapping Section -->
       <div id="regionMappingSection" class="field-group" style="display: none;">
-        <label class="field-label">Map to BigQuery Region</label>
+        <label class="field-label">Map to NetSuite Region</label>
         <div class="custom-select-wrapper">
           <input 
             type="text" 
@@ -858,7 +1002,7 @@
 
       <!-- Department/Subsidiary Mapping Section -->
       <div id="departmentMappingSection" class="field-group" style="display: none;">
-        <label class="field-label">Map to BigQuery Subsidiary</label>
+        <label class="field-label">Map to NetSuite Subsidiary</label>
         <div class="custom-select-wrapper">
           <input 
             type="text" 
@@ -906,6 +1050,133 @@
       <div class="sidebar-actions">
         <button class="btn-cancel" onclick="closeEditSidebar()">Cancel</button>
         <button class="btn-primary" onclick="saveChanges()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Legend Modal -->
+  <div id="legendModal" class="legend-modal" onclick="closeLegendModal(event)">
+    <div class="legend-modal-content" onclick="event.stopPropagation()">
+      <div class="legend-modal-header">
+        <h2>Icon Legend</h2>
+        <button class="legend-close-btn" onclick="closeLegendModal()">✕</button>
+      </div>
+      <div class="legend-modal-body">
+        
+        <!-- Node Type Icons -->
+        <div class="legend-section">
+          <h3>Node Types</h3>
+          <div class="legend-item">
+            <div class="legend-icon">🏢</div>
+            <div class="legend-description">
+              <strong>District</strong>
+              <span>Indicates this is a district node (group of facilities)</span>
+            </div>
+          </div>
+          <div class="legend-item">
+            <div class="legend-icon">👤</div>
+            <div class="legend-description">
+              <strong>Customer / Facility</strong>
+              <span>Indicates this is a customer/facility node</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Status Icons -->
+        <div class="legend-section">
+          <h3>Mapping & Status</h3>
+          <div class="legend-item">
+            <div class="legend-icon" style="color: #2196F3; font-weight: bold;">Ⓜ️</div>
+            <div class="legend-description">
+              <strong>Mapped</strong>
+              <span>This item is mapped to the corresponding NetSuite dimension (required for P&L reporting)</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Exclusion Icons -->
+        <div class="legend-section">
+          <h3>Exclusions</h3>
+          <div class="legend-item">
+            <div class="legend-icon">🙈</div>
+            <div class="legend-description">
+              <strong>Display Excluded</strong>
+              <span>Hidden from all P&L reports (completely excluded)</span>
+            </div>
+          </div>
+          <div class="legend-item">
+            <div class="legend-icon" style="color: #FF6F00; font-weight: bold;">⊘</div>
+            <div class="legend-description">
+              <strong>Operational Excluded</strong>
+              <span>Excluded from Operational P&L view only (still shows in Standard view)</span>
+            </div>
+          </div>
+          <div class="legend-item">
+            <div class="legend-icon" style="color: #D32F2F; font-weight: bold;">⊖</div>
+            <div class="legend-description">
+              <strong>District Reporting Excluded</strong>
+              <span>Excluded from district-level reports (customers only)</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Display Options -->
+        <div class="legend-section">
+          <h3>Display Options</h3>
+          <div class="legend-item">
+            <div class="legend-icon" style="color: #9C27B0; font-weight: bold;">☰</div>
+            <div class="legend-description">
+              <strong>Double Lines</strong>
+              <span>Adds a visual separator line after this account in P&L reports</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Navigation Icons -->
+        <div class="legend-section">
+          <h3>Navigation</h3>
+          <div class="legend-item">
+            <div class="legend-icon">▶</div>
+            <div class="legend-description">
+              <strong>Collapsed</strong>
+              <span>Click to expand and show child items</span>
+            </div>
+          </div>
+          <div class="legend-item">
+            <div class="legend-icon">▼</div>
+            <div class="legend-description">
+              <strong>Expanded</strong>
+              <span>Click to collapse and hide child items</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tags -->
+        <div class="legend-section">
+          <h3>Tags</h3>
+          <div class="legend-item">
+            <div class="legend-icon" style="background: #ede7f6; padding: 2px 6px; border-radius: 3px; font-size: 10px; color: #4527a0;">D:Tag</div>
+            <div class="legend-description">
+              <strong>District Tag</strong>
+              <span>Tag for grouping districts (purple background)</span>
+            </div>
+          </div>
+          <div class="legend-item">
+            <div class="legend-icon" style="background: #e8f5e9; padding: 2px 6px; border-radius: 3px; font-size: 10px; color: #1b5e20;">C:Tag</div>
+            <div class="legend-description">
+              <strong>Customer Tag</strong>
+              <span>Tag for grouping customers/facilities (green background)</span>
+            </div>
+          </div>
+          <div class="legend-item">
+            <div class="legend-icon" style="background: #fff3e0; padding: 2px 6px; border-radius: 3px; font-size: 10px; color: #e65100;">S:Tag</div>
+            <div class="legend-description">
+              <strong>Subsidiary Tag</strong>
+              <span>Tag for grouping subsidiaries (orange background)</span>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
   </div>
@@ -1085,10 +1356,11 @@
           node.region_internal_id || node.subsidiary_internal_id || 
           node.vendor_internal_id) {
         const mappedIcon = document.createElement('span');
-        mappedIcon.innerHTML = '✓';
+        mappedIcon.className = 'inline-icon';
+        mappedIcon.innerHTML = 'Ⓜ️';
         mappedIcon.style.color = '#2196F3';
         mappedIcon.style.fontWeight = 'bold';
-        mappedIcon.title = 'Mapped';
+        mappedIcon.title = 'Mapped to NetSuite';
         label.appendChild(mappedIcon);
       }
       
@@ -1096,20 +1368,19 @@
       if (node.displayExcluded) {
         const icon = document.createElement('span');
         icon.className = 'inline-icon';
-        icon.innerHTML = '👁️';
+        icon.innerHTML = '🙈';
         icon.title = 'Display Excluded';
-        icon.style.opacity = '0.5';
+        icon.style.opacity = '0.7';
         label.appendChild(icon);
       }
       
       if (node.doubleLines) {
         const icon = document.createElement('span');
         icon.className = 'inline-icon';
-        icon.innerHTML = '≡';
+        icon.innerHTML = '☰';
         icon.title = 'Double Lines';
         icon.style.color = '#9C27B0';
         icon.style.fontWeight = 'bold';
-        icon.style.fontSize = '14px';
         label.appendChild(icon);
       }
       
@@ -1118,14 +1389,18 @@
         icon.className = 'inline-icon';
         icon.innerHTML = '⊘';
         icon.title = 'Operational Excluded';
+        icon.style.color = '#FF6F00';
+        icon.style.fontWeight = 'bold';
         label.appendChild(icon);
       }
       
       if (node.districtReportingExcluded) {
         const icon = document.createElement('span');
         icon.className = 'inline-icon';
-        icon.innerHTML = '🚫';
+        icon.innerHTML = '⊖';
         icon.title = 'District Reporting Excluded';
+        icon.style.color = '#D32F2F';
+        icon.style.fontWeight = 'bold';
         label.appendChild(icon);
       }
       
@@ -1147,7 +1422,18 @@
           tagSpan.textContent = `C:${tag}`;
           label.appendChild(tagSpan);
         });
+      } else if (AppState.currentDimension === 'department') {
+        // Subsidiary tags
+        if (node.tags && node.tags.length > 0) {
+          node.tags.forEach(tag => {
+            const tagSpan = document.createElement('span');
+            tagSpan.className = 'tag tag-subsidiary';
+            tagSpan.textContent = `S:${tag}`;
+            label.appendChild(tagSpan);
+          });
+        }
       } else if (node.tags && node.tags.length > 0) {
+        // Generic tags for other dimensions
         node.tags.forEach(tag => {
           const tagSpan = document.createElement('span');
           tagSpan.className = 'tag tag-generic';
@@ -1486,6 +1772,31 @@
         showErrorState(error.message);
       }
     }
+
+    // Legend Modal Functions
+    function openLegendModal() {
+      const modal = document.getElementById('legendModal');
+      modal.classList.add('open');
+      // Prevent body scroll when modal is open
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeLegendModal(event) {
+      // Close if clicking outside the modal content or on close button
+      if (!event || event.target === event.currentTarget || event.target.classList.contains('legend-close-btn')) {
+        const modal = document.getElementById('legendModal');
+        modal.classList.remove('open');
+        // Re-enable body scroll
+        document.body.style.overflow = '';
+      }
+    }
+
+    // Close modal on Escape key
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') {
+        closeLegendModal();
+      }
+    });
 
     // Event Listeners
     document.querySelectorAll('.tab').forEach(tab => {
