@@ -1344,7 +1344,7 @@ function createApiRoutes(storageService, bigQueryService) {
       const allAccounts = await bigQueryService.getAllAccounts();
       
       // Fetch account config
-      const accountConfig = await storageService.getAccounts();
+      const accountConfig = await storageService.getFileAsJson('account_config.json');
       
       // Create a set of mapped account IDs from config
       const mappedAccountIds = new Set();
@@ -1386,7 +1386,7 @@ function createApiRoutes(storageService, bigQueryService) {
       const allCustomers = await bigQueryService.getAllCustomers();
       
       // Fetch customer config
-      const customerConfig = await storageService.getCustomers();
+      const customerConfig = await storageService.getFileAsJson('customer_config.json');
       
       // Create a set of mapped customer IDs from config
       const mappedCustomerIds = new Set();
