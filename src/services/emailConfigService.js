@@ -314,7 +314,7 @@ class EmailConfigService {
         eg.name as email_group_name
       FROM report_schedules rs
       LEFT JOIN email_groups eg ON rs.email_group_id = eg.id
-      WHERE rs.status = 'active'
+      WHERE rs.enabled = true
         AND (rs.next_send_at IS NULL OR rs.next_send_at <= CURRENT_TIMESTAMP)
       ORDER BY rs.next_send_at ASC NULLS FIRST
     `;
