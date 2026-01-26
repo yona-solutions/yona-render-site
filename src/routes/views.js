@@ -48,11 +48,20 @@ function createViewRoutes() {
 
   /**
    * Email Configuration page
-   * 
+   *
    * GET /email-config
    */
   router.get('/email-config', (req, res) => {
     res.sendFile(path.join(publicPath, 'email-config.html'));
+  });
+
+  /**
+   * Run Log page
+   *
+   * GET /run-log
+   */
+  router.get('/run-log', (req, res) => {
+    res.sendFile(path.join(publicPath, 'run-log.html'));
   });
 
   // Future routes can be added here:

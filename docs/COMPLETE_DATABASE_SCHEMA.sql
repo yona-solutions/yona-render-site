@@ -50,6 +50,8 @@ CREATE TABLE IF NOT EXISTS report_schedules (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   last_sent_at TIMESTAMP,
   next_send_at TIMESTAMP,
+  last_run_manual TIMESTAMP,
+  last_run_automated TIMESTAMP,
   
   CONSTRAINT chk_template_type CHECK (template_type IN ('district', 'region', 'subsidiary')),
   CONSTRAINT chk_process CHECK (process IN ('standard', 'operational')),
@@ -65,19 +67,55 @@ CREATE TABLE IF NOT EXISTS report_schedules (
 );
 
 -- ============================================
+-- Run Logs Table
+-- ============================================
+CREATE TABLE IF NOT EXISTS run_logs (
+  id SERIAL PRIMARY KEY,
+  schedule_id INTEGER REFERENCES report_schedules(id) ON DELETE SET NULL,
+  run_started_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  run_completed_at TIMESTAMP,
+  template_name VARCHAR(255) NOT NULL,
+  template_type VARCHAR(50) NOT NULL,
+  process VARCHAR(50) NOT NULL,
+  entity_id VARCHAR(255),
+  entity_name VARCHAR(255),
+  report_date VARCHAR(50),
+  status VARCHAR(20) NOT NULL DEFAULT 'pending',
+  error_message TEXT,
+  emails_sent INTEGER DEFAULT 0,
+  emails_failed INTEGER DEFAULT 0,
+  recipient_emails TEXT[],
+  trigger_type VARCHAR(20) NOT NULL DEFAULT 'scheduled',
+  pdf_size_bytes INTEGER,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ============================================
 -- Indexes for Performance
 -- ============================================
-CREATE INDEX IF NOT EXISTS idx_email_group_contacts_group_id 
+CREATE INDEX IF NOT EXISTS idx_email_group_contacts_group_id
   ON email_group_contacts(email_group_id);
 
-CREATE INDEX IF NOT EXISTS idx_report_schedules_group_id 
+CREATE INDEX IF NOT EXISTS idx_report_schedules_group_id
   ON report_schedules(email_group_id);
 
-CREATE INDEX IF NOT EXISTS idx_report_schedules_enabled 
+CREATE INDEX IF NOT EXISTS idx_report_schedules_enabled
   ON report_schedules(enabled);
 
-CREATE INDEX IF NOT EXISTS idx_report_schedules_next_send 
+CREATE INDEX IF NOT EXISTS idx_report_schedules_next_send
   ON report_schedules(next_send_at);
+
+CREATE INDEX IF NOT EXISTS idx_run_logs_schedule_id
+  ON run_logs(schedule_id);
+
+CREATE INDEX IF NOT EXISTS idx_run_logs_run_started_at
+  ON run_logs(run_started_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_run_logs_status
+  ON run_logs(status);
+
+CREATE INDEX IF NOT EXISTS idx_run_logs_template_name
+  ON run_logs(template_name);
 
 -- ============================================
 -- Auto-Update Timestamp Triggers

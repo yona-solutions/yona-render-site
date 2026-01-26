@@ -404,6 +404,9 @@ class EmailConfigService {
       throw new Error('Database not initialized');
     }
 
+    console.log('📝 Updating schedule with data:', JSON.stringify(data, null, 2));
+    console.log('   day_of_month in data:', data.day_of_month, '| hasOwnProperty:', data.hasOwnProperty('day_of_month'));
+
     const {
       template_name,
       template_type,
@@ -437,7 +440,7 @@ class EmailConfigService {
 
     const query = `
       UPDATE report_schedules
-      SET 
+      SET
         template_name = COALESCE($1, template_name),
         template_type = COALESCE($2, template_type),
         process = COALESCE($3, process),
@@ -450,8 +453,8 @@ class EmailConfigService {
         email_group_id = COALESCE($10, email_group_id),
         email_group_ids = COALESCE($11, email_group_ids),
         frequency = COALESCE($12, frequency),
-        day_of_week = $13,
-        day_of_month = $14,
+        day_of_week = COALESCE($13, day_of_week),
+        day_of_month = COALESCE($14, day_of_month),
         time_of_day = COALESCE($15, time_of_day),
         enabled = COALESCE($16, enabled),
         updated_at = CURRENT_TIMESTAMP
@@ -488,17 +491,25 @@ class EmailConfigService {
 
   /**
    * Update schedule send timestamps
+   * @param {number} id - Schedule ID
+   * @param {Date} lastSentAt - When the schedule was last sent
+   * @param {Date} nextSendAt - When the schedule should next be sent (null to keep existing)
+   * @param {string} triggerType - 'manual' or 'scheduled' to update the appropriate last_run column
    */
-  async updateScheduleSendTimestamps(id, lastSentAt, nextSendAt) {
+  async updateScheduleSendTimestamps(id, lastSentAt, nextSendAt, triggerType = 'scheduled') {
     if (!this.isAvailable()) {
       throw new Error('Database not initialized');
     }
 
+    // Determine which column to update based on trigger type
+    const lastRunColumn = triggerType === 'manual' ? 'last_run_manual' : 'last_run_automated';
+
     const query = `
       UPDATE report_schedules
-      SET 
+      SET
         last_sent_at = $1,
-        next_send_at = $2,
+        next_send_at = COALESCE($2, next_send_at),
+        ${lastRunColumn} = $1,
         updated_at = CURRENT_TIMESTAMP
       WHERE id = $3
       RETURNING *
@@ -524,6 +535,220 @@ class EmailConfigService {
     }
 
     return result.rows[0];
+  }
+
+  // ============================================
+  // Run Logs
+  // ============================================
+
+  /**
+   * Create a new run log entry
+   */
+  async createRunLog(data) {
+    if (!this.isAvailable()) {
+      throw new Error('Database not initialized');
+    }
+
+    const {
+      schedule_id,
+      template_name,
+      template_type,
+      process,
+      entity_id,
+      entity_name,
+      report_date,
+      status = 'pending',
+      error_message,
+      emails_sent = 0,
+      emails_failed = 0,
+      recipient_emails = [],
+      trigger_type = 'scheduled',
+      pdf_size_bytes
+    } = data;
+
+    const query = `
+      INSERT INTO run_logs (
+        schedule_id, template_name, template_type, process,
+        entity_id, entity_name, report_date, status, error_message,
+        emails_sent, emails_failed, recipient_emails, trigger_type, pdf_size_bytes,
+        run_started_at
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, CURRENT_TIMESTAMP)
+      RETURNING *
+    `;
+
+    const result = await this.pool.query(query, [
+      schedule_id || null,
+      template_name,
+      template_type,
+      process,
+      entity_id || null,
+      entity_name || null,
+      report_date || null,
+      status,
+      error_message || null,
+      emails_sent,
+      emails_failed,
+      recipient_emails,
+      trigger_type,
+      pdf_size_bytes || null
+    ]);
+
+    return result.rows[0];
+  }
+
+  /**
+   * Update a run log entry (e.g., when run completes)
+   */
+  async updateRunLog(id, data) {
+    if (!this.isAvailable()) {
+      throw new Error('Database not initialized');
+    }
+
+    const {
+      status,
+      error_message,
+      emails_sent,
+      emails_failed,
+      recipient_emails,
+      pdf_size_bytes,
+      run_completed_at
+    } = data;
+
+    const query = `
+      UPDATE run_logs
+      SET
+        status = COALESCE($1, status),
+        error_message = COALESCE($2, error_message),
+        emails_sent = COALESCE($3, emails_sent),
+        emails_failed = COALESCE($4, emails_failed),
+        recipient_emails = COALESCE($5, recipient_emails),
+        pdf_size_bytes = COALESCE($6, pdf_size_bytes),
+        run_completed_at = COALESCE($7, CURRENT_TIMESTAMP)
+      WHERE id = $8
+      RETURNING *
+    `;
+
+    const result = await this.pool.query(query, [
+      status,
+      error_message,
+      emails_sent,
+      emails_failed,
+      recipient_emails,
+      pdf_size_bytes,
+      run_completed_at,
+      id
+    ]);
+
+    return result.rows[0];
+  }
+
+  /**
+   * Get all run logs with pagination
+   */
+  async getRunLogs(options = {}) {
+    if (!this.isAvailable()) {
+      throw new Error('Database not initialized');
+    }
+
+    const { limit = 100, offset = 0, schedule_id, status, template_name } = options;
+
+    let query = `
+      SELECT
+        rl.*,
+        rs.template_name as current_schedule_name
+      FROM run_logs rl
+      LEFT JOIN report_schedules rs ON rl.schedule_id = rs.id
+      WHERE 1=1
+    `;
+    const params = [];
+    let paramIndex = 1;
+
+    if (schedule_id) {
+      query += ` AND rl.schedule_id = $${paramIndex++}`;
+      params.push(schedule_id);
+    }
+
+    if (status) {
+      query += ` AND rl.status = $${paramIndex++}`;
+      params.push(status);
+    }
+
+    if (template_name) {
+      query += ` AND rl.template_name ILIKE $${paramIndex++}`;
+      params.push(`%${template_name}%`);
+    }
+
+    query += ` ORDER BY rl.run_started_at DESC`;
+    query += ` LIMIT $${paramIndex++} OFFSET $${paramIndex++}`;
+    params.push(limit, offset);
+
+    const result = await this.pool.query(query, params);
+    return result.rows;
+  }
+
+  /**
+   * Get a single run log by ID
+   */
+  async getRunLog(id) {
+    if (!this.isAvailable()) {
+      throw new Error('Database not initialized');
+    }
+
+    const query = `
+      SELECT
+        rl.*,
+        rs.template_name as current_schedule_name
+      FROM run_logs rl
+      LEFT JOIN report_schedules rs ON rl.schedule_id = rs.id
+      WHERE rl.id = $1
+    `;
+
+    const result = await this.pool.query(query, [id]);
+    return result.rows[0] || null;
+  }
+
+  /**
+   * Get run log statistics
+   */
+  async getRunLogStats() {
+    if (!this.isAvailable()) {
+      throw new Error('Database not initialized');
+    }
+
+    const query = `
+      SELECT
+        COUNT(*) as total_runs,
+        COUNT(CASE WHEN status = 'success' THEN 1 END) as successful_runs,
+        COUNT(CASE WHEN status = 'partial' THEN 1 END) as partial_runs,
+        COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed_runs,
+        COUNT(CASE WHEN status = 'skipped' THEN 1 END) as skipped_runs,
+        SUM(emails_sent) as total_emails_sent,
+        SUM(emails_failed) as total_emails_failed,
+        MAX(run_started_at) as last_run_at
+      FROM run_logs
+    `;
+
+    const result = await this.pool.query(query);
+    return result.rows[0];
+  }
+
+  /**
+   * Delete old run logs (cleanup)
+   */
+  async deleteOldRunLogs(daysToKeep = 90) {
+    if (!this.isAvailable()) {
+      throw new Error('Database not initialized');
+    }
+
+    const query = `
+      DELETE FROM run_logs
+      WHERE run_started_at < CURRENT_TIMESTAMP - INTERVAL '1 day' * $1
+      RETURNING id
+    `;
+
+    const result = await this.pool.query(query, [daysToKeep]);
+    return result.rows.length;
   }
 
   // ============================================

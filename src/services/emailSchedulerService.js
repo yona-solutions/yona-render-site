@@ -143,8 +143,9 @@ class EmailSchedulerService {
       console.log('');
 
       // Process each schedule
+      const triggerType = forceAll ? 'manual' : 'scheduled';
       for (const schedule of schedules) {
-        const result = await this.processSchedule(schedule);
+        const result = await this.processSchedule(schedule, triggerType);
         results.push(result);
         
         if (result.status === 'success') {
@@ -164,11 +165,13 @@ class EmailSchedulerService {
 
   /**
    * Process a single schedule - send to all recipients in email group
+   * @param {Object} schedule - The schedule to process
+   * @param {string} triggerType - 'scheduled', 'manual', or 'test'
    * @returns {Object} Result object with status, emails sent, and skip/error details
    */
-  async processSchedule(schedule) {
+  async processSchedule(schedule, triggerType = 'scheduled') {
     console.log(`\n📋 Processing schedule: ${schedule.template_name} (ID: ${schedule.id})`);
-    
+
     const result = {
       scheduleId: schedule.id,
       scheduleName: schedule.template_name,
@@ -176,7 +179,14 @@ class EmailSchedulerService {
       emailsSent: 0,
       emailsFailed: 0
     };
-    
+
+    // Initialize run log data
+    let runLogId = null;
+    let entityId, entityName;
+    let allRecipients = new Set();
+    let reportDate = null;
+    let pdfSizeBytes = null;
+
     try {
       // Validate schedule configuration
       if (!schedule.template_type || !schedule.process) {
@@ -184,11 +194,19 @@ class EmailSchedulerService {
         console.log(`   ⚠️  Skipping: ${reason}`);
         result.status = 'skipped';
         result.skipReason = reason;
+
+        // Log skipped run
+        await this.logRun({
+          schedule,
+          status: 'skipped',
+          error_message: reason,
+          trigger_type: triggerType
+        });
+
         return result;
       }
 
       // Get entity ID
-      let entityId, entityName;
       if (schedule.template_type === 'district' && schedule.district_id) {
         entityId = schedule.district_id;
         entityName = schedule.district_name || 'District';
@@ -203,17 +221,37 @@ class EmailSchedulerService {
         console.log(`   ⚠️  Skipping: ${reason}`);
         result.status = 'skipped';
         result.skipReason = reason;
+
+        // Log skipped run
+        await this.logRun({
+          schedule,
+          status: 'skipped',
+          error_message: reason,
+          trigger_type: triggerType
+        });
+
         return result;
       }
 
       // Get all email groups for this schedule (now supports multiple groups)
       const emailGroupIds = schedule.email_group_ids || [schedule.email_group_id].filter(Boolean);
-      
+
       if (emailGroupIds.length === 0) {
         const reason = 'No email groups assigned';
         console.log(`   ⚠️  Skipping: ${reason}`);
         result.status = 'skipped';
         result.skipReason = reason;
+
+        // Log skipped run
+        await this.logRun({
+          schedule,
+          entity_id: entityId,
+          entity_name: entityName,
+          status: 'skipped',
+          error_message: reason,
+          trigger_type: triggerType
+        });
+
         return result;
       }
 
@@ -222,7 +260,6 @@ class EmailSchedulerService {
       console.log(`   Email Groups: ${emailGroupIds.length}`);
 
       // Get all recipients from all email groups
-      const allRecipients = new Set();
       for (const groupId of emailGroupIds) {
         const contacts = await emailConfigService.getEmailGroupContacts(groupId);
         contacts.forEach(contact => allRecipients.add(contact.email));
@@ -233,6 +270,17 @@ class EmailSchedulerService {
         console.log(`   ⚠️  Skipping: ${reason}`);
         result.status = 'skipped';
         result.skipReason = reason;
+
+        // Log skipped run
+        await this.logRun({
+          schedule,
+          entity_id: entityId,
+          entity_name: entityName,
+          status: 'skipped',
+          error_message: reason,
+          trigger_type: triggerType
+        });
+
         return result;
       }
 
@@ -241,17 +289,31 @@ class EmailSchedulerService {
       // Generate the report once (to be sent to all recipients)
       console.log(`   📊 Generating P&L report...`);
       const reportData = await this.generateReport(schedule, entityId);
-      
+
       if (!reportData) {
         const errorMsg = 'Failed to generate report';
         console.log(`   ❌ ${errorMsg}`);
         this.stats.failedSends++;
         result.status = 'error';
         result.error = errorMsg;
+
+        // Log failed run
+        await this.logRun({
+          schedule,
+          entity_id: entityId,
+          entity_name: entityName,
+          status: 'failed',
+          error_message: errorMsg,
+          recipient_emails: Array.from(allRecipients),
+          trigger_type: triggerType
+        });
+
         return result;
       }
 
-      console.log(`   ✓ Report generated: ${(reportData.pdfBuffer.length / 1024).toFixed(1)} KB`);
+      reportDate = reportData.date;
+      pdfSizeBytes = reportData.pdfBuffer.length;
+      console.log(`   ✓ Report generated: ${(pdfSizeBytes / 1024).toFixed(1)} KB`);
 
       // Send to all recipients
       let successCount = 0;
@@ -278,21 +340,41 @@ class EmailSchedulerService {
 
       this.stats.successfulSends += successCount;
       this.stats.failedSends += failCount;
-      
+
       result.emailsSent = successCount;
       result.emailsFailed = failCount;
-      result.status = successCount > 0 ? 'success' : 'error';
-      
-      if (failCount > 0 && successCount === 0) {
+
+      // Determine final status
+      if (successCount === 0) {
+        result.status = 'failed';
         result.error = `All ${failCount} email(s) failed to send`;
+      } else if (failCount > 0) {
+        result.status = 'partial';
+      } else {
+        result.status = 'success';
       }
+
+      // Log the run
+      await this.logRun({
+        schedule,
+        entity_id: entityId,
+        entity_name: entityName,
+        report_date: reportDate,
+        status: result.status,
+        error_message: result.error,
+        emails_sent: successCount,
+        emails_failed: failCount,
+        recipient_emails: Array.from(allRecipients),
+        trigger_type: triggerType,
+        pdf_size_bytes: pdfSizeBytes
+      });
 
       // Update schedule timestamps
       if (successCount > 0) {
-        await this.updateScheduleTimestamps(schedule);
+        await this.updateScheduleTimestamps(schedule, triggerType);
         console.log(`   ✓ Schedule updated for next run`);
       }
-      
+
       return result;
 
     } catch (error) {
@@ -300,7 +382,63 @@ class EmailSchedulerService {
       this.stats.failedSends++;
       result.status = 'error';
       result.error = error.message;
+
+      // Log failed run
+      await this.logRun({
+        schedule,
+        entity_id: entityId,
+        entity_name: entityName,
+        report_date: reportDate,
+        status: 'failed',
+        error_message: error.message,
+        recipient_emails: Array.from(allRecipients),
+        trigger_type: triggerType,
+        pdf_size_bytes: pdfSizeBytes
+      });
+
       return result;
+    }
+  }
+
+  /**
+   * Log a schedule run to the database
+   */
+  async logRun(data) {
+    try {
+      if (!emailConfigService.isAvailable()) {
+        console.log('   ℹ️  Run log skipped (database not available)');
+        return null;
+      }
+
+      const logEntry = await emailConfigService.createRunLog({
+        schedule_id: data.schedule?.id,
+        template_name: data.schedule?.template_name || 'Unknown',
+        template_type: data.schedule?.template_type || 'unknown',
+        process: data.schedule?.process || 'unknown',
+        entity_id: data.entity_id,
+        entity_name: data.entity_name,
+        report_date: data.report_date,
+        status: data.status,
+        error_message: data.error_message,
+        emails_sent: data.emails_sent || 0,
+        emails_failed: data.emails_failed || 0,
+        recipient_emails: data.recipient_emails || [],
+        trigger_type: data.trigger_type || 'scheduled',
+        pdf_size_bytes: data.pdf_size_bytes
+      });
+
+      // Update to mark as completed
+      if (logEntry) {
+        await emailConfigService.updateRunLog(logEntry.id, {
+          run_completed_at: new Date()
+        });
+      }
+
+      console.log(`   📝 Run logged (ID: ${logEntry?.id})`);
+      return logEntry;
+    } catch (error) {
+      console.error('   ⚠️  Failed to log run:', error.message);
+      return null;
     }
   }
 
@@ -490,13 +628,15 @@ class EmailSchedulerService {
 
   /**
    * Update schedule timestamps after successful send
+   * @param {Object} schedule - The schedule object
+   * @param {string} triggerType - 'manual' or 'scheduled'
    */
-  async updateScheduleTimestamps(schedule) {
+  async updateScheduleTimestamps(schedule, triggerType = 'scheduled') {
     try {
       const now = new Date();
       const nextSendAt = this.calculateNextSendTime(schedule, now);
 
-      await emailConfigService.updateScheduleSendTimestamps(schedule.id, now, nextSendAt);
+      await emailConfigService.updateScheduleSendTimestamps(schedule.id, now, nextSendAt, triggerType);
 
     } catch (error) {
       console.error('Error updating schedule timestamps:', error);
