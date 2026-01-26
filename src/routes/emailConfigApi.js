@@ -10,6 +10,7 @@ const emailConfigService = require('../services/emailConfigService');
 const mockEmailData = require('../services/mockEmailData');
 const emailService = require('../services/emailService');
 const bigQueryService = require('../services/bigQueryService');
+const emailSchedulerService = require('../services/emailSchedulerService');
 
 // ============================================
 // Email Groups API
@@ -939,6 +940,53 @@ function buildPDFHTML(content) {
 </body>
 </html>`;
 }
+
+// ============================================
+// Email Scheduler API
+// ============================================
+
+/**
+ * GET /api/email-scheduler/status
+ * Get scheduler status and statistics
+ */
+router.get('/email-scheduler/status', (req, res) => {
+  try {
+    const stats = emailSchedulerService.getStats();
+    res.json(stats);
+  } catch (error) {
+    console.error('Error fetching scheduler status:', error);
+    res.status(500).json({
+      error: 'Failed to fetch scheduler status',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/email-scheduler/run-now
+ * Manually trigger scheduler (for testing)
+ */
+router.post('/email-scheduler/run-now', async (req, res) => {
+  try {
+    console.log('📧 Manual scheduler trigger requested via API');
+    
+    // Run scheduler in background (don't wait for it to complete)
+    emailSchedulerService.runNow().catch(error => {
+      console.error('Error in manual scheduler run:', error);
+    });
+    
+    res.json({
+      success: true,
+      message: 'Scheduler triggered manually. Check server logs for progress.'
+    });
+  } catch (error) {
+    console.error('Error triggering scheduler:', error);
+    res.status(500).json({
+      error: 'Failed to trigger scheduler',
+      message: error.message
+    });
+  }
+});
 
 module.exports = router;
 

@@ -25,6 +25,7 @@ if (process.env.NODE_ENV !== 'production') {
 
 const createApp = require('./src/app');
 const emailConfigService = require('./src/services/emailConfigService');
+const emailSchedulerService = require('./src/services/emailSchedulerService');
 
 const PORT = process.env.PORT || 3000;
 
@@ -43,11 +44,19 @@ async function startServer() {
       console.log(`   Environment: ${process.env.NODE_ENV || 'development'}`);
       console.log(`   Node: ${process.version}`);
       console.log('=================================');
+      
+      // Start the email scheduler
+      console.log('');
+      emailSchedulerService.start();
+      console.log('');
     });
 
     // Graceful shutdown handling
     const shutdown = async (signal) => {
       console.log(`\n📡 ${signal} signal received: closing server gracefully`);
+      
+      // Stop the email scheduler
+      emailSchedulerService.stop();
       
       // Close HTTP server
       server.close(async () => {
