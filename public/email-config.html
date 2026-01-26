@@ -2851,7 +2851,7 @@
       }
 
       // Show save button
-      document.getElementById('saveAllBtn').style.display = 'inline-flex';
+      { const btn = document.getElementById('saveAllBtn'); if (btn) btn.style.display = 'inline-flex'; }
 
       // If template_type changed, re-render to enable/disable appropriate dropdowns
       if (fieldName === 'template_type') {
@@ -2893,7 +2893,7 @@
       }
 
       // Show save button
-      document.getElementById('saveAllBtn').style.display = 'inline-flex';
+      { const btn = document.getElementById('saveAllBtn'); if (btn) btn.style.display = 'inline-flex'; }
 
       // Re-render to update UI
       renderReportSchedulesTable();
@@ -2921,7 +2921,7 @@
       }
 
       // Show save button
-      document.getElementById('saveAllBtn').style.display = 'inline-flex';
+      { const btn = document.getElementById('saveAllBtn'); if (btn) btn.style.display = 'inline-flex'; }
 
       // Re-render to update UI
       renderReportSchedulesTable();
@@ -3135,7 +3135,7 @@
       unsavedChanges.set(newSchedule.id, { ...newSchedule });
       
       // Show save button
-      document.getElementById('saveAllBtn').style.display = 'inline-flex';
+      { const btn = document.getElementById('saveAllBtn'); if (btn) btn.style.display = 'inline-flex'; }
       
       // Re-render table
       renderReportSchedulesTable();
@@ -3173,7 +3173,8 @@
         // Remove from unsaved changes if it exists
         unsavedChanges.delete(id);
         if (unsavedChanges.size === 0) {
-          document.getElementById('saveAllBtn').style.display = 'none';
+          const saveBtn = document.getElementById('saveAllBtn');
+          if (saveBtn) saveBtn.style.display = 'none';
         }
 
         loadReportSchedules();
