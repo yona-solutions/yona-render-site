@@ -332,32 +332,65 @@ class EmailConfigService {
     }
 
     const {
+      template_name,
+      template_type,
+      process,
+      district_id,
+      district_name,
+      region_id,
+      region_name,
+      subsidiary_id,
+      subsidiary_name,
+      email_group_id,
+      email_group_ids,
+      frequency,
+      day_of_week,
+      day_of_month,
+      time_of_day,
+      enabled = true,
+      // Legacy support
       report_type,
       hierarchy,
       entity_id,
       entity_name,
-      email_group_id,
-      frequency,
-      status = 'active'
+      status
     } = data;
+
+    // Map legacy fields to new fields if provided
+    const finalTemplateName = template_name || `${hierarchy || template_type} ${report_type || process} Report`;
+    const finalTemplateType = template_type || hierarchy;
+    const finalProcess = process || report_type;
+    const finalEnabled = enabled !== undefined ? enabled : (status === 'active');
 
     const query = `
       INSERT INTO report_schedules (
-        report_type, hierarchy, entity_id, entity_name,
-        email_group_id, frequency, status
+        template_name, template_type, process,
+        district_id, district_name, region_id, region_name,
+        subsidiary_id, subsidiary_name,
+        email_group_id, email_group_ids, frequency,
+        day_of_week, day_of_month, time_of_day, enabled
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
       RETURNING *
     `;
 
     const result = await this.pool.query(query, [
-      report_type,
-      hierarchy,
-      entity_id,
-      entity_name || null,
-      email_group_id,
+      finalTemplateName,
+      finalTemplateType,
+      finalProcess,
+      district_id || (finalTemplateType === 'district' ? entity_id : null),
+      district_name || (finalTemplateType === 'district' ? entity_name : null),
+      region_id || (finalTemplateType === 'region' ? entity_id : null),
+      region_name || (finalTemplateType === 'region' ? entity_name : null),
+      subsidiary_id || (finalTemplateType === 'subsidiary' ? entity_id : null),
+      subsidiary_name || (finalTemplateType === 'subsidiary' ? entity_name : null),
+      email_group_id || null,
+      email_group_ids || null,
       frequency,
-      status
+      day_of_week || null,
+      day_of_month || null,
+      time_of_day || '08:00:00',
+      finalEnabled
     ]);
 
     return result.rows[0];
@@ -372,38 +405,76 @@ class EmailConfigService {
     }
 
     const {
+      template_name,
+      template_type,
+      process,
+      district_id,
+      district_name,
+      region_id,
+      region_name,
+      subsidiary_id,
+      subsidiary_name,
+      email_group_id,
+      email_group_ids,
+      frequency,
+      day_of_week,
+      day_of_month,
+      time_of_day,
+      enabled,
+      // Legacy support
       report_type,
       hierarchy,
       entity_id,
       entity_name,
-      email_group_id,
-      frequency,
       status
     } = data;
+
+    // Map legacy fields to new fields if provided
+    const finalTemplateType = template_type || hierarchy;
+    const finalProcess = process || report_type;
+    const finalEnabled = enabled !== undefined ? enabled : (status === 'active');
 
     const query = `
       UPDATE report_schedules
       SET 
-        report_type = $1,
-        hierarchy = $2,
-        entity_id = $3,
-        entity_name = $4,
-        email_group_id = $5,
-        frequency = $6,
-        status = $7,
+        template_name = COALESCE($1, template_name),
+        template_type = COALESCE($2, template_type),
+        process = COALESCE($3, process),
+        district_id = $4,
+        district_name = $5,
+        region_id = $6,
+        region_name = $7,
+        subsidiary_id = $8,
+        subsidiary_name = $9,
+        email_group_id = $10,
+        email_group_ids = $11,
+        frequency = COALESCE($12, frequency),
+        day_of_week = $13,
+        day_of_month = $14,
+        time_of_day = COALESCE($15, time_of_day),
+        enabled = COALESCE($16, enabled),
         updated_at = CURRENT_TIMESTAMP
-      WHERE id = $8
+      WHERE id = $17
       RETURNING *
     `;
 
     const result = await this.pool.query(query, [
-      report_type,
-      hierarchy,
-      entity_id,
-      entity_name || null,
+      template_name,
+      finalTemplateType,
+      finalProcess,
+      district_id !== undefined ? district_id : (finalTemplateType === 'district' ? entity_id : null),
+      district_name !== undefined ? district_name : (finalTemplateType === 'district' ? entity_name : null),
+      region_id !== undefined ? region_id : (finalTemplateType === 'region' ? entity_id : null),
+      region_name !== undefined ? region_name : (finalTemplateType === 'region' ? entity_name : null),
+      subsidiary_id !== undefined ? subsidiary_id : (finalTemplateType === 'subsidiary' ? entity_id : null),
+      subsidiary_name !== undefined ? subsidiary_name : (finalTemplateType === 'subsidiary' ? entity_name : null),
       email_group_id,
+      email_group_ids,
       frequency,
-      status,
+      day_of_week,
+      day_of_month,
+      time_of_day,
+      finalEnabled,
       id
     ]);
 
