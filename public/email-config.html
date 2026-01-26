@@ -982,14 +982,14 @@
 
   <!-- Scheduler Progress Modal -->
   <div id="schedulerProgressModal" class="loading-modal">
-    <div class="loading-content" style="max-width: 600px;">
+    <div class="loading-content" style="max-width: 700px; max-height: 80vh; overflow-y: auto;">
       <div class="loading-spinner"></div>
       <div class="loading-message" style="font-size: 18px; margin-bottom: 20px;">⚙️ Running All Schedules...</div>
       
       <div style="background: #f7fafc; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
         <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
           <span style="color: #4a5568; font-weight: 500;">📊 Schedules Processed:</span>
-          <span style="color: #2d3748; font-weight: 600;" id="schedulesProcessedCount">0</span>
+          <span style="color: #2d3748; font-weight: 600;" id="schedulesProcessedCount">0 / 0</span>
         </div>
         <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
           <span style="color: #4a5568; font-weight: 500;">✉️ Emails Sent:</span>
@@ -1001,12 +1001,13 @@
         </div>
       </div>
 
-      <div id="schedulerStatusText" style="color: #718096; font-size: 13px; text-align: center; min-height: 20px;">
+      <div id="schedulerStatusText" style="color: #718096; font-size: 13px; text-align: center; margin-bottom: 16px;">
         Starting scheduler...
       </div>
 
-      <div id="schedulerLogContainer" style="max-height: 200px; overflow-y: auto; background: #1a202c; color: #e2e8f0; padding: 12px; border-radius: 6px; font-family: monospace; font-size: 11px; margin-top: 16px; display: none;">
-        <div id="schedulerLog"></div>
+      <!-- Schedule List -->
+      <div id="scheduleProgressList" style="background: white; border-radius: 8px; border: 1px solid #e2e8f0; max-height: 400px; overflow-y: auto;">
+        <!-- Schedules will be inserted here -->
       </div>
     </div>
   </div>
@@ -2909,18 +2910,126 @@
     // ============================================
     
     let schedulerPollingInterval = null;
+    let schedulesToProcess = [];
     
-    function showSchedulerProgress() {
+    async function showSchedulerProgress() {
       const modal = document.getElementById('schedulerProgressModal');
       modal.classList.add('active');
       
       // Reset counts
-      document.getElementById('schedulesProcessedCount').textContent = '0';
+      document.getElementById('schedulesProcessedCount').textContent = '0 / 0';
       document.getElementById('emailsSentCount').textContent = '0';
       document.getElementById('errorsCount').textContent = '0';
-      document.getElementById('schedulerStatusText').textContent = 'Starting scheduler...';
-      document.getElementById('schedulerLog').innerHTML = '';
-      document.getElementById('schedulerLogContainer').style.display = 'none';
+      document.getElementById('schedulerStatusText').textContent = 'Loading schedules...';
+      
+      // Fetch all enabled schedules that will be processed
+      try {
+        const schedules = reportSchedules.filter(s => s.enabled);
+        schedulesToProcess = [];
+        
+        // Get email group details for each schedule
+        for (const schedule of schedules) {
+          const emailGroupIds = schedule.email_group_ids || 
+                               (schedule.email_group_id ? [schedule.email_group_id] : []);
+          
+          let recipients = [];
+          for (const groupId of emailGroupIds) {
+            try {
+              const response = await fetch(`/api/email-groups/${groupId}/contacts`);
+              if (response.ok) {
+                const contacts = await response.json();
+                recipients.push(...contacts.map(c => c.email));
+              }
+            } catch (err) {
+              console.error(`Failed to fetch contacts for group ${groupId}:`, err);
+            }
+          }
+          
+          // Remove duplicates
+          recipients = [...new Set(recipients)];
+          
+          schedulesToProcess.push({
+            id: schedule.id,
+            name: schedule.template_name,
+            entity: schedule.district_name || schedule.region_name || schedule.subsidiary_name || 'Unknown',
+            emailGroupName: schedule.email_group_name || 'Multiple Groups',
+            recipients: recipients,
+            status: 'pending'  // pending, processing, complete, error
+          });
+        }
+        
+        // Update count
+        document.getElementById('schedulesProcessedCount').textContent = `0 / ${schedulesToProcess.length}`;
+        document.getElementById('schedulerStatusText').textContent = 
+          `Ready to process ${schedulesToProcess.length} schedule(s)`;
+        
+        // Render schedule list
+        renderScheduleProgressList();
+      } catch (error) {
+        console.error('Error loading schedules:', error);
+        document.getElementById('schedulerStatusText').textContent = 'Error loading schedules';
+      }
+    }
+    
+    function renderScheduleProgressList() {
+      const container = document.getElementById('scheduleProgressList');
+      
+      if (schedulesToProcess.length === 0) {
+        container.innerHTML = '<div style="padding: 20px; text-align: center; color: #718096;">No schedules to process</div>';
+        return;
+      }
+      
+      container.innerHTML = schedulesToProcess.map(schedule => {
+        const statusIcon = {
+          'pending': '⏳',
+          'processing': '⚙️',
+          'complete': '✅',
+          'error': '❌'
+        }[schedule.status] || '⏳';
+        
+        const statusColor = {
+          'pending': '#cbd5e0',
+          'processing': '#5a6fd8',
+          'complete': '#48bb78',
+          'error': '#f56565'
+        }[schedule.status] || '#cbd5e0';
+        
+        const statusText = {
+          'pending': 'Pending',
+          'processing': 'Sending emails...',
+          'complete': `Complete (${schedule.recipients.length} sent)`,
+          'error': 'Failed'
+        }[schedule.status] || 'Pending';
+        
+        return `
+          <div class="schedule-progress-item" data-schedule-id="${schedule.id}" style="padding: 16px; border-bottom: 1px solid #e2e8f0;">
+            <div style="display: flex; align-items: start; gap: 12px;">
+              <div style="font-size: 24px; line-height: 1;">${statusIcon}</div>
+              <div style="flex: 1;">
+                <div style="font-weight: 600; color: #2d3748; margin-bottom: 4px;">
+                  ${escapeHtml(schedule.name)}
+                </div>
+                <div style="font-size: 13px; color: #718096; margin-bottom: 8px;">
+                  📊 ${escapeHtml(schedule.entity)} · 📧 ${escapeHtml(schedule.emailGroupName)}
+                </div>
+                <div style="font-size: 12px; font-weight: 500; color: ${statusColor}; margin-bottom: 8px;">
+                  ${statusText}
+                </div>
+                <details style="font-size: 12px; color: #4a5568;">
+                  <summary style="cursor: pointer; user-select: none; padding: 4px 0;">
+                    Recipients (${schedule.recipients.length})
+                  </summary>
+                  <div style="padding: 8px 0 4px 16px; color: #718096;">
+                    ${schedule.recipients.length > 0 
+                      ? schedule.recipients.map(email => `• ${escapeHtml(email)}`).join('<br>')
+                      : 'No recipients configured'}
+                  </div>
+                </details>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
     }
     
     function hideSchedulerProgress() {
@@ -2932,27 +3041,31 @@
         clearInterval(schedulerPollingInterval);
         schedulerPollingInterval = null;
       }
+      
+      // Reset schedules
+      schedulesToProcess = [];
     }
     
     function updateSchedulerProgress(stats) {
-      document.getElementById('schedulesProcessedCount').textContent = stats.schedulesProcessed || 0;
+      const totalSchedules = schedulesToProcess.length;
+      document.getElementById('schedulesProcessedCount').textContent = 
+        `${stats.schedulesProcessed || 0} / ${totalSchedules}`;
       document.getElementById('emailsSentCount').textContent = stats.emailsSent || 0;
       document.getElementById('errorsCount').textContent = stats.errors || 0;
-    }
-    
-    function addSchedulerLog(message) {
-      const logContainer = document.getElementById('schedulerLog');
-      const logElement = document.createElement('div');
-      logElement.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
-      logElement.style.marginBottom = '4px';
-      logContainer.appendChild(logElement);
       
-      // Show log container
-      document.getElementById('schedulerLogContainer').style.display = 'block';
+      // Update schedule statuses based on progress
+      const processed = stats.schedulesProcessed || 0;
+      for (let i = 0; i < schedulesToProcess.length; i++) {
+        if (i < processed) {
+          schedulesToProcess[i].status = 'complete';
+        } else if (i === processed) {
+          schedulesToProcess[i].status = 'processing';
+        } else {
+          schedulesToProcess[i].status = 'pending';
+        }
+      }
       
-      // Auto-scroll to bottom
-      document.getElementById('schedulerLogContainer').scrollTop = 
-        document.getElementById('schedulerLogContainer').scrollHeight;
+      renderScheduleProgressList();
     }
     
     async function pollSchedulerStatus(startStats) {
@@ -3001,9 +3114,8 @@
         const initialStatsResponse = await fetch('/api/email-scheduler/status');
         const startStats = await initialStatsResponse.json();
         
-        // Show progress modal
-        showSchedulerProgress();
-        addSchedulerLog('🚀 Starting scheduler...');
+        // Show progress modal (fetches schedules and builds UI)
+        await showSchedulerProgress();
         
         // Start polling for updates every 1 second
         schedulerPollingInterval = setInterval(() => {
@@ -3011,7 +3123,7 @@
         }, 1000);
         
         console.log('🚀 Manually triggering scheduler...');
-        addSchedulerLog('📧 Processing all enabled schedules...');
+        document.getElementById('schedulerStatusText').textContent = 'Processing schedules...';
         
         // Trigger the scheduler (this will take a while)
         const response = await fetch('/api/email-scheduler/run-now', {
@@ -3034,27 +3146,20 @@
         const result = await response.json();
         console.log('✅ Scheduler completed:', result);
         
-        // Update final stats
+        // Update final stats and mark all as complete
         updateSchedulerProgress({
           schedulesProcessed: result.schedulesProcessed,
           emailsSent: result.emailsSent,
           errors: result.emailsFailed
         });
         
-        addSchedulerLog(`✅ Complete! Processed ${result.schedulesProcessed} schedule(s)`);
-        addSchedulerLog(`📧 Sent ${result.emailsSent} email(s)`);
-        
-        if (result.emailsFailed > 0) {
-          addSchedulerLog(`⚠️ ${result.emailsFailed} email(s) failed`);
-        }
-        
         document.getElementById('schedulerStatusText').textContent = 
-          '✅ Scheduler run completed successfully!';
+          '✅ All schedules processed successfully!';
         
         // Show success message in button
         btn.innerHTML = '✅ Complete!';
         
-        // Wait 2 seconds, then hide modal and show summary
+        // Wait 3 seconds, then hide modal and show summary
         setTimeout(async () => {
           hideSchedulerProgress();
           
@@ -3077,7 +3182,7 @@
           
           // Refresh the schedules table to show updated timestamps
           await loadReportSchedules();
-        }, 2000);
+        }, 3000);
         
       } catch (error) {
         console.error('❌ Error running scheduler:', error);
@@ -3088,20 +3193,23 @@
           schedulerPollingInterval = null;
         }
         
-        addSchedulerLog(`❌ Error: ${error.message}`);
+        // Mark all schedules as error
+        schedulesToProcess.forEach(s => s.status = 'error');
+        renderScheduleProgressList();
+        
         document.getElementById('schedulerStatusText').textContent = 
-          '❌ Scheduler run failed';
+          '❌ Scheduler run failed: ' + error.message;
         
         setTimeout(() => {
           hideSchedulerProgress();
           alert('Failed to run scheduler: ' + error.message);
-        }, 2000);
+        }, 3000);
       } finally {
         // Reset button after a delay
         setTimeout(() => {
           btn.disabled = false;
           btn.innerHTML = originalText;
-        }, 3000);
+        }, 4000);
       }
     }
 
