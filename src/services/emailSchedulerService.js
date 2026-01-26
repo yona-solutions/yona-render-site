@@ -3,9 +3,14 @@
  * 
  * Automatically sends scheduled P&L reports based on configured schedules.
  * Runs periodically to check for due schedules and sends emails to all recipients.
+ * 
+ * IMPORTANT: All schedule times are stored in Eastern Time (EST/EDT) and converted
+ * to UTC for server execution. This ensures schedules run at the correct time
+ * regardless of server timezone.
  */
 
 const cron = require('node-cron');
+const { DateTime } = require('luxon');
 const emailConfigService = require('./emailConfigService');
 const emailService = require('./emailService');
 
@@ -500,46 +505,69 @@ class EmailSchedulerService {
 
   /**
    * Calculate next send time based on frequency
+   * NOTE: All times are treated as Eastern Time (EST/EDT) and converted to UTC
+   * @param {Object} schedule - The schedule object with frequency, day_of_month, time_of_day
+   * @param {Date} fromDate - The date to calculate from (in UTC)
+   * @returns {Date} The next send time in UTC
    */
   calculateNextSendTime(schedule, fromDate) {
-    const next = new Date(fromDate);
+    // Parse the scheduled time (stored as EST)
     const [hours, minutes] = (schedule.time_of_day || '08:00').split(':').map(Number);
+    
+    // Convert fromDate to Eastern Time
+    const nowEST = DateTime.fromJSDate(fromDate).setZone('America/New_York');
+    
+    let nextEST;
 
     switch (schedule.frequency) {
       case 'daily':
-        // Next day at scheduled time
-        next.setDate(next.getDate() + 1);
-        next.setHours(hours, minutes, 0, 0);
+        // Next day at scheduled time (EST)
+        nextEST = nowEST.plus({ days: 1 }).set({ hour: hours, minute: minutes, second: 0, millisecond: 0 });
         break;
 
       case 'weekly':
-        // Next week on same day
-        next.setDate(next.getDate() + 7);
-        next.setHours(hours, minutes, 0, 0);
+        // Next week on same day (EST)
+        nextEST = nowEST.plus({ weeks: 1 }).set({ hour: hours, minute: minutes, second: 0, millisecond: 0 });
         break;
 
       case 'monthly':
-        // Next month on same day
-        next.setMonth(next.getMonth() + 1);
-        if (schedule.day_of_month) {
-          next.setDate(schedule.day_of_month);
-        }
-        next.setHours(hours, minutes, 0, 0);
+        // Next month on specified day (EST)
+        const targetDay = schedule.day_of_month || nowEST.day;
         
-        // Handle end of month (e.g., Feb 31 -> Feb 28/29)
-        if (next.getDate() !== schedule.day_of_month) {
-          // Day doesn't exist in this month, use last day
-          next.setDate(0); // Go to last day of previous month
+        // Start with next month
+        nextEST = nowEST.plus({ months: 1 }).set({ 
+          day: 1,  // Start with first of month
+          hour: hours, 
+          minute: minutes, 
+          second: 0, 
+          millisecond: 0 
+        });
+        
+        // Try to set the target day
+        try {
+          nextEST = nextEST.set({ day: targetDay });
+        } catch (e) {
+          // Day doesn't exist in this month (e.g., Feb 31)
+          // Use last day of month
+          nextEST = nextEST.endOf('month').set({ hour: hours, minute: minutes, second: 0, millisecond: 0 });
         }
         break;
 
       default:
-        // Default to next day
-        next.setDate(next.getDate() + 1);
-        next.setHours(hours, minutes, 0, 0);
+        // Default to tomorrow (EST)
+        nextEST = nowEST.plus({ days: 1 }).set({ hour: hours, minute: minutes, second: 0, millisecond: 0 });
     }
 
-    return next;
+    // Convert EST time to UTC for storage
+    const nextUTC = nextEST.toUTC();
+    
+    // Log for debugging (can remove later)
+    console.log(`   📅 Next send time calculated:`);
+    console.log(`      EST: ${nextEST.toFormat('yyyy-MM-dd HH:mm:ss ZZZZ')}`);
+    console.log(`      UTC: ${nextUTC.toFormat('yyyy-MM-dd HH:mm:ss ZZZZ')}`);
+    
+    // Return as JavaScript Date object
+    return nextUTC.toJSDate();
   }
 
   /**

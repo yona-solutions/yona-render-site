@@ -1095,9 +1095,10 @@
             
             <div style="flex: 0 0 150px;">
               <label style="display: block; margin-bottom: 6px; color: #4a5568; font-weight: 500; font-size: 13px;">
-                Time of Day
+                Time of Day (EST)
               </label>
               <input type="time" id="globalTimeOfDay" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 14px; color: #2d3748;">
+              <div style="font-size: 11px; color: #718096; margin-top: 4px;">Eastern Time</div>
             </div>
             
             <button class="btn btn-primary" onclick="applyGlobalSchedule()" style="height: 38px;">
@@ -1112,6 +1113,8 @@
           <div style="margin-top: 16px; padding: 12px; background: #f7fafc; border-radius: 6px; color: #4a5568; font-size: 13px;">
             💡 <strong>Tip:</strong> This will update all monthly report schedules to send on the same day and time. 
             Individual schedules can still be customized in the table below.
+            <br><br>
+            🌍 <strong>Timezone:</strong> All times are in Eastern Time (EST/EDT). The server will automatically convert to UTC for scheduling.
           </div>
         </div>
       </div>
