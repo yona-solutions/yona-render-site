@@ -104,128 +104,30 @@ class EmailService {
               margin: 0 auto;
               padding: 20px;
             }
-            .header {
-              background: linear-gradient(135deg, #3b5998 0%, #2d4373 100%);
-              color: white;
-              padding: 30px 20px;
-              border-radius: 8px 8px 0 0;
-              text-align: center;
-            }
-            .header h1 {
-              margin: 0;
-              font-size: 24px;
-              font-weight: 600;
-            }
-            .content {
-              background: #ffffff;
-              padding: 30px 20px;
-              border: 1px solid #e0e0e0;
-              border-top: none;
-            }
-            .report-details {
-              background: #f8f9fa;
-              padding: 20px;
-              border-radius: 6px;
-              margin: 20px 0;
-            }
-            .detail-row {
-              display: flex;
-              justify-content: space-between;
-              padding: 8px 0;
-              border-bottom: 1px solid #e0e0e0;
-            }
-            .detail-row:last-child {
-              border-bottom: none;
-            }
-            .detail-label {
-              font-weight: 600;
-              color: #555;
-            }
-            .detail-value {
-              color: #333;
-            }
-            .footer {
-              background: #f8f9fa;
-              padding: 20px;
-              border-radius: 0 0 8px 8px;
-              text-align: center;
-              font-size: 12px;
-              color: #666;
-              border: 1px solid #e0e0e0;
-              border-top: none;
-            }
-            .attachment-note {
-              background: #e3f2fd;
-              border-left: 4px solid #2196f3;
-              padding: 15px;
-              margin: 20px 0;
-              border-radius: 4px;
-            }
           </style>
         </head>
         <body>
-          <div class="header">
-            <h1>📊 P&L Report</h1>
-          </div>
-          
-          <div class="content">
-            <p>Hello,</p>
-            
-            <p>Your scheduled P&L report is ready and attached to this email.</p>
-            
-            <div class="report-details">
-              <div class="detail-row">
-                <span class="detail-label">Report Name:</span>
-                <span class="detail-value">${schedule.template_name}</span>
-              </div>
-              <div class="detail-row">
-                <span class="detail-label">Type:</span>
-                <span class="detail-value">${entityType}</span>
-              </div>
-              <div class="detail-row">
-                <span class="detail-label">Entity:</span>
-                <span class="detail-value">${entityName}</span>
-              </div>
-              <div class="detail-row">
-                <span class="detail-label">Process:</span>
-                <span class="detail-value">${processType}</span>
-              </div>
-              <div class="detail-row">
-                <span class="detail-label">Report Date:</span>
-                <span class="detail-value">${reportDate}</span>
-              </div>
-            </div>
-            
-            <div class="attachment-note">
-              <strong>📎 Attachment:</strong> The P&L report is attached as a PDF file to this email.
-            </div>
-            
-            <p>If you have any questions about this report, please contact your finance team.</p>
-          </div>
-          
-          <div class="footer">
-            <p><strong>Yona Solutions SPHERE</strong></p>
-            <p>This is an automated report delivery. Please do not reply to this email.</p>
-          </div>
+          <p>Hello,</p>
+
+          <p>This is Yona Solutions. Your P&L for <strong>${entityType}: ${entityName}</strong> is ready.</p>
+
+          <p>Please find your ${processType} P&L report for <strong>${reportDate}</strong> attached to this email.</p>
+
+          <p>Best regards,<br>Yona Solutions</p>
         </body>
         </html>
       `;
 
       // Create plain text version
       const textContent = `
-P&L Report - ${schedule.template_name}
+Hello,
 
-Report Name: ${schedule.template_name}
-Type: ${entityType}
-Entity: ${entityName}
-Process: ${processType}
-Report Date: ${reportDate}
+This is Yona Solutions. Your P&L for ${entityType}: ${entityName} is ready.
 
-Your P&L report is attached as a PDF file.
+Please find your ${processType} P&L report for ${reportDate} attached to this email.
 
----
-Yona Solutions SPHERE
-This is an automated report delivery.
+Best regards,
+Yona Solutions
       `.trim();
 
       // Create filename for PDF attachment
