@@ -432,7 +432,8 @@ class EmailConfigService {
     // Map legacy fields to new fields if provided
     const finalTemplateType = template_type || hierarchy;
     const finalProcess = process || report_type;
-    const finalEnabled = enabled !== undefined ? enabled : (status === 'active');
+    // Only set enabled if explicitly provided, otherwise keep existing value (via COALESCE in SQL)
+    const finalEnabled = enabled !== undefined ? enabled : (status !== undefined ? (status === 'active') : undefined);
 
     const query = `
       UPDATE report_schedules
