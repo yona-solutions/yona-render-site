@@ -1044,6 +1044,78 @@
 
     <!-- Content -->
     <div class="content">
+      <!-- Global Schedule Settings -->
+      <div class="section-card" style="margin-bottom: 25px;">
+        <div class="section-header">
+          <div>
+            <h2>🕐 Global Schedule Settings</h2>
+            <div class="subtitle">Set when all monthly reports will be sent</div>
+          </div>
+        </div>
+        
+        <div style="padding: 20px;">
+          <div style="display: flex; gap: 20px; align-items: end; flex-wrap: wrap;">
+            <div style="flex: 0 0 200px;">
+              <label style="display: block; margin-bottom: 6px; color: #4a5568; font-weight: 500; font-size: 13px;">
+                Day of Month
+              </label>
+              <select id="globalDayOfMonth" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 14px; color: #2d3748; background: white;">
+                <option value="">Select day...</option>
+                <option value="1">1st of month</option>
+                <option value="2">2nd of month</option>
+                <option value="3">3rd of month</option>
+                <option value="4">4th of month</option>
+                <option value="5">5th of month</option>
+                <option value="6">6th of month</option>
+                <option value="7">7th of month</option>
+                <option value="8">8th of month</option>
+                <option value="9">9th of month</option>
+                <option value="10">10th of month</option>
+                <option value="11">11th of month</option>
+                <option value="12">12th of month</option>
+                <option value="13">13th of month</option>
+                <option value="14">14th of month</option>
+                <option value="15">15th of month</option>
+                <option value="16">16th of month</option>
+                <option value="17">17th of month</option>
+                <option value="18">18th of month</option>
+                <option value="19">19th of month</option>
+                <option value="20">20th of month</option>
+                <option value="21">21st of month</option>
+                <option value="22">22nd of month</option>
+                <option value="23">23rd of month</option>
+                <option value="24">24th of month</option>
+                <option value="25">25th of month</option>
+                <option value="26">26th of month</option>
+                <option value="27">27th of month</option>
+                <option value="28">28th of month</option>
+                <option value="-1">Last day of month</option>
+              </select>
+            </div>
+            
+            <div style="flex: 0 0 150px;">
+              <label style="display: block; margin-bottom: 6px; color: #4a5568; font-weight: 500; font-size: 13px;">
+                Time of Day
+              </label>
+              <input type="time" id="globalTimeOfDay" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 14px; color: #2d3748;">
+            </div>
+            
+            <button class="btn btn-primary" onclick="applyGlobalSchedule()" style="height: 38px;">
+              📅 Apply to All Monthly Schedules
+            </button>
+            
+            <div id="globalScheduleStatus" style="flex: 1 0 200px; color: #718096; font-size: 13px; padding: 8px 0;">
+              <!-- Status messages will appear here -->
+            </div>
+          </div>
+          
+          <div style="margin-top: 16px; padding: 12px; background: #f7fafc; border-radius: 6px; color: #4a5568; font-size: 13px;">
+            💡 <strong>Tip:</strong> This will update all monthly report schedules to send on the same day and time. 
+            Individual schedules can still be customized in the table below.
+          </div>
+        </div>
+      </div>
+
       <!-- Email Groups Section -->
       <div class="section-card">
         <div class="section-header">
@@ -1292,9 +1364,48 @@
         reportSchedules = await response.json();
         filteredSchedules = [...reportSchedules];
         renderReportSchedulesTable();
+        updateGlobalScheduleDisplay();
       } catch (error) {
         console.error('Error loading report schedules:', error);
         showEmptyState('reportSchedulesBody', 'Failed to load report schedules', '⚠️');
+      }
+    }
+    
+    function updateGlobalScheduleDisplay() {
+      // Find the most common day_of_month and time_of_day across monthly schedules
+      const monthlySchedules = reportSchedules.filter(s => s.frequency === 'monthly');
+      
+      if (monthlySchedules.length === 0) return;
+      
+      // Count occurrences of each day and time
+      const dayCounts = {};
+      const timeCounts = {};
+      
+      monthlySchedules.forEach(s => {
+        if (s.day_of_month !== null && s.day_of_month !== undefined) {
+          dayCounts[s.day_of_month] = (dayCounts[s.day_of_month] || 0) + 1;
+        }
+        if (s.time_of_day) {
+          timeCounts[s.time_of_day] = (timeCounts[s.time_of_day] || 0) + 1;
+        }
+      });
+      
+      // Find most common values
+      const mostCommonDay = Object.keys(dayCounts).length > 0
+        ? Object.entries(dayCounts).sort((a, b) => b[1] - a[1])[0][0]
+        : null;
+      
+      const mostCommonTime = Object.keys(timeCounts).length > 0
+        ? Object.entries(timeCounts).sort((a, b) => b[1] - a[1])[0][0]
+        : null;
+      
+      // Update the form fields
+      if (mostCommonDay) {
+        document.getElementById('globalDayOfMonth').value = mostCommonDay;
+      }
+      
+      if (mostCommonTime) {
+        document.getElementById('globalTimeOfDay').value = mostCommonTime;
       }
     }
 
@@ -2905,6 +3016,94 @@
       }
     }
 
+    // ============================================
+    // Global Schedule Settings
+    // ============================================
+    
+    async function applyGlobalSchedule() {
+      const dayOfMonth = document.getElementById('globalDayOfMonth').value;
+      const timeOfDay = document.getElementById('globalTimeOfDay').value;
+      const statusEl = document.getElementById('globalScheduleStatus');
+      
+      // Validate inputs
+      if (!dayOfMonth) {
+        statusEl.innerHTML = '<span style="color: #f56565;">⚠️ Please select a day of month</span>';
+        return;
+      }
+      
+      if (!timeOfDay) {
+        statusEl.innerHTML = '<span style="color: #f56565;">⚠️ Please select a time of day</span>';
+        return;
+      }
+      
+      // Confirm with user
+      const dayText = dayOfMonth === '-1' ? 'last day' : `day ${dayOfMonth}`;
+      if (!confirm(`Apply this schedule to ALL monthly report schedules?\n\nDay: ${dayText} of month\nTime: ${timeOfDay}\n\nThis will update all enabled monthly schedules.`)) {
+        return;
+      }
+      
+      statusEl.innerHTML = '<span style="color: #5a6fd8;">⏳ Updating schedules...</span>';
+      
+      try {
+        // Get all monthly schedules
+        const monthlySchedules = reportSchedules.filter(s => 
+          s.frequency === 'monthly' && s.enabled !== false
+        );
+        
+        if (monthlySchedules.length === 0) {
+          statusEl.innerHTML = '<span style="color: #ed8936;">⚠️ No monthly schedules found</span>';
+          return;
+        }
+        
+        let successCount = 0;
+        let errorCount = 0;
+        
+        // Update each schedule
+        for (const schedule of monthlySchedules) {
+          try {
+            const response = await fetch(`/api/report-schedules/${schedule.id}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                day_of_month: dayOfMonth === '-1' ? null : parseInt(dayOfMonth),
+                time_of_day: timeOfDay
+              })
+            });
+            
+            if (!response.ok) throw new Error('Failed to update');
+            
+            const updated = await response.json();
+            
+            // Update local state
+            Object.assign(schedule, updated);
+            successCount++;
+          } catch (error) {
+            console.error(`Failed to update schedule ${schedule.id}:`, error);
+            errorCount++;
+          }
+        }
+        
+        // Show results
+        if (errorCount === 0) {
+          statusEl.innerHTML = `<span style="color: #48bb78;">✅ Updated ${successCount} schedule(s) successfully!</span>`;
+        } else {
+          statusEl.innerHTML = `<span style="color: #ed8936;">⚠️ Updated ${successCount} schedule(s), ${errorCount} failed</span>`;
+        }
+        
+        // Refresh the table
+        await loadReportSchedules();
+        
+        // Clear status after 5 seconds
+        setTimeout(() => {
+          statusEl.innerHTML = '';
+        }, 5000);
+        
+      } catch (error) {
+        console.error('Error applying global schedule:', error);
+        statusEl.innerHTML = '<span style="color: #f56565;">❌ Error: ' + error.message + '</span>';
+      }
+    }
+    
     // ============================================
     // Scheduler Functions
     // ============================================
