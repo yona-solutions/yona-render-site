@@ -976,8 +976,8 @@ router.post('/email-scheduler/run-now', async (req, res) => {
     const successBefore = statsBefore.successfulSends;
     const failBefore = statsBefore.failedSends;
     
-    // Run scheduler and wait for it to complete
-    await emailSchedulerService.runNow();
+    // Run scheduler and wait for it to complete (returns array of results)
+    const scheduleResults = await emailSchedulerService.runNow();
     
     // Get stats after running
     const statsAfter = emailSchedulerService.getStats();
@@ -987,13 +987,26 @@ router.post('/email-scheduler/run-now', async (req, res) => {
     
     console.log(`✅ Manual scheduler run complete: ${schedulesProcessed} schedules, ${successCount} sent, ${failCount} failed`);
     
+    // Build errors array from schedule results
+    const errors = [];
+    const skipped = [];
+    scheduleResults.forEach(r => {
+      if (r.status === 'error') {
+        errors.push(`${r.scheduleName}: ${r.error}`);
+      } else if (r.status === 'skipped') {
+        skipped.push(`${r.scheduleName}: ${r.skipReason}`);
+      }
+    });
+    
     res.json({
       success: true,
       message: 'Scheduler run completed successfully',
       schedulesProcessed,
       emailsSent: successCount,
       emailsFailed: failCount,
-      errors: statsAfter.lastError ? [statsAfter.lastError] : []
+      scheduleResults: scheduleResults, // Detailed per-schedule results
+      errors: errors.length > 0 ? errors : (statsAfter.lastError ? [statsAfter.lastError] : []),
+      skipped: skipped
     });
   } catch (error) {
     console.error('Error triggering scheduler:', error);

@@ -2983,23 +2983,31 @@
         const statusIcon = {
           'pending': '⏳',
           'processing': '⚙️',
-          'complete': '✅',
+          'success': '✅',
+          'skipped': '⚠️',
           'error': '❌'
         }[schedule.status] || '⏳';
         
         const statusColor = {
           'pending': '#cbd5e0',
           'processing': '#5a6fd8',
-          'complete': '#48bb78',
+          'success': '#48bb78',
+          'skipped': '#ed8936',
           'error': '#f56565'
         }[schedule.status] || '#cbd5e0';
         
-        const statusText = {
-          'pending': 'Pending',
-          'processing': 'Sending emails...',
-          'complete': `Complete (${schedule.recipients.length} sent)`,
-          'error': 'Failed'
-        }[schedule.status] || 'Pending';
+        let statusText = '';
+        if (schedule.status === 'success') {
+          statusText = `Complete (${schedule.emailsSent || schedule.recipients.length} sent)`;
+        } else if (schedule.status === 'skipped') {
+          statusText = `Skipped: ${schedule.skipReason || 'Configuration incomplete'}`;
+        } else if (schedule.status === 'error') {
+          statusText = `Error: ${schedule.error || 'Failed to process'}`;
+        } else if (schedule.status === 'processing') {
+          statusText = 'Sending emails...';
+        } else {
+          statusText = 'Pending';
+        }
         
         return `
           <div class="schedule-progress-item" data-schedule-id="${schedule.id}" style="padding: 16px; border-bottom: 1px solid #e2e8f0;">
@@ -3015,16 +3023,18 @@
                 <div style="font-size: 12px; font-weight: 500; color: ${statusColor}; margin-bottom: 8px;">
                   ${statusText}
                 </div>
-                <details style="font-size: 12px; color: #4a5568;">
-                  <summary style="cursor: pointer; user-select: none; padding: 4px 0;">
-                    Recipients (${schedule.recipients.length})
-                  </summary>
-                  <div style="padding: 8px 0 4px 16px; color: #718096;">
-                    ${schedule.recipients.length > 0 
-                      ? schedule.recipients.map(email => `• ${escapeHtml(email)}`).join('<br>')
-                      : 'No recipients configured'}
-                  </div>
-                </details>
+                ${schedule.status !== 'skipped' ? `
+                  <details style="font-size: 12px; color: #4a5568;">
+                    <summary style="cursor: pointer; user-select: none; padding: 4px 0;">
+                      Recipients (${schedule.recipients.length})
+                    </summary>
+                    <div style="padding: 8px 0 4px 16px; color: #718096;">
+                      ${schedule.recipients.length > 0 
+                        ? schedule.recipients.map(email => `• ${escapeHtml(email)}`).join('<br>')
+                        : 'No recipients configured'}
+                    </div>
+                  </details>
+                ` : ''}
               </div>
             </div>
           </div>
@@ -3046,22 +3056,37 @@
       schedulesToProcess = [];
     }
     
-    function updateSchedulerProgress(stats) {
+    function updateSchedulerProgress(stats, scheduleResults) {
       const totalSchedules = schedulesToProcess.length;
       document.getElementById('schedulesProcessedCount').textContent = 
         `${stats.schedulesProcessed || 0} / ${totalSchedules}`;
       document.getElementById('emailsSentCount').textContent = stats.emailsSent || 0;
       document.getElementById('errorsCount').textContent = stats.errors || 0;
       
-      // Update schedule statuses based on progress
-      const processed = stats.schedulesProcessed || 0;
-      for (let i = 0; i < schedulesToProcess.length; i++) {
-        if (i < processed) {
-          schedulesToProcess[i].status = 'complete';
-        } else if (i === processed) {
-          schedulesToProcess[i].status = 'processing';
-        } else {
-          schedulesToProcess[i].status = 'pending';
+      // Update schedule statuses based on results if provided
+      if (scheduleResults && scheduleResults.length > 0) {
+        // Map results to our schedule list
+        scheduleResults.forEach(result => {
+          const schedule = schedulesToProcess.find(s => s.id === result.scheduleId);
+          if (schedule) {
+            schedule.status = result.status; // 'success', 'skipped', 'error'
+            schedule.emailsSent = result.emailsSent;
+            schedule.emailsFailed = result.emailsFailed;
+            schedule.skipReason = result.skipReason;
+            schedule.error = result.error;
+          }
+        });
+      } else {
+        // Fallback: Update schedule statuses based on progress count
+        const processed = stats.schedulesProcessed || 0;
+        for (let i = 0; i < schedulesToProcess.length; i++) {
+          if (i < processed) {
+            schedulesToProcess[i].status = 'complete';
+          } else if (i === processed) {
+            schedulesToProcess[i].status = 'processing';
+          } else {
+            schedulesToProcess[i].status = 'pending';
+          }
         }
       }
       
@@ -3146,15 +3171,25 @@
         const result = await response.json();
         console.log('✅ Scheduler completed:', result);
         
-        // Update final stats and mark all as complete
+        // Update final stats with detailed schedule results
         updateSchedulerProgress({
           schedulesProcessed: result.schedulesProcessed,
           emailsSent: result.emailsSent,
           errors: result.emailsFailed
-        });
+        }, result.scheduleResults);
         
-        document.getElementById('schedulerStatusText').textContent = 
-          '✅ All schedules processed successfully!';
+        const skippedCount = result.skipped ? result.skipped.length : 0;
+        const errorCount = result.errors ? result.errors.length : 0;
+        
+        let statusMessage = '✅ Scheduler run completed!';
+        if (skippedCount > 0) {
+          statusMessage += ` (${skippedCount} skipped)`;
+        }
+        if (errorCount > 0) {
+          statusMessage += ` (${errorCount} errors)`;
+        }
+        
+        document.getElementById('schedulerStatusText').textContent = statusMessage;
         
         // Show success message in button
         btn.innerHTML = '✅ Complete!';

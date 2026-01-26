@@ -86,6 +86,7 @@ class EmailSchedulerService {
   /**
    * Main processing function - check and send due schedules
    * @param {boolean} forceAll - If true, process ALL schedules regardless of due date
+   * @returns {Array} Array of schedule results with status and details
    */
   async processSchedules(forceAll = false) {
     console.log('\n⏰ ======================================');
@@ -96,12 +97,14 @@ class EmailSchedulerService {
     this.lastRunTime = new Date();
     this.stats.totalRuns++;
 
+    const results = []; // Track results per schedule
+
     try {
       // Check if email service is available
       if (!emailService.isAvailable()) {
         console.log('⚠️  Email service not configured (SENDGRID_API_KEY missing)');
         console.log('   Scheduler will continue checking, but emails cannot be sent');
-        return;
+        return results;
       }
 
       // Check if database is available
@@ -126,7 +129,7 @@ class EmailSchedulerService {
       
       if (schedules.length === 0) {
         console.log('✓ No schedules to process at this time');
-        return;
+        return results;
       }
 
       schedules.forEach(s => {
@@ -136,8 +139,12 @@ class EmailSchedulerService {
 
       // Process each schedule
       for (const schedule of schedules) {
-        await this.processSchedule(schedule);
-        this.stats.schedulesProcessed++;
+        const result = await this.processSchedule(schedule);
+        results.push(result);
+        
+        if (result.status === 'success') {
+          this.stats.schedulesProcessed++;
+        }
       }
 
       console.log('\n✅ Scheduler run complete\n');
@@ -146,19 +153,33 @@ class EmailSchedulerService {
       console.error('❌ Error in scheduler:', error);
       this.stats.lastError = error.message;
     }
+    
+    return results;
   }
 
   /**
    * Process a single schedule - send to all recipients in email group
+   * @returns {Object} Result object with status, emails sent, and skip/error details
    */
   async processSchedule(schedule) {
     console.log(`\n📋 Processing schedule: ${schedule.template_name} (ID: ${schedule.id})`);
     
+    const result = {
+      scheduleId: schedule.id,
+      scheduleName: schedule.template_name,
+      status: 'pending',
+      emailsSent: 0,
+      emailsFailed: 0
+    };
+    
     try {
       // Validate schedule configuration
       if (!schedule.template_type || !schedule.process) {
-        console.log(`   ⚠️  Skipping: Invalid configuration (missing template_type or process)`);
-        return;
+        const reason = 'Invalid configuration (missing template_type or process)';
+        console.log(`   ⚠️  Skipping: ${reason}`);
+        result.status = 'skipped';
+        result.skipReason = reason;
+        return result;
       }
 
       // Get entity ID
@@ -173,16 +194,22 @@ class EmailSchedulerService {
         entityId = schedule.subsidiary_id;
         entityName = schedule.subsidiary_name || 'Subsidiary';
       } else {
-        console.log(`   ⚠️  Skipping: No entity selected for ${schedule.template_type}`);
-        return;
+        const reason = `No ${schedule.template_type} selected`;
+        console.log(`   ⚠️  Skipping: ${reason}`);
+        result.status = 'skipped';
+        result.skipReason = reason;
+        return result;
       }
 
       // Get all email groups for this schedule (now supports multiple groups)
       const emailGroupIds = schedule.email_group_ids || [schedule.email_group_id].filter(Boolean);
       
       if (emailGroupIds.length === 0) {
-        console.log(`   ⚠️  Skipping: No email groups assigned`);
-        return;
+        const reason = 'No email groups assigned';
+        console.log(`   ⚠️  Skipping: ${reason}`);
+        result.status = 'skipped';
+        result.skipReason = reason;
+        return result;
       }
 
       console.log(`   Type: ${schedule.template_type} - ${entityName}`);
@@ -197,8 +224,11 @@ class EmailSchedulerService {
       }
 
       if (allRecipients.size === 0) {
-        console.log(`   ⚠️  Skipping: No recipients in email groups`);
-        return;
+        const reason = 'No recipients in email groups';
+        console.log(`   ⚠️  Skipping: ${reason}`);
+        result.status = 'skipped';
+        result.skipReason = reason;
+        return result;
       }
 
       console.log(`   Recipients: ${allRecipients.size} total`);
@@ -208,9 +238,12 @@ class EmailSchedulerService {
       const reportData = await this.generateReport(schedule, entityId);
       
       if (!reportData) {
-        console.log(`   ❌ Failed to generate report`);
+        const errorMsg = 'Failed to generate report';
+        console.log(`   ❌ ${errorMsg}`);
         this.stats.failedSends++;
-        return;
+        result.status = 'error';
+        result.error = errorMsg;
+        return result;
       }
 
       console.log(`   ✓ Report generated: ${(reportData.pdfBuffer.length / 1024).toFixed(1)} KB`);
@@ -240,16 +273,29 @@ class EmailSchedulerService {
 
       this.stats.successfulSends += successCount;
       this.stats.failedSends += failCount;
+      
+      result.emailsSent = successCount;
+      result.emailsFailed = failCount;
+      result.status = successCount > 0 ? 'success' : 'error';
+      
+      if (failCount > 0 && successCount === 0) {
+        result.error = `All ${failCount} email(s) failed to send`;
+      }
 
       // Update schedule timestamps
       if (successCount > 0) {
         await this.updateScheduleTimestamps(schedule);
         console.log(`   ✓ Schedule updated for next run`);
       }
+      
+      return result;
 
     } catch (error) {
       console.error(`   ❌ Error processing schedule ${schedule.id}:`, error);
       this.stats.failedSends++;
+      result.status = 'error';
+      result.error = error.message;
+      return result;
     }
   }
 
@@ -502,10 +548,11 @@ class EmailSchedulerService {
   /**
    * Manually run scheduler, processing ALL enabled schedules (not just due ones)
    * This is for manual testing/triggering
+   * @returns {Array} Array of schedule results
    */
   async runNow() {
     console.log('⏰ Manual scheduler trigger - processing ALL enabled schedules...');
-    await this.processSchedules(true); // Force process all schedules
+    return await this.processSchedules(true); // Force process all schedules
   }
 }
 
