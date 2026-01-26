@@ -24,10 +24,9 @@ class EmailConfigService {
     try {
       const connectionConfig = {
         connectionString: process.env.DATABASE_URL,
-        // SSL required for Render PostgreSQL in production
-        ssl: process.env.NODE_ENV === 'production' 
-          ? { rejectUnauthorized: false } 
-          : false,
+        // SSL required for Render PostgreSQL (both production and development)
+        // Render databases always require SSL connections
+        ssl: { rejectUnauthorized: false },
         // Connection pool settings
         max: 20, // Maximum number of clients
         idleTimeoutMillis: 30000,
