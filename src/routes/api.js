@@ -903,16 +903,32 @@ function createApiRoutes(storageService, bigQueryService) {
         
         for (const region of regionGroups) {
           console.log(`\n   Processing Region: ${region.regionLabel}`);
-          
-          // Get all customer IDs for this region
-          const regionCustomerIds = region.districts.flatMap(d => 
+
+          // Get all customer IDs for this region (used for district/facility filtering)
+          const regionCustomerIds = region.districts.flatMap(d =>
             d.customers.map(c => c.customer_internal_id)
           );
-          
-          // Filter data for this region
-          const regionMonthData = accountService.filterDataByCustomers(allCustomersMonthData, regionCustomerIds);
-          const regionYtdData = accountService.filterDataByCustomers(allCustomersYtdData, regionCustomerIds);
-          
+
+          // Query BigQuery directly for region summary using region_internal_id AND subsidiary_internal_id
+          // This ensures the region total matches the sum of all transactions for this region within the subsidiary
+          console.log(`      Querying BigQuery for region summary (region_internal_id=${region.regionInternalId}, subsidiary_internal_id=${Array.isArray(subsidiaryId) ? subsidiaryId.join(',') : subsidiaryId})...`);
+          const regionMonthData = await bigQueryService.getPLData({
+            hierarchy: 'region',
+            regionId: region.regionInternalId,
+            subsidiaryId: subsidiaryId, // Supports both single ID and array (for subsidiary tags)
+            date,
+            accountConfig,
+            ytd: false
+          });
+          const regionYtdData = await bigQueryService.getPLData({
+            hierarchy: 'region',
+            regionId: region.regionInternalId,
+            subsidiaryId: subsidiaryId,
+            date,
+            accountConfig,
+            ytd: true
+          });
+
           // Region summaries don't show census (only individual facilities do)
           const regionMeta = {
             typeLabel: 'Region',

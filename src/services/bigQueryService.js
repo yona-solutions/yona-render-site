@@ -121,11 +121,18 @@ class BigQueryService {
       // Region filtering - can optionally include subsidiary filter
       whereClause = 'region_internal_id = @regionId';
       queryParams.regionId = regionId;
-      
-      // Add subsidiary filter if provided (region + subsidiary combination)
+
+      // Add subsidiary filter if provided (supports both single ID and array for subsidiary tags)
       if (subsidiaryId) {
-        whereClause += ' AND subsidiary_internal_id = @subsidiaryId';
-        queryParams.subsidiaryId = subsidiaryId;
+        const subsidiaryIds = Array.isArray(subsidiaryId) ? subsidiaryId : [subsidiaryId];
+        if (subsidiaryIds.length === 1) {
+          whereClause += ' AND subsidiary_internal_id = @subsidiaryId';
+          queryParams.subsidiaryId = subsidiaryIds[0];
+        } else {
+          // Multiple subsidiaries (tag) - use IN clause
+          whereClause += ' AND subsidiary_internal_id IN UNNEST(@subsidiaryIds)';
+          queryParams.subsidiaryIds = subsidiaryIds;
+        }
       }
     } else if (hierarchy === 'subsidiary' && subsidiaryId) {
       // Handle both single subsidiary ID and array of IDs (for subsidiary tags)
