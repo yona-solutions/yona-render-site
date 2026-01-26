@@ -1,0 +1,7 @@
+# Ignore everything except what we need
+.git
+.gitignore
+node_modules
+*.md
+*.log
+.env*

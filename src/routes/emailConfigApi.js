@@ -1,6 +1,6 @@
 /**
  * Email Configuration API Routes
- * 
+ *
  * RESTful API endpoints for managing email groups and report schedules.
  */
 
@@ -11,6 +11,43 @@ const mockEmailData = require('../services/mockEmailData');
 const emailService = require('../services/emailService');
 const bigQueryService = require('../services/bigQueryService');
 const emailSchedulerService = require('../services/emailSchedulerService');
+
+// ============================================
+// API Key Authentication Middleware
+// ============================================
+
+/**
+ * Middleware to verify API key for protected endpoints
+ * Checks for X-API-Key header against SCHEDULER_API_KEY env var
+ */
+const requireApiKey = (req, res, next) => {
+  const apiKey = req.headers['x-api-key'];
+  const expectedKey = process.env.SCHEDULER_API_KEY;
+
+  if (!expectedKey) {
+    console.error('SCHEDULER_API_KEY not configured');
+    return res.status(500).json({
+      error: 'Server configuration error',
+      message: 'API key authentication not configured'
+    });
+  }
+
+  if (!apiKey) {
+    return res.status(401).json({
+      error: 'Unauthorized',
+      message: 'Missing X-API-Key header'
+    });
+  }
+
+  if (apiKey !== expectedKey) {
+    return res.status(403).json({
+      error: 'Forbidden',
+      message: 'Invalid API key'
+    });
+  }
+
+  next();
+};
 
 // ============================================
 // Email Groups API
@@ -785,17 +822,69 @@ router.post('/report-schedules/:id/send-email', async (req, res) => {
 
     // Send email with PDF attachment (using recipient from request body)
     console.log(`   Sending to: ${recipientEmail}`);
-    const result = await emailService.sendPDFEmail(schedule, pdfBuffer, recipientEmail, latestDate);
+    let emailSuccess = false;
+    let emailError = null;
 
-    console.log(`✅ Email sent successfully`);
+    try {
+      const result = await emailService.sendPDFEmail(schedule, pdfBuffer, recipientEmail, latestDate);
+      emailSuccess = true;
+      console.log(`✅ Email sent successfully`);
 
-    res.json({
-      success: true,
-      message: `Email sent successfully to ${result.recipient}`,
-      recipient: result.recipient,
-      subject: result.subject,
-      filename: result.filename
-    });
+      // Log the test run
+      if (emailConfigService.isAvailable()) {
+        await emailConfigService.createRunLog({
+          schedule_id: schedule.id,
+          template_name: schedule.template_name,
+          template_type: schedule.template_type,
+          process: schedule.process,
+          entity_id: entityId,
+          entity_name: entityName,
+          report_date: latestDate,
+          status: 'success',
+          emails_sent: 1,
+          emails_failed: 0,
+          recipient_emails: [recipientEmail],
+          trigger_type: 'manual',
+          pdf_size_bytes: pdfBuffer.length
+        });
+
+        // Update last_run_manual timestamp
+        await emailConfigService.updateScheduleSendTimestamps(schedule.id, new Date(), null, 'manual');
+        console.log(`   Updated last_run_manual timestamp`);
+      }
+
+      res.json({
+        success: true,
+        message: `Email sent successfully to ${result.recipient}`,
+        recipient: result.recipient,
+        subject: result.subject,
+        filename: result.filename
+      });
+    } catch (sendError) {
+      emailError = sendError;
+
+      // Log the failed test run
+      if (emailConfigService.isAvailable()) {
+        await emailConfigService.createRunLog({
+          schedule_id: schedule.id,
+          template_name: schedule.template_name,
+          template_type: schedule.template_type,
+          process: schedule.process,
+          entity_id: entityId,
+          entity_name: entityName,
+          report_date: latestDate,
+          status: 'failed',
+          error_message: sendError.message,
+          emails_sent: 0,
+          emails_failed: 1,
+          recipient_emails: [recipientEmail],
+          trigger_type: 'test',
+          pdf_size_bytes: pdfBuffer.length
+        });
+      }
+
+      throw sendError;
+    }
 
   } catch (error) {
     console.error('❌ Error sending email:', error);
@@ -942,6 +1031,340 @@ function buildPDFHTML(content) {
 }
 
 // ============================================
+// Process Schedule API (for Cloud Function)
+// ============================================
+
+/**
+ * POST /api/report-schedules/:id/process
+ * Process a single schedule - generate PDF and send to all recipients in email groups
+ * Protected by API key authentication for use by Cloud Functions
+ */
+router.post('/report-schedules/:id/process', requireApiKey, async (req, res) => {
+  const startTime = Date.now();
+  const { id } = req.params;
+  const { triggerType = 'scheduled' } = req.body;
+
+  console.log(`\n📧 Processing schedule ${id} (trigger: ${triggerType})`);
+
+  try {
+    // Get report schedule
+    let schedule;
+    if (!emailConfigService.isAvailable()) {
+      schedule = mockEmailData.getMockReportSchedule(parseInt(id));
+    } else {
+      schedule = await emailConfigService.getReportSchedule(parseInt(id));
+    }
+
+    if (!schedule) {
+      return res.status(404).json({
+        error: 'Report schedule not found',
+        scheduleId: parseInt(id),
+        status: 'error'
+      });
+    }
+
+    // Check if schedule is enabled
+    if (schedule.enabled === false) {
+      return res.status(400).json({
+        error: 'Schedule is disabled',
+        scheduleId: parseInt(id),
+        scheduleName: schedule.template_name,
+        status: 'skipped',
+        skipReason: 'Schedule is disabled'
+      });
+    }
+
+    // Validate schedule configuration
+    if (!schedule.template_type) {
+      return res.status(400).json({
+        error: 'Invalid schedule configuration',
+        message: 'Template type is required',
+        scheduleId: parseInt(id),
+        scheduleName: schedule.template_name,
+        status: 'skipped',
+        skipReason: 'Missing template_type'
+      });
+    }
+
+    if (!schedule.process) {
+      return res.status(400).json({
+        error: 'Invalid schedule configuration',
+        message: 'Process (standard/operational) is required',
+        scheduleId: parseInt(id),
+        scheduleName: schedule.template_name,
+        status: 'skipped',
+        skipReason: 'Missing process'
+      });
+    }
+
+    // Get entity ID based on template type
+    let entityId, entityName;
+    if (schedule.template_type === 'district' && schedule.district_id) {
+      entityId = schedule.district_id;
+      entityName = schedule.district_name || 'District';
+    } else if (schedule.template_type === 'region' && schedule.region_id) {
+      entityId = schedule.region_id;
+      entityName = schedule.region_name || 'Region';
+    } else if (schedule.template_type === 'subsidiary' && schedule.subsidiary_id) {
+      entityId = schedule.subsidiary_id;
+      entityName = schedule.subsidiary_name || 'Subsidiary';
+    } else {
+      return res.status(400).json({
+        error: 'Invalid schedule configuration',
+        message: `Please select a ${schedule.template_type} before sending email`,
+        scheduleId: parseInt(id),
+        scheduleName: schedule.template_name,
+        status: 'skipped',
+        skipReason: `No ${schedule.template_type} selected`
+      });
+    }
+
+    // Get all email groups for this schedule
+    const emailGroupIds = schedule.email_group_ids || [schedule.email_group_id].filter(Boolean);
+
+    if (emailGroupIds.length === 0) {
+      return res.status(400).json({
+        error: 'No email groups assigned',
+        scheduleId: parseInt(id),
+        scheduleName: schedule.template_name,
+        status: 'skipped',
+        skipReason: 'No email groups assigned'
+      });
+    }
+
+    // Check if email service is available
+    if (!emailService.isAvailable()) {
+      return res.status(503).json({
+        error: 'Email service not configured',
+        message: 'SendGrid API key not configured',
+        scheduleId: parseInt(id),
+        scheduleName: schedule.template_name,
+        status: 'error'
+      });
+    }
+
+    // Get all recipients from all email groups
+    const allRecipients = new Set();
+    for (const groupId of emailGroupIds) {
+      const contacts = await emailConfigService.getEmailGroupContacts(groupId);
+      contacts.forEach(contact => allRecipients.add(contact.email));
+    }
+
+    if (allRecipients.size === 0) {
+      return res.status(400).json({
+        error: 'No recipients in email groups',
+        scheduleId: parseInt(id),
+        scheduleName: schedule.template_name,
+        status: 'skipped',
+        skipReason: 'No recipients in email groups'
+      });
+    }
+
+    console.log(`   Schedule: ${schedule.template_name}`);
+    console.log(`   Type: ${schedule.template_type} - ${entityName}`);
+    console.log(`   Process: ${schedule.process}`);
+    console.log(`   Recipients: ${allRecipients.size}`);
+
+    // Get latest available date
+    const datesResponse = await fetch('http://localhost:' + (process.env.PORT || 3000) + '/api/pl/dates');
+    const dates = await datesResponse.json();
+
+    if (!dates || dates.length === 0) {
+      return res.status(400).json({
+        error: 'No P&L data available',
+        message: 'Cannot generate report: no data available',
+        scheduleId: parseInt(id),
+        scheduleName: schedule.template_name,
+        status: 'error'
+      });
+    }
+
+    const latestDate = dates[0].time || dates[0].formatted;
+    console.log(`   Using date: ${latestDate}`);
+
+    // Fetch P&L data
+    const dataUrl = `http://localhost:${process.env.PORT || 3000}/api/pl/data?hierarchy=${schedule.template_type}&selectedId=${encodeURIComponent(entityId)}&date=${latestDate}&plType=${schedule.process}`;
+    console.log(`   Fetching data...`);
+
+    const dataResponse = await fetch(dataUrl);
+
+    if (!dataResponse.ok) {
+      throw new Error(`Failed to fetch P&L data: ${dataResponse.status}`);
+    }
+
+    const jsonData = await dataResponse.json();
+    const htmlContent = jsonData.html;
+
+    if (!htmlContent || !htmlContent.trim()) {
+      return res.status(400).json({
+        error: 'No report data available',
+        message: 'Cannot generate PDF: no data for selected configuration',
+        scheduleId: parseInt(id),
+        scheduleName: schedule.template_name,
+        status: 'error'
+      });
+    }
+
+    // Parse and filter HTML
+    const parser = new (require('jsdom').JSDOM)(htmlContent).window.DOMParser;
+    const doc = new parser().parseFromString(`<div id="root">${htmlContent}</div>`, "text/html");
+    const root = doc.getElementById("root");
+
+    // Helper function to check if a report has non-zero income
+    function hasNonZeroIncome(container) {
+      const table = container.querySelector("table");
+      if (!table) return false;
+
+      const rows = Array.from(table.querySelectorAll("tr"));
+      for (const row of rows) {
+        const cells = Array.from(row.querySelectorAll("td"));
+        if (cells.length > 0 && cells[0].textContent.trim() === "Income") {
+          if (cells.length > 1) {
+            const valueText = cells[1].textContent.trim();
+            const numValue = parseAccountingToNumber(valueText);
+            return numValue !== 0;
+          }
+        }
+      }
+      return false;
+    }
+
+    function parseAccountingToNumber(str) {
+      if (!str || str === "—" || str === "-") return 0;
+      let cleaned = str.replace(/[$,\s]/g, "");
+      if (cleaned.startsWith("(") && cleaned.endsWith(")")) {
+        cleaned = "-" + cleaned.slice(1, -1);
+      }
+      const num = parseFloat(cleaned);
+      return isNaN(num) ? 0 : num;
+    }
+
+    // Filter pages
+    const kept = [];
+    root.querySelectorAll(".pnl-report-container").forEach(container => {
+      if (hasNonZeroIncome(container)) {
+        kept.push(container.outerHTML);
+      }
+    });
+
+    const filteredHtmlContent = kept.length ? kept.join("\n") :
+      (root.querySelector(".pnl-report-container")?.outerHTML || htmlContent);
+
+    console.log(`   Filtered to ${kept.length} reports with non-zero income`);
+
+    // Build complete PDF HTML
+    const fullHTML = buildPDFHTML(filteredHtmlContent);
+
+    console.log(`   Generating PDF...`);
+
+    // Convert to PDF using PDFShift
+    const pdfResponse = await fetch('https://api.pdfshift.io/v3/convert/pdf', {
+      method: 'POST',
+      headers: {
+        'X-API-Key': 'sk_3df748acf1ce265988e07e04544b6452ece1b20e',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        source: fullHTML,
+        landscape: false,
+        use_print: true,
+        margin: { top: 10, bottom: 10, left: 10, right: 10 }
+      })
+    });
+
+    if (!pdfResponse.ok) {
+      throw new Error(`PDF generation failed: ${pdfResponse.status}`);
+    }
+
+    const pdfBuffer = Buffer.from(await pdfResponse.arrayBuffer());
+    console.log(`   PDF generated: ${(pdfBuffer.length / 1024).toFixed(1)} KB`);
+
+    // Send to all recipients
+    let successCount = 0;
+    let failCount = 0;
+    const recipientResults = [];
+
+    console.log(`   Sending emails to ${allRecipients.size} recipient(s)...`);
+
+    for (const recipientEmail of allRecipients) {
+      try {
+        await emailService.sendPDFEmail(schedule, pdfBuffer, recipientEmail, latestDate);
+        successCount++;
+        recipientResults.push({ email: recipientEmail, status: 'sent' });
+        console.log(`      ✓ Sent to ${recipientEmail}`);
+      } catch (error) {
+        failCount++;
+        recipientResults.push({ email: recipientEmail, status: 'failed', error: error.message });
+        console.log(`      ✗ Failed: ${recipientEmail} - ${error.message}`);
+      }
+    }
+
+    // Determine status
+    let status;
+    let errorMessage = null;
+    if (successCount === 0) {
+      status = 'failed';
+      errorMessage = `All ${failCount} email(s) failed to send`;
+    } else if (failCount > 0) {
+      status = 'partial';
+    } else {
+      status = 'success';
+    }
+
+    // Log the run
+    if (emailConfigService.isAvailable()) {
+      await emailConfigService.createRunLog({
+        schedule_id: schedule.id,
+        template_name: schedule.template_name,
+        template_type: schedule.template_type,
+        process: schedule.process,
+        entity_id: entityId,
+        entity_name: entityName,
+        report_date: latestDate,
+        status: status,
+        error_message: errorMessage,
+        emails_sent: successCount,
+        emails_failed: failCount,
+        recipient_emails: Array.from(allRecipients),
+        trigger_type: triggerType,
+        pdf_size_bytes: pdfBuffer.length
+      });
+
+      // Update schedule timestamps
+      if (successCount > 0) {
+        await emailConfigService.updateScheduleSendTimestamps(schedule.id, new Date(), null, triggerType);
+      }
+    }
+
+    const durationMs = Date.now() - startTime;
+    console.log(`   ✅ Complete: ${successCount} sent, ${failCount} failed (${durationMs}ms)`);
+
+    res.json({
+      success: status !== 'failed',
+      scheduleId: parseInt(id),
+      scheduleName: schedule.template_name,
+      status,
+      emailsSent: successCount,
+      emailsFailed: failCount,
+      reportDate: latestDate,
+      pdfSizeBytes: pdfBuffer.length,
+      durationMs,
+      error: errorMessage,
+      recipients: recipientResults
+    });
+
+  } catch (error) {
+    console.error(`❌ Error processing schedule ${id}:`, error);
+    res.status(500).json({
+      error: 'Failed to process schedule',
+      message: error.message,
+      scheduleId: parseInt(id),
+      status: 'error'
+    });
+  }
+});
+
+// ============================================
 // Email Scheduler API
 // ============================================
 
@@ -1013,6 +1436,131 @@ router.post('/email-scheduler/run-now', async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Failed to trigger scheduler',
+      message: error.message
+    });
+  }
+});
+
+// ============================================
+// Run Logs API
+// ============================================
+
+/**
+ * GET /api/run-logs
+ * Get all run logs with optional filters
+ */
+router.get('/run-logs', async (req, res) => {
+  try {
+    if (!emailConfigService.isAvailable()) {
+      return res.status(503).json({
+        error: 'Database not available',
+        message: 'Run logs require database connection'
+      });
+    }
+
+    const { limit, offset, schedule_id, status, template_name } = req.query;
+
+    const logs = await emailConfigService.getRunLogs({
+      limit: limit ? parseInt(limit) : 100,
+      offset: offset ? parseInt(offset) : 0,
+      schedule_id: schedule_id ? parseInt(schedule_id) : undefined,
+      status,
+      template_name
+    });
+
+    res.json(logs);
+  } catch (error) {
+    console.error('Error fetching run logs:', error);
+    res.status(500).json({
+      error: 'Failed to fetch run logs',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/run-logs/stats
+ * Get run log statistics
+ */
+router.get('/run-logs/stats', async (req, res) => {
+  try {
+    if (!emailConfigService.isAvailable()) {
+      return res.status(503).json({
+        error: 'Database not available',
+        message: 'Run logs require database connection'
+      });
+    }
+
+    const stats = await emailConfigService.getRunLogStats();
+    res.json(stats);
+  } catch (error) {
+    console.error('Error fetching run log stats:', error);
+    res.status(500).json({
+      error: 'Failed to fetch run log statistics',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/run-logs/:id
+ * Get a single run log by ID
+ */
+router.get('/run-logs/:id', async (req, res) => {
+  try {
+    if (!emailConfigService.isAvailable()) {
+      return res.status(503).json({
+        error: 'Database not available',
+        message: 'Run logs require database connection'
+      });
+    }
+
+    const { id } = req.params;
+    const log = await emailConfigService.getRunLog(parseInt(id));
+
+    if (!log) {
+      return res.status(404).json({
+        error: 'Run log not found'
+      });
+    }
+
+    res.json(log);
+  } catch (error) {
+    console.error('Error fetching run log:', error);
+    res.status(500).json({
+      error: 'Failed to fetch run log',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * DELETE /api/run-logs/cleanup
+ * Delete old run logs (older than specified days)
+ */
+router.delete('/run-logs/cleanup', async (req, res) => {
+  try {
+    if (!emailConfigService.isAvailable()) {
+      return res.status(503).json({
+        error: 'Database not available',
+        message: 'Run logs require database connection'
+      });
+    }
+
+    const { days } = req.query;
+    const daysToKeep = days ? parseInt(days) : 90;
+
+    const deletedCount = await emailConfigService.deleteOldRunLogs(daysToKeep);
+
+    res.json({
+      success: true,
+      message: `Deleted ${deletedCount} run logs older than ${daysToKeep} days`,
+      deletedCount
+    });
+  } catch (error) {
+    console.error('Error cleaning up run logs:', error);
+    res.status(500).json({
+      error: 'Failed to cleanup run logs',
       message: error.message
     });
   }
