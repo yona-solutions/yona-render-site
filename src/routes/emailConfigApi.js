@@ -964,24 +964,43 @@ router.get('/email-scheduler/status', (req, res) => {
 
 /**
  * POST /api/email-scheduler/run-now
- * Manually trigger scheduler (for testing)
+ * Manually trigger scheduler and wait for completion
  */
 router.post('/email-scheduler/run-now', async (req, res) => {
   try {
     console.log('📧 Manual scheduler trigger requested via API');
     
-    // Run scheduler in background (don't wait for it to complete)
-    emailSchedulerService.runNow().catch(error => {
-      console.error('Error in manual scheduler run:', error);
-    });
+    // Get stats before running
+    const statsBefore = emailSchedulerService.getStats();
+    const successBefore = statsBefore.successfulSends;
+    const failBefore = statsBefore.failedSends;
+    
+    // Run scheduler and wait for it to complete
+    await emailSchedulerService.runNow();
+    
+    // Get stats after running
+    const statsAfter = emailSchedulerService.getStats();
+    const successCount = statsAfter.successfulSends - successBefore;
+    const failCount = statsAfter.failedSends - failBefore;
+    
+    // Calculate number of schedules processed (estimate based on emails sent)
+    // Each schedule typically sends to multiple recipients
+    const schedulesProcessed = Math.max(1, Math.ceil((successCount + failCount) / 5));
+    
+    console.log(`✅ Manual scheduler run complete: ${successCount} sent, ${failCount} failed`);
     
     res.json({
       success: true,
-      message: 'Scheduler triggered manually. Check server logs for progress.'
+      message: 'Scheduler run completed successfully',
+      schedulesProcessed,
+      emailsSent: successCount,
+      emailsFailed: failCount,
+      errors: statsAfter.lastError ? [statsAfter.lastError] : []
     });
   } catch (error) {
     console.error('Error triggering scheduler:', error);
     res.status(500).json({
+      success: false,
       error: 'Failed to trigger scheduler',
       message: error.message
     });

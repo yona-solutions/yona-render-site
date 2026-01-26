@@ -99,18 +99,26 @@
       background: white;
       padding: 20px 35px;
       border-bottom: 1px solid #e2e8f0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
     }
 
-    .header h1 {
+    .header-left h1 {
       font-size: 24px;
       color: #1a202c;
       font-weight: 600;
       margin-bottom: 4px;
     }
 
-    .header p {
+    .header-left p {
       color: #718096;
       font-size: 14px;
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 12px;
     }
 
     /* Content Area */
@@ -186,6 +194,22 @@
 
     .btn-secondary:hover {
       background: #cbd5e0;
+    }
+
+    .btn-success {
+      background: #48bb78;
+      color: white;
+    }
+
+    .btn-success:hover {
+      background: #38a169;
+      box-shadow: 0 2px 4px rgba(72, 187, 120, 0.2);
+    }
+
+    .btn-success:disabled {
+      background: #9ae6b4;
+      cursor: not-allowed;
+      opacity: 0.6;
     }
 
     .btn-small {
@@ -975,8 +999,15 @@
   <div class="main-content">
     <!-- Header -->
     <div class="header">
-      <h1>📧 Email Configuration</h1>
-      <p>Configure automated report schedules and manage email distribution lists</p>
+      <div class="header-left">
+        <h1>📧 Email Configuration</h1>
+        <p>Configure automated report schedules and manage email distribution lists</p>
+      </div>
+      <div class="header-actions">
+        <button class="btn btn-success" id="runAllSchedulesBtn" onclick="runAllSchedulesNow()">
+          ▶️ Run All Schedules Now
+        </button>
+      </div>
     </div>
 
     <!-- Content -->
@@ -2839,6 +2870,71 @@
         document.getElementById('step3').textContent = 'Processing report';
         document.getElementById('step4').textContent = 'Converting to PDF';
         document.getElementById('step5').textContent = 'Downloading file';
+      }
+    }
+
+    // ============================================
+    // Scheduler Functions
+    // ============================================
+    
+    async function runAllSchedulesNow() {
+      const btn = document.getElementById('runAllSchedulesBtn');
+      const originalText = btn.innerHTML;
+      
+      if (!confirm('This will immediately process ALL report schedules and send emails to all recipients. Continue?')) {
+        return;
+      }
+      
+      try {
+        // Disable button and show loading state
+        btn.disabled = true;
+        btn.innerHTML = '⏳ Processing...';
+        
+        console.log('🚀 Manually triggering scheduler...');
+        
+        // Trigger the scheduler
+        const response = await fetch('/api/email-scheduler/run-now', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Failed to run scheduler: ${response.status} ${response.statusText}`);
+        }
+        
+        const result = await response.json();
+        console.log('✅ Scheduler completed:', result);
+        
+        // Show success message
+        btn.innerHTML = '✅ Complete!';
+        
+        let message = 'Scheduler run completed!\n\n';
+        message += `📊 Total schedules processed: ${result.schedulesProcessed}\n`;
+        message += `✉️ Emails sent: ${result.emailsSent}\n`;
+        
+        if (result.errors && result.errors.length > 0) {
+          message += `\n⚠️ Errors encountered:\n`;
+          result.errors.forEach(err => {
+            message += `  • ${err}\n`;
+          });
+        }
+        
+        alert(message);
+        
+        // Refresh the schedules table to show updated timestamps
+        await loadReportSchedules();
+        
+      } catch (error) {
+        console.error('❌ Error running scheduler:', error);
+        alert('Failed to run scheduler: ' + error.message);
+      } finally {
+        // Reset button after 2 seconds
+        setTimeout(() => {
+          btn.disabled = false;
+          btn.innerHTML = originalText;
+        }, 2000);
       }
     }
 
