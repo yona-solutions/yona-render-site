@@ -16,6 +16,7 @@ class EmailSchedulerService {
     this.lastRunTime = null;
     this.stats = {
       totalRuns: 0,
+      schedulesProcessed: 0,
       successfulSends: 0,
       failedSends: 0,
       lastError: null
@@ -84,10 +85,11 @@ class EmailSchedulerService {
 
   /**
    * Main processing function - check and send due schedules
+   * @param {boolean} forceAll - If true, process ALL schedules regardless of due date
    */
-  async processSchedules() {
+  async processSchedules(forceAll = false) {
     console.log('\n⏰ ======================================');
-    console.log('⏰ Email Scheduler: Checking for due schedules');
+    console.log(`⏰ Email Scheduler: ${forceAll ? 'Processing ALL schedules' : 'Checking for due schedules'}`);
     console.log('⏰ Time:', new Date().toLocaleString());
     console.log('⏰ ======================================\n');
 
@@ -109,23 +111,33 @@ class EmailSchedulerService {
         // Still process mock schedules for testing
       }
 
-      // Get all schedules that are due
-      const dueSchedules = await emailConfigService.getSchedulesDueForSend();
+      // Get schedules to process
+      let schedules;
+      if (forceAll) {
+        // Get ALL enabled schedules
+        schedules = await emailConfigService.getReportSchedules();
+        schedules = schedules.filter(s => s.enabled !== false);
+        console.log(`📧 Found ${schedules.length} enabled schedule(s) to process (forced run)`);
+      } else {
+        // Get only schedules that are due
+        schedules = await emailConfigService.getSchedulesDueForSend();
+        console.log(`📧 Found ${schedules.length} schedule(s) due for sending`);
+      }
       
-      if (dueSchedules.length === 0) {
-        console.log('✓ No schedules due at this time');
+      if (schedules.length === 0) {
+        console.log('✓ No schedules to process at this time');
         return;
       }
 
-      console.log(`📧 Found ${dueSchedules.length} schedule(s) due for sending:`);
-      dueSchedules.forEach(s => {
+      schedules.forEach(s => {
         console.log(`   - ${s.template_name} (ID: ${s.id})`);
       });
       console.log('');
 
-      // Process each due schedule
-      for (const schedule of dueSchedules) {
+      // Process each schedule
+      for (const schedule of schedules) {
         await this.processSchedule(schedule);
+        this.stats.schedulesProcessed++;
       }
 
       console.log('\n✅ Scheduler run complete\n');
@@ -487,9 +499,13 @@ class EmailSchedulerService {
   /**
    * Manually trigger processing (for testing)
    */
+  /**
+   * Manually run scheduler, processing ALL enabled schedules (not just due ones)
+   * This is for manual testing/triggering
+   */
   async runNow() {
-    console.log('⏰ Manual scheduler trigger...');
-    await this.processSchedules();
+    console.log('⏰ Manual scheduler trigger - processing ALL enabled schedules...');
+    await this.processSchedules(true); // Force process all schedules
   }
 }
 

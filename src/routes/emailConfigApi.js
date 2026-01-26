@@ -972,6 +972,7 @@ router.post('/email-scheduler/run-now', async (req, res) => {
     
     // Get stats before running
     const statsBefore = emailSchedulerService.getStats();
+    const schedulesProcessedBefore = statsBefore.schedulesProcessed || 0;
     const successBefore = statsBefore.successfulSends;
     const failBefore = statsBefore.failedSends;
     
@@ -980,14 +981,11 @@ router.post('/email-scheduler/run-now', async (req, res) => {
     
     // Get stats after running
     const statsAfter = emailSchedulerService.getStats();
+    const schedulesProcessed = (statsAfter.schedulesProcessed || 0) - schedulesProcessedBefore;
     const successCount = statsAfter.successfulSends - successBefore;
     const failCount = statsAfter.failedSends - failBefore;
     
-    // Calculate number of schedules processed (estimate based on emails sent)
-    // Each schedule typically sends to multiple recipients
-    const schedulesProcessed = Math.max(1, Math.ceil((successCount + failCount) / 5));
-    
-    console.log(`✅ Manual scheduler run complete: ${successCount} sent, ${failCount} failed`);
+    console.log(`✅ Manual scheduler run complete: ${schedulesProcessed} schedules, ${successCount} sent, ${failCount} failed`);
     
     res.json({
       success: true,
