@@ -760,71 +760,113 @@ class StorageService {
       regionMap[regionId].customers.push(customer);
     }
     
-    // Second pass: Within each region, group customers by district
+    // Second pass: Within each region, group customers by district (with tag support)
+    // District tags aggregate multiple districts into a single group
+    // Same logic as groupCustomersByDistrict() for consistency
     for (const [regionId, regionData] of Object.entries(regionMap)) {
-      const districtMap = {};
-      const districtOrder = {};
-      let orderIndex = 0;
-      
-      // Build district map for this region
+      // Collect all unique district tags and districts
+      const districtTags = new Set();
+      const districtConfigs = {};
+
       for (const [configId, config] of Object.entries(customerConfig)) {
-        if (config.isDistrict && !config.districtReportingExcluded && !config.displayExcluded) {
-          districtOrder[configId] = orderIndex++;
-          districtMap[configId] = {
-            districtId: configId,
-            districtLabel: config.label,
-            customers: [],
-            order: districtOrder[configId]
-          };
+        if (config.isDistrict && !config.displayExcluded) {
+          districtConfigs[configId] = config;
+          const tags = config.tags || [];
+          tags.forEach(tag => districtTags.add(tag));
         }
       }
-      
-      // Assign customers to districts
+
+      // Build map of tag -> district IDs
+      const tagToDistricts = {};
+      for (const tag of districtTags) {
+        tagToDistricts[tag] = [];
+        for (const [districtId, config] of Object.entries(districtConfigs)) {
+          const tags = config.tags || [];
+          if (tags.includes(tag)) {
+            tagToDistricts[tag].push(districtId);
+          }
+        }
+      }
+
+      // Track which districts have been assigned to tags
+      const districtsInTags = new Set();
+      for (const districtIds of Object.values(tagToDistricts)) {
+        districtIds.forEach(id => districtsInTags.add(id));
+      }
+
+      // Build groups (tags + individual districts not in any tag)
+      const groups = [];
+      let orderIndex = 0;
+
+      // First, create groups for district tags
+      for (const [tag, districtIds] of Object.entries(tagToDistricts)) {
+        groups.push({
+          districtId: `tag_${tag}`,
+          districtLabel: tag,
+          isTag: true,
+          districtIds: districtIds, // Array of district IDs in this tag
+          customers: [],
+          order: orderIndex++
+        });
+      }
+
+      // Then, create groups for individual districts NOT in any tag
+      // These should respect districtReportingExcluded
+      for (const [districtId, config] of Object.entries(districtConfigs)) {
+        if (!districtsInTags.has(districtId) && !config.districtReportingExcluded) {
+          groups.push({
+            districtId: districtId,
+            districtLabel: config.label,
+            isTag: false,
+            districtIds: [districtId], // Single district
+            customers: [],
+            order: orderIndex++
+          });
+        }
+      }
+
+      // Assign customers to groups
       for (const customer of regionData.customers) {
         const customerId = customer.customer_internal_id;
         const customerConfigEntry = customerIdToConfig[customerId];
-        
+
         if (!customerConfigEntry) {
           console.warn(`⚠ Customer ${customerId} not found in customer_config.json`);
           continue;
         }
-        
+
         const parentDistrictId = customerConfigEntry.parent;
-        
+
         if (!parentDistrictId) {
           console.warn(`⚠ Customer ${customerId} has no parent district`);
           continue;
         }
-        
+
         // Check if parent is a district
         const parentConfig = customerConfig[parentDistrictId];
         if (!parentConfig?.isDistrict) {
           console.warn(`⚠ Customer ${customerId} parent ${parentDistrictId} is not a district`);
           continue;
         }
-        
-        // Initialize district if not in map (defensive)
-        if (!districtMap[parentDistrictId]) {
-          districtMap[parentDistrictId] = {
-            districtId: parentDistrictId,
-            districtLabel: parentConfig.label,
-            customers: [],
-            order: orderIndex++
-          };
+
+        // Find which group this customer belongs to
+        const group = groups.find(g => g.districtIds.includes(parentDistrictId));
+
+        if (group) {
+          group.customers.push({
+            ...customer,
+            configId: customerConfigEntry.configId
+          });
+        } else {
+          console.warn(`⚠ Customer ${customerId} parent district ${parentDistrictId} not in any group (likely excluded)`);
         }
-        
-        // Add customer to district
-        districtMap[parentDistrictId].customers.push({
-          ...customer,
-          configId: customerConfigEntry.configId
-        });
       }
-      
-      // Convert district map to array, filter out empty districts, and sort by order
-      regionData.districts = Object.values(districtMap)
-        .filter(district => district.customers.length > 0)
+
+      // Convert to array, filter out empty groups, and sort by order
+      regionData.districts = groups
+        .filter(group => group.customers.length > 0)
         .sort((a, b) => a.order - b.order);
-      
+
       // Remove the flat customers array as we've organized them into districts
       delete regionData.customers;
     }
