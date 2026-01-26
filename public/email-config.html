@@ -241,7 +241,7 @@
       width: 100%;
       border-collapse: collapse;
       font-size: 11px;
-      table-layout: fixed;
+      table-layout: auto;
     }
 
     thead {
@@ -252,22 +252,31 @@
 
     th {
       text-align: left;
-      padding: 6px 8px;
+      padding: 8px 12px;
       font-weight: 600;
       color: #4a5568;
       font-size: 10px;
       text-transform: uppercase;
       letter-spacing: 0.02em;
       white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+    }
+
+    /* Report schedules table specific th/td styling */
+    #reportSchedulesTable th,
+    #reportSchedulesTable td {
+      padding: 10px 14px;
     }
 
     td {
-      padding: 6px 8px;
+      padding: 8px 12px;
       border-bottom: 1px solid #e2e8f0;
       color: #2d3748;
       vertical-align: middle;
+    }
+
+    /* Ensure action buttons don't wrap */
+    td .btn {
+      white-space: nowrap;
     }
 
     tbody tr:hover {
@@ -515,6 +524,103 @@
     .icon-btn.success:hover {
       background: #f0fff4;
       color: #48bb78;
+    }
+
+    /* Resizable Columns */
+    th.resizable {
+      position: relative;
+    }
+
+    th .resize-handle {
+      position: absolute;
+      right: 0;
+      top: 0;
+      bottom: 0;
+      width: 5px;
+      cursor: col-resize;
+      background: transparent;
+      transition: background 0.15s ease;
+    }
+
+    th .resize-handle:hover,
+    th .resize-handle.resizing {
+      background: #5a6fd8;
+    }
+
+    /* Column Filter Styles */
+    .column-filter-row {
+      background: #f1f5f9;
+      border-bottom: 1px solid #e2e8f0;
+      display: none;
+    }
+
+    .column-filter-row.visible {
+      display: table-row;
+    }
+
+    .column-filter-row th {
+      padding: 6px 8px;
+      background: #f1f5f9;
+    }
+
+    .column-filter {
+      width: 100%;
+      padding: 4px 8px;
+      font-size: 11px;
+      border: 1px solid #cbd5e0;
+      border-radius: 4px;
+      background: white;
+    }
+
+    .column-filter:focus {
+      outline: none;
+      border-color: #5a6fd8;
+      box-shadow: 0 0 0 2px rgba(90, 111, 216, 0.1);
+    }
+
+    .column-filter option {
+      font-size: 11px;
+    }
+
+    .filter-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+      padding: 12px;
+      background: #f7fafc;
+      border-radius: 6px;
+      border: 1px solid #e2e8f0;
+    }
+
+    .filter-toolbar label {
+      font-size: 12px;
+      color: #4a5568;
+      font-weight: 500;
+    }
+
+    .clear-filters-btn {
+      margin-left: auto;
+    }
+
+    /* Process Badge */
+    .process-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .process-badge.standard {
+      background: #e6fffa;
+      color: #047857;
+    }
+
+    .process-badge.operational {
+      background: #fef3c7;
+      color: #92400e;
     }
 
     /* Loading State */
@@ -793,6 +899,88 @@
       background: #fef3c7 !important;
     }
 
+    /* Status Badges */
+    .status-badge {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 12px;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .status-badge.enabled {
+      background: #c6f6d5;
+      color: #22543d;
+    }
+
+    .status-badge.disabled {
+      background: #e2e8f0;
+      color: #718096;
+    }
+
+    /* Type Badges */
+    .type-badge {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 500;
+    }
+
+    .type-badge.district {
+      background: #e6f0f8;
+      color: #2d4a68;
+    }
+
+    .type-badge.region {
+      background: #faf5ff;
+      color: #553c9a;
+    }
+
+    .type-badge.subsidiary {
+      background: #fffaf0;
+      color: #c05621;
+    }
+
+    /* Mini Tags for Email Groups */
+    .mini-tag {
+      display: inline-block;
+      padding: 2px 6px;
+      background: #edf2f7;
+      color: #4a5568;
+      border-radius: 3px;
+      font-size: 10px;
+      margin-right: 4px;
+      margin-bottom: 2px;
+    }
+
+    /* Modal Email Group Tags */
+    .modal-email-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 8px;
+      background: #e6f0f8;
+      color: #2d4a68;
+      border-radius: 4px;
+      font-size: 12px;
+    }
+
+    .modal-email-tag button {
+      background: none;
+      border: none;
+      color: #718096;
+      cursor: pointer;
+      font-size: 14px;
+      padding: 0;
+      line-height: 1;
+    }
+
+    .modal-email-tag button:hover {
+      color: #e53e3e;
+    }
+
     /* Loading Modal */
     .loading-modal {
       position: fixed;
@@ -1023,7 +1211,7 @@
       <div class="nav-item" onclick="window.location.href='/'">P&L View</div>
       <div class="nav-item" onclick="window.location.href='/dimension-config'">Dimension Config</div>
       <div class="nav-item active">Email Config</div>
-      <div class="nav-item disabled">User Management</div>
+      <div class="nav-item" onclick="window.location.href='/run-log'">Run Log</div>
     </nav>
   </div>
 
@@ -1049,72 +1237,86 @@
         <div class="section-header">
           <div>
             <h2>🕐 Global Schedule Settings</h2>
-            <div class="subtitle">Set when all monthly reports will be sent</div>
+            <div class="subtitle">View and update when all monthly reports are sent</div>
           </div>
         </div>
-        
+
         <div style="padding: 20px;">
-          <div style="display: flex; gap: 20px; align-items: end; flex-wrap: wrap;">
-            <div style="flex: 0 0 200px;">
-              <label style="display: block; margin-bottom: 6px; color: #4a5568; font-weight: 500; font-size: 13px;">
-                Day of Month
-              </label>
-              <select id="globalDayOfMonth" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 14px; color: #2d3748; background: white;">
-                <option value="">Select day...</option>
-                <option value="1">1st of month</option>
-                <option value="2">2nd of month</option>
-                <option value="3">3rd of month</option>
-                <option value="4">4th of month</option>
-                <option value="5">5th of month</option>
-                <option value="6">6th of month</option>
-                <option value="7">7th of month</option>
-                <option value="8">8th of month</option>
-                <option value="9">9th of month</option>
-                <option value="10">10th of month</option>
-                <option value="11">11th of month</option>
-                <option value="12">12th of month</option>
-                <option value="13">13th of month</option>
-                <option value="14">14th of month</option>
-                <option value="15">15th of month</option>
-                <option value="16">16th of month</option>
-                <option value="17">17th of month</option>
-                <option value="18">18th of month</option>
-                <option value="19">19th of month</option>
-                <option value="20">20th of month</option>
-                <option value="21">21st of month</option>
-                <option value="22">22nd of month</option>
-                <option value="23">23rd of month</option>
-                <option value="24">24th of month</option>
-                <option value="25">25th of month</option>
-                <option value="26">26th of month</option>
-                <option value="27">27th of month</option>
-                <option value="28">28th of month</option>
-                <option value="-1">Last day of month</option>
-              </select>
+          <!-- Current Schedule Summary -->
+          <div id="currentScheduleSummary" style="margin-bottom: 20px; padding: 16px; background: linear-gradient(135deg, #e6f0f8 0%, #f0f4f8 100%); border-radius: 8px; border: 1px solid #d1e3f0;">
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+              <div style="font-size: 32px;">📅</div>
+              <div>
+                <div style="font-size: 13px; color: #4a5568; font-weight: 500;">Current Schedule</div>
+                <div id="currentScheduleText" style="font-size: 18px; color: #2d4a68; font-weight: 600;">Loading...</div>
+              </div>
             </div>
-            
-            <div style="flex: 0 0 150px;">
-              <label style="display: block; margin-bottom: 6px; color: #4a5568; font-weight: 500; font-size: 13px;">
-                Time of Day (EST)
-              </label>
-              <input type="time" id="globalTimeOfDay" style="width: 100%; padding: 8px 12px; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 14px; color: #2d3748;">
-              <div style="font-size: 11px; color: #718096; margin-top: 4px;">Eastern Time</div>
-            </div>
-            
-            <button class="btn btn-primary" onclick="applyGlobalSchedule()" style="height: 38px;">
-              📅 Apply to All Monthly Schedules
-            </button>
-            
-            <div id="globalScheduleStatus" style="flex: 1 0 200px; color: #718096; font-size: 13px; padding: 8px 0;">
-              <!-- Status messages will appear here -->
+            <div id="scheduleStats" style="display: flex; gap: 24px; font-size: 12px; color: #718096;">
+              <!-- Stats will be populated by JS -->
             </div>
           </div>
-          
-          <div style="margin-top: 16px; padding: 12px; background: #f7fafc; border-radius: 6px; color: #4a5568; font-size: 13px;">
-            💡 <strong>Tip:</strong> This will update all monthly report schedules to send on the same day and time. 
-            Individual schedules can still be customized in the table below.
-            <br><br>
-            🌍 <strong>Timezone:</strong> All times are in Eastern Time (EST/EDT). The server will automatically convert to UTC for scheduling.
+
+          <!-- Edit Schedule Form -->
+          <div style="background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px;">
+            <div style="font-size: 14px; font-weight: 600; color: #2d3748; margin-bottom: 16px;">Edit Schedule</div>
+
+            <div style="display: flex; gap: 16px; align-items: end; flex-wrap: wrap;">
+              <div style="flex: 0 0 180px;">
+                <label style="display: block; margin-bottom: 6px; color: #4a5568; font-weight: 500; font-size: 12px;">
+                  Day of Month
+                </label>
+                <select id="globalDayOfMonth" style="width: 100%; padding: 10px 12px; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 14px; color: #2d3748; background: white;">
+                  <option value="">Select day...</option>
+                  <option value="1">1st</option>
+                  <option value="2">2nd</option>
+                  <option value="3">3rd</option>
+                  <option value="4">4th</option>
+                  <option value="5">5th</option>
+                  <option value="6">6th</option>
+                  <option value="7">7th</option>
+                  <option value="8">8th</option>
+                  <option value="9">9th</option>
+                  <option value="10">10th</option>
+                  <option value="11">11th</option>
+                  <option value="12">12th</option>
+                  <option value="13">13th</option>
+                  <option value="14">14th</option>
+                  <option value="15">15th</option>
+                  <option value="16">16th</option>
+                  <option value="17">17th</option>
+                  <option value="18">18th</option>
+                  <option value="19">19th</option>
+                  <option value="20">20th</option>
+                  <option value="21">21st</option>
+                  <option value="22">22nd</option>
+                  <option value="23">23rd</option>
+                  <option value="24">24th</option>
+                  <option value="25">25th</option>
+                  <option value="26">26th</option>
+                  <option value="27">27th</option>
+                  <option value="28">28th</option>
+                </select>
+              </div>
+
+              <div style="flex: 0 0 140px;">
+                <label style="display: block; margin-bottom: 6px; color: #4a5568; font-weight: 500; font-size: 12px;">
+                  Time (EST)
+                </label>
+                <input type="time" id="globalTimeOfDay" value="08:00" style="width: 100%; padding: 10px 12px; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 14px; color: #2d3748;">
+              </div>
+
+              <button class="btn btn-primary" onclick="applyGlobalSchedule()" style="height: 42px; padding: 0 20px;">
+                ✓ Apply to All
+              </button>
+
+              <div id="globalScheduleStatus" style="flex: 1; min-width: 150px; font-size: 13px; padding: 8px 0;">
+                <!-- Status messages will appear here -->
+              </div>
+            </div>
+
+            <div style="margin-top: 12px; font-size: 11px; color: #718096;">
+              🌍 Times are in Eastern Time (EST/EDT). Changes apply to all monthly schedules.
+            </div>
           </div>
         </div>
       </div>
@@ -1164,26 +1366,8 @@
             <div class="subtitle">Configure automated P&L report delivery</div>
           </div>
           <div style="display: flex; gap: 12px;">
-            <button class="btn btn-primary" onclick="saveAllChanges()" id="saveAllBtn" style="display: none;">
-              💾 Save Changes
-            </button>
-          </div>
-        </div>
-        
-        <!-- Filter Bar -->
-        <div style="margin-bottom: 16px; padding: 12px; background: #f7fafc; border-radius: 6px; border: 1px solid #e2e8f0;">
-          <div style="display: flex; gap: 12px; align-items: center;">
-            <div style="flex: 1;">
-              <input 
-                type="text" 
-                id="scheduleFilterInput" 
-                placeholder="🔍 Filter by template name, type, or email group..." 
-                style="width: 100%; padding: 6px 12px; border: 1px solid #cbd5e0; border-radius: 4px; font-size: 12px;"
-                oninput="filterReportSchedules()"
-              />
-            </div>
-            <button class="btn btn-secondary btn-small" onclick="clearScheduleFilter()">
-              Clear
+            <button class="btn btn-secondary" onclick="toggleFilterRow()" id="filterToggleBtn">
+              🔍 Show Filters
             </button>
           </div>
         </div>
@@ -1192,15 +1376,53 @@
           <table id="reportSchedulesTable">
             <thead>
               <tr>
-                <th style="width: 120px;">Template Name <span style="color: #e53e3e;">*</span></th>
-                <th style="width: 85px;">Type <span style="color: #e53e3e;">*</span></th>
-                <th style="width: 75px;">Process <span style="color: #e53e3e;">*</span></th>
-                <th style="width: 120px;">District</th>
-                <th style="width: 100px;">Region</th>
-                <th style="width: 120px;">Subsidiary</th>
-                <th style="width: 110px;">Email Group</th>
-                <th style="width: 55px;">Enabled</th>
-                <th style="width: 65px;"></th>
+                <th class="resizable" style="width: 170px;">Template Name<span class="resize-handle"></span></th>
+                <th class="resizable" style="width: 100px;">Type<span class="resize-handle"></span></th>
+                <th class="resizable" style="width: 110px;">Process<span class="resize-handle"></span></th>
+                <th class="resizable" style="width: 190px;">Entity<span class="resize-handle"></span></th>
+                <th class="resizable" style="width: 110px;">Schedule<span class="resize-handle"></span></th>
+                <th class="resizable" style="width: 130px;">Email Groups<span class="resize-handle"></span></th>
+                <th class="resizable" style="width: 80px;">Status<span class="resize-handle"></span></th>
+                <th class="resizable" style="width: 130px;">Last Manual<span class="resize-handle"></span></th>
+                <th class="resizable" style="width: 130px;">Last Automated<span class="resize-handle"></span></th>
+                <th style="width: 85px; text-align: center;">Edit</th>
+                <th style="width: 135px; text-align: center;">Download</th>
+                <th style="width: 125px; text-align: center;">Email</th>
+                <th style="width: 95px; text-align: center;">Delete</th>
+              </tr>
+              <tr class="column-filter-row">
+                <th><input type="text" class="column-filter" id="filterTemplateName" placeholder="Filter..." onkeyup="applyColumnFilters()"></th>
+                <th>
+                  <select class="column-filter" id="filterType" onchange="applyColumnFilters()">
+                    <option value="">All</option>
+                    <option value="district">District</option>
+                    <option value="region">Region</option>
+                    <option value="subsidiary">Subsidiary</option>
+                  </select>
+                </th>
+                <th>
+                  <select class="column-filter" id="filterProcess" onchange="applyColumnFilters()">
+                    <option value="">All</option>
+                    <option value="standard">Standard</option>
+                    <option value="operational">Operational</option>
+                  </select>
+                </th>
+                <th><input type="text" class="column-filter" id="filterEntity" placeholder="Filter..." onkeyup="applyColumnFilters()"></th>
+                <th></th>
+                <th><input type="text" class="column-filter" id="filterEmailGroup" placeholder="Filter..." onkeyup="applyColumnFilters()"></th>
+                <th>
+                  <select class="column-filter" id="filterStatus" onchange="applyColumnFilters()">
+                    <option value="">All</option>
+                    <option value="enabled">Active</option>
+                    <option value="disabled">Disabled</option>
+                  </select>
+                </th>
+                <th></th>
+                <th></th>
+                <th></th>
+                <th></th>
+                <th></th>
+                <th><button class="btn btn-small btn-secondary" onclick="clearColumnFilters()" style="font-size: 10px; padding: 2px 6px;">Clear</button></th>
               </tr>
             </thead>
             <tbody id="reportSchedulesBody">
@@ -1218,7 +1440,7 @@
         
         <!-- Add New Schedule Button -->
         <div style="margin-top: 12px; text-align: center;">
-          <button class="btn btn-secondary" onclick="addNewScheduleRow()" style="min-width: 200px;">
+          <button class="btn btn-primary" onclick="openNewScheduleModal()" style="min-width: 200px;">
             ➕ Add New Schedule
           </button>
         </div>
@@ -1300,6 +1522,112 @@
     </div>
   </div>
 
+  <!-- Schedule Edit Modal -->
+  <div class="modal" id="scheduleEditModal">
+    <div class="modal-content" style="max-width: 700px;">
+      <div class="modal-header">
+        <h3 id="scheduleEditModalTitle">Edit Report Schedule</h3>
+        <button class="modal-close" onclick="closeScheduleEditModal()">&times;</button>
+      </div>
+      <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
+        <form id="scheduleEditForm">
+          <input type="hidden" id="editScheduleId">
+
+          <!-- Basic Info Section -->
+          <div style="margin-bottom: 24px;">
+            <h4 style="font-size: 14px; color: #4a5568; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0;">Basic Information</h4>
+
+            <div class="form-group">
+              <label for="editTemplateName">Template Name <span style="color: #e53e3e;">*</span></label>
+              <input type="text" id="editTemplateName" required placeholder="e.g., District 5 Monthly Report">
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+              <div class="form-group" style="margin-bottom: 0;">
+                <label for="editTemplateType">Report Type <span style="color: #e53e3e;">*</span></label>
+                <select id="editTemplateType" required onchange="onEditTemplateTypeChange()">
+                  <option value="">Select type...</option>
+                  <option value="district">District</option>
+                  <option value="region">Region</option>
+                  <option value="subsidiary">Subsidiary</option>
+                </select>
+              </div>
+
+              <div class="form-group" style="margin-bottom: 0;">
+                <label for="editProcess">P&L Process <span style="color: #e53e3e;">*</span></label>
+                <select id="editProcess" required>
+                  <option value="">Select process...</option>
+                  <option value="standard">Standard</option>
+                  <option value="operational">Operational</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Entity Selection Section -->
+          <div style="margin-bottom: 24px;">
+            <h4 style="font-size: 14px; color: #4a5568; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0;">Entity Selection</h4>
+
+            <div class="form-group" id="editDistrictGroup">
+              <label for="editDistrictId">District</label>
+              <select id="editDistrictId" onchange="onEditEntityChange('district')">
+                <option value="">Select district...</option>
+              </select>
+            </div>
+
+            <div class="form-group" id="editRegionGroup">
+              <label for="editRegionId">Region</label>
+              <select id="editRegionId" onchange="onEditEntityChange('region')">
+                <option value="">Select region...</option>
+              </select>
+            </div>
+
+            <div class="form-group" id="editSubsidiaryGroup">
+              <label for="editSubsidiaryId">Subsidiary</label>
+              <select id="editSubsidiaryId" onchange="onEditEntityChange('subsidiary')">
+                <option value="">Select subsidiary...</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Email Groups Section -->
+          <div style="margin-bottom: 24px;">
+            <h4 style="font-size: 14px; color: #4a5568; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0;">Email Recipients</h4>
+
+            <div class="form-group">
+              <label>Email Groups</label>
+              <div id="editEmailGroupsContainer" style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; min-height: 32px; padding: 8px; background: #f7fafc; border-radius: 6px; border: 1px solid #e2e8f0;">
+                <!-- Tags will be inserted here -->
+              </div>
+              <select id="editEmailGroupSelect" onchange="addEmailGroupInModal(this.value); this.value='';" style="width: 100%;">
+                <option value="">+ Add email group...</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Status Section -->
+          <div style="margin-bottom: 16px;">
+            <h4 style="font-size: 14px; color: #4a5568; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0;">Status</h4>
+
+            <div style="display: flex; align-items: center; gap: 16px;">
+              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                <input type="checkbox" id="editEnabled" checked style="width: 18px; height: 18px;">
+                <span style="font-size: 14px; color: #2d3748;">Schedule Enabled</span>
+              </label>
+            </div>
+
+            <div id="editScheduleStatus" style="margin-top: 12px; padding: 12px; background: #f7fafc; border-radius: 6px; font-size: 12px; color: #718096;">
+              <!-- Status info will be shown here -->
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeScheduleEditModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveScheduleFromModal()">Save Schedule</button>
+      </div>
+    </div>
+  </div>
 
   <script>
     // ============================================
@@ -1329,10 +1657,13 @@
         loadEmailGroups(),
         loadHierarchyOptions()
       ]);
-      
+
       // THEN load and render report schedules (so dropdowns have data)
       await loadReportSchedules();
-      
+
+      // Initialize resizable columns
+      initResizableColumns();
+
       // Allow adding email with Enter key
       document.getElementById('newEmail').addEventListener('keypress', (e) => {
         if (e.key === 'Enter') {
@@ -1375,41 +1706,94 @@
     }
     
     function updateGlobalScheduleDisplay() {
-      // Find the most common day_of_month and time_of_day across monthly schedules
+      const summaryTextEl = document.getElementById('currentScheduleText');
+      const statsEl = document.getElementById('scheduleStats');
+
+      // Get all schedules and monthly schedules
+      const allSchedules = reportSchedules;
       const monthlySchedules = reportSchedules.filter(s => s.frequency === 'monthly');
-      
-      if (monthlySchedules.length === 0) return;
-      
+      const enabledMonthly = monthlySchedules.filter(s => s.enabled !== false);
+
+      if (monthlySchedules.length === 0) {
+        summaryTextEl.textContent = 'No monthly schedules configured';
+        statsEl.innerHTML = `
+          <span>📊 ${allSchedules.length} total schedule(s)</span>
+          <span>📅 0 monthly</span>
+        `;
+        return;
+      }
+
       // Count occurrences of each day and time
       const dayCounts = {};
       const timeCounts = {};
-      
+
       monthlySchedules.forEach(s => {
         if (s.day_of_month !== null && s.day_of_month !== undefined) {
           dayCounts[s.day_of_month] = (dayCounts[s.day_of_month] || 0) + 1;
         }
         if (s.time_of_day) {
-          timeCounts[s.time_of_day] = (timeCounts[s.time_of_day] || 0) + 1;
+          const timeShort = s.time_of_day.substring(0, 5);
+          timeCounts[timeShort] = (timeCounts[timeShort] || 0) + 1;
         }
       });
-      
+
       // Find most common values
       const mostCommonDay = Object.keys(dayCounts).length > 0
-        ? Object.entries(dayCounts).sort((a, b) => b[1] - a[1])[0][0]
+        ? Object.entries(dayCounts).sort((a, b) => b[1] - a[1])[0]
         : null;
-      
+
       const mostCommonTime = Object.keys(timeCounts).length > 0
-        ? Object.entries(timeCounts).sort((a, b) => b[1] - a[1])[0][0]
+        ? Object.entries(timeCounts).sort((a, b) => b[1] - a[1])[0]
         : null;
-      
-      // Update the form fields
+
+      // Build summary text
+      let summaryText = '';
+      if (mostCommonDay && mostCommonTime) {
+        const dayNum = parseInt(mostCommonDay[0]);
+        const dayText = dayNum + getOrdinalSuffix(dayNum);
+        const timeText = formatTimeForDisplay(mostCommonTime[0]);
+        summaryText = `${dayText} of each month at ${timeText} EST`;
+      } else if (mostCommonDay) {
+        const dayNum = parseInt(mostCommonDay[0]);
+        const dayText = dayNum + getOrdinalSuffix(dayNum);
+        summaryText = `${dayText} of each month`;
+      } else if (mostCommonTime) {
+        summaryText = `Monthly at ${formatTimeForDisplay(mostCommonTime[0])} EST`;
+      } else {
+        summaryText = 'Schedule times vary';
+      }
+
+      summaryTextEl.textContent = summaryText;
+
+      // Update the form fields with most common values
       if (mostCommonDay) {
-        document.getElementById('globalDayOfMonth').value = mostCommonDay;
+        document.getElementById('globalDayOfMonth').value = mostCommonDay[0];
       }
-      
+
       if (mostCommonTime) {
-        document.getElementById('globalTimeOfDay').value = mostCommonTime;
+        document.getElementById('globalTimeOfDay').value = mostCommonTime[0];
       }
+
+      // Build stats
+      const dayMatchCount = mostCommonDay ? mostCommonDay[1] : 0;
+      const timeMatchCount = mostCommonTime ? mostCommonTime[1] : 0;
+      const allMatch = dayMatchCount === monthlySchedules.length && timeMatchCount === monthlySchedules.length;
+
+      statsEl.innerHTML = `
+        <span>📊 <strong>${allSchedules.length}</strong> total schedule(s)</span>
+        <span>📅 <strong>${monthlySchedules.length}</strong> monthly</span>
+        <span>✅ <strong>${enabledMonthly.length}</strong> active</span>
+        ${!allMatch ? `<span style="color: #ed8936;">⚠️ ${monthlySchedules.length - Math.min(dayMatchCount, timeMatchCount)} with different settings</span>` : '<span style="color: #48bb78;">✓ All schedules synchronized</span>'}
+      `;
+    }
+
+    function formatTimeForDisplay(time) {
+      if (!time) return '';
+      const [hours, minutes] = time.split(':');
+      const h = parseInt(hours);
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      const h12 = h % 12 || 12;
+      return `${h12}:${minutes} ${ampm}`;
     }
 
     async function loadHierarchyOptions() {
@@ -1659,179 +2043,144 @@
 
     function renderReportSchedulesTable() {
       const tbody = document.getElementById('reportSchedulesBody');
-      
-      // Use filtered schedules if filter is active, otherwise use all
-      const schedulesToRender = filteredSchedules.length > 0 || document.getElementById('scheduleFilterInput')?.value 
-        ? filteredSchedules 
-        : reportSchedules;
-      
+
+      // Use filtered schedules
+      const schedulesToRender = filteredSchedules;
+
+      // Check if any column filter is active
+      const hasActiveFilter =
+        document.getElementById('filterTemplateName')?.value ||
+        document.getElementById('filterType')?.value ||
+        document.getElementById('filterProcess')?.value ||
+        document.getElementById('filterEntity')?.value ||
+        document.getElementById('filterEmailGroup')?.value ||
+        document.getElementById('filterStatus')?.value;
+
       if (schedulesToRender.length === 0) {
-        const filterActive = document.getElementById('scheduleFilterInput')?.value;
-        const message = filterActive 
-          ? 'No schedules match your filter. Try a different search term.'
-          : 'No report schedules yet. Create one to automate report delivery!';
+        const message = hasActiveFilter
+          ? 'No schedules match your filters. Try adjusting your criteria or click Clear.'
+          : 'No report schedules yet. Click "Add New Schedule" to get started!';
         showEmptyState('reportSchedulesBody', message, '📊');
         return;
       }
 
-      const setupFunctions = [];
-      
       tbody.innerHTML = schedulesToRender.map(schedule => {
-        const hasChanges = unsavedChanges.has(schedule.id);
-        const group = emailGroups.find(g => g.id === schedule.email_group_id);
-        
-        // Create searchable selects for hierarchy dropdowns
-        const districtSelect = createSearchableSelect(
-          districtOptions,
-          schedule.district_id || '',
-          (value) => updateScheduleField(schedule.id, 'district_id', value),
-          schedule.template_type !== 'district',
-          '—'
-        );
-        
-        const regionSelect = createSearchableSelect(
-          regionOptions,
-          schedule.region_id || '',
-          (value) => updateScheduleField(schedule.id, 'region_id', value),
-          schedule.template_type !== 'region',
-          '—'
-        );
-        
-        const subsidiarySelect = createSearchableSelect(
-          subsidiaryOptions,
-          schedule.subsidiary_id || '',
-          (value) => updateScheduleField(schedule.id, 'subsidiary_id', value),
-          schedule.template_type !== 'subsidiary',
-          '—'
-        );
-        
-        // Store setup functions to call after DOM is rendered
-        setupFunctions.push({
-          districtSetup: districtSelect.setup,
-          regionSetup: regionSelect.setup,
-          subsidiarySetup: subsidiarySelect.setup,
-          scheduleId: schedule.id
-        });
-        
+        // Get entity display based on type - show region+subsidiary when applicable
+        let entityDisplay = '—';
+        let entityTooltip = '';
+        if (schedule.template_type === 'district' && schedule.district_name) {
+          entityDisplay = schedule.district_name;
+          entityTooltip = `District: ${schedule.district_name}`;
+        } else if (schedule.template_type === 'region') {
+          const parts = [];
+          if (schedule.region_name) parts.push(schedule.region_name);
+          if (schedule.subsidiary_name) parts.push(schedule.subsidiary_name);
+          if (parts.length > 0) {
+            entityDisplay = parts.join(' / ');
+            entityTooltip = parts.length === 2
+              ? `Region: ${schedule.region_name}, Subsidiary: ${schedule.subsidiary_name}`
+              : (schedule.region_name ? `Region: ${schedule.region_name}` : `Subsidiary: ${schedule.subsidiary_name}`);
+          }
+        } else if (schedule.template_type === 'subsidiary' && schedule.subsidiary_name) {
+          entityDisplay = schedule.subsidiary_name;
+          entityTooltip = `Subsidiary: ${schedule.subsidiary_name}`;
+        }
+
+        // Format schedule info
+        let scheduleDisplay = '—';
+        if (schedule.frequency) {
+          const freq = schedule.frequency.charAt(0).toUpperCase() + schedule.frequency.slice(1);
+          const time = schedule.time_of_day ? schedule.time_of_day.substring(0, 5) : '08:00';
+          if (schedule.frequency === 'monthly' && schedule.day_of_month) {
+            scheduleDisplay = `${freq} (${schedule.day_of_month}${getOrdinalSuffix(schedule.day_of_month)}) @ ${time}`;
+          } else if (schedule.frequency === 'weekly' && schedule.day_of_week) {
+            scheduleDisplay = `${freq} (${schedule.day_of_week.substring(0, 3)}) @ ${time}`;
+          } else if (schedule.frequency === 'daily') {
+            scheduleDisplay = `${freq} @ ${time}`;
+          } else {
+            scheduleDisplay = `${freq} @ ${time}`;
+          }
+        }
+
+        // Get email group names
+        const groupNames = (schedule.email_group_ids || []).map(gid => {
+          const group = emailGroups.find(g => g.id === gid);
+          return group ? group.name : null;
+        }).filter(Boolean);
+
+        const groupsDisplay = groupNames.length > 0
+          ? groupNames.map(n => `<span class="mini-tag">${escapeHtml(n)}</span>`).join(' ')
+          : '<span style="color: #a0aec0;">None</span>';
+
+        // Status badge
+        const statusBadge = schedule.enabled
+          ? '<span class="status-badge enabled">Active</span>'
+          : '<span class="status-badge disabled">Disabled</span>';
+
+        // Process badge
+        const processBadge = schedule.process
+          ? `<span class="process-badge ${schedule.process}">${schedule.process.charAt(0).toUpperCase() + schedule.process.slice(1)}</span>`
+          : '—';
+
         return `
-          <tr data-schedule-id="${schedule.id}" class="${hasChanges ? 'has-changes' : ''}">
-            <!-- Template Name -->
+          <tr data-schedule-id="${schedule.id}" data-template-type="${schedule.template_type || ''}" data-process="${schedule.process || ''}" data-enabled="${schedule.enabled}">
             <td>
-              <input 
-                type="text" 
-                class="inline-input" 
-                value="${escapeHtml(schedule.template_name || '')}"
-                onchange="updateScheduleField(${schedule.id}, 'template_name', this.value)"
-                placeholder="Enter name..."
-              />
+              <strong>${escapeHtml(schedule.template_name || 'Untitled')}</strong>
             </td>
-            
-            <!-- Template Type -->
             <td>
-              <select 
-                class="inline-select" 
-                onchange="updateScheduleField(${schedule.id}, 'template_type', this.value)"
-              >
-                <option value="">Select...</option>
-                <option value="district" ${schedule.template_type === 'district' ? 'selected' : ''}>District</option>
-                <option value="region" ${schedule.template_type === 'region' ? 'selected' : ''}>Region</option>
-                <option value="subsidiary" ${schedule.template_type === 'subsidiary' ? 'selected' : ''}>Subsidiary</option>
-              </select>
+              <span class="type-badge ${schedule.template_type || ''}">${schedule.template_type ? (schedule.template_type.charAt(0).toUpperCase() + schedule.template_type.slice(1)) : '—'}</span>
             </td>
-            
-            <!-- Process -->
             <td>
-              <select 
-                class="inline-select" 
-                onchange="updateScheduleField(${schedule.id}, 'process', this.value)"
-              >
-                <option value="">Select...</option>
-                <option value="standard" ${schedule.process === 'standard' ? 'selected' : ''}>Standard</option>
-                <option value="operational" ${schedule.process === 'operational' ? 'selected' : ''}>Operational</option>
-              </select>
+              ${processBadge}
             </td>
-            
-            <!-- District -->
-            <td data-searchable-district-${schedule.id}>
-              ${districtSelect.html}
+            <td style="max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(entityTooltip || entityDisplay)}">
+              ${escapeHtml(entityDisplay)}
             </td>
-            
-            <!-- Region -->
-            <td data-searchable-region-${schedule.id}>
-              ${regionSelect.html}
+            <td style="font-size: 11px;">
+              ${scheduleDisplay}
             </td>
-            
-            <!-- Subsidiary -->
-            <td data-searchable-subsidiary-${schedule.id}>
-              ${subsidiarySelect.html}
-            </td>
-            
-            <!-- Email Groups (Multiple) -->
             <td>
-              <div class="email-groups-cell" data-schedule-id="${schedule.id}">
-                <div class="tags-container">
-                  ${(schedule.email_group_ids || []).map(groupId => {
-                    const group = emailGroups.find(g => g.id === groupId);
-                    return group ? `
-                      <span class="tag email-group-tag">
-                        ${escapeHtml(group.name)}
-                        <button class="tag-remove" onclick="removeEmailGroupFromSchedule(${schedule.id}, ${groupId})" title="Remove">×</button>
-                      </span>
-                    ` : '';
-                  }).join('')}
-                </div>
-                <select 
-                  class="inline-select add-group-select" 
-                  onchange="addEmailGroupToSchedule(${schedule.id}, this.value); this.value='';"
-                >
-                  <option value="">+ Add Group...</option>
-                  ${emailGroups.map(g => `
-                    <option value="${g.id}" ${(schedule.email_group_ids || []).includes(g.id) ? 'disabled' : ''}>
-                      ${escapeHtml(g.name)}
-                    </option>
-                  `).join('')}
-                </select>
-              </div>
+              ${groupsDisplay}
             </td>
-            
-            <!-- Enabled Toggle -->
             <td style="text-align: center;">
-              <label class="toggle-switch">
-                <input 
-                  type="checkbox" 
-                  ${schedule.enabled ? 'checked' : ''}
-                  onchange="updateScheduleField(${schedule.id}, 'enabled', this.checked)"
-                />
-                <span class="toggle-slider"></span>
-              </label>
+              ${statusBadge}
             </td>
-            
-            <!-- Actions -->
-            <td>
-              <div class="action-buttons">
-                <button class="icon-btn" onclick="downloadSchedulePDF(${schedule.id})" title="Download PDF">📥</button>
-                <button class="icon-btn success" onclick="sendScheduleEmail(${schedule.id})" title="Send Email">📧</button>
-                <button class="icon-btn danger" onclick="deleteReportSchedule(${schedule.id})" title="Delete">🗑️</button>
-              </div>
+            <td style="font-size: 10px; color: #666;">
+              ${schedule.last_run_manual ? formatDate(schedule.last_run_manual) : '<span style="color: #a0aec0;">Never</span>'}
+            </td>
+            <td style="font-size: 10px; color: #666;">
+              ${schedule.last_run_automated ? formatDate(schedule.last_run_automated) : '<span style="color: #a0aec0;">Never</span>'}
+            </td>
+            <td style="text-align: center;">
+              <button class="btn btn-small btn-secondary" onclick="openScheduleEditModal(${schedule.id})" style="font-size: 11px; padding: 4px 8px;">✏️ Edit</button>
+            </td>
+            <td style="text-align: center;">
+              <button class="btn btn-small btn-secondary" onclick="downloadSchedulePDF(${schedule.id})" style="font-size: 11px; padding: 4px 8px;">📥 Download P&L</button>
+            </td>
+            <td style="text-align: center;">
+              <button class="btn btn-small btn-primary" onclick="sendScheduleEmail(${schedule.id})" style="font-size: 11px; padding: 4px 8px;">📧 Email P&L</button>
+            </td>
+            <td style="text-align: center;">
+              <button class="btn btn-small btn-danger" onclick="deleteReportSchedule(${schedule.id})" style="font-size: 11px; padding: 4px 8px;">🗑️ Delete</button>
             </td>
           </tr>
         `;
       }).join('');
-      
-      // Setup all searchable selects after DOM is rendered
-      setTimeout(() => {
-        setupFunctions.forEach(({ districtSetup, regionSetup, subsidiarySetup }) => {
-          districtSetup();
-          regionSetup();
-          subsidiarySetup();
-        });
-      }, 0);
+    }
+
+    // Helper function for ordinal suffixes
+    function getOrdinalSuffix(n) {
+      const s = ['th', 'st', 'nd', 'rd'];
+      const v = n % 100;
+      return s[(v - 20) % 10] || s[v] || s[0];
     }
 
     function showEmptyState(tbodyId, message, icon) {
       const tbody = document.getElementById(tbodyId);
-      const colSpan = tbody.closest('table').querySelectorAll('thead th').length;
-      
+      // Get number of columns from the first header row (not the filter row)
+      const headerRow = tbody.closest('table').querySelector('thead tr:first-child');
+      const colSpan = headerRow ? headerRow.querySelectorAll('th').length : 11;
+
       tbody.innerHTML = `
         <tr>
           <td colspan="${colSpan}">
@@ -1843,6 +2192,135 @@
           </td>
         </tr>
       `;
+    }
+
+    // ============================================
+    // Column Filtering Functions
+    // ============================================
+
+    function applyColumnFilters() {
+      const templateNameFilter = document.getElementById('filterTemplateName').value.toLowerCase();
+      const typeFilter = document.getElementById('filterType').value;
+      const processFilter = document.getElementById('filterProcess').value;
+      const entityFilter = document.getElementById('filterEntity').value.toLowerCase();
+      const emailGroupFilter = document.getElementById('filterEmailGroup').value.toLowerCase();
+      const statusFilter = document.getElementById('filterStatus').value;
+
+      filteredSchedules = reportSchedules.filter(schedule => {
+        // Template name filter
+        if (templateNameFilter && !(schedule.template_name || '').toLowerCase().includes(templateNameFilter)) {
+          return false;
+        }
+
+        // Type filter
+        if (typeFilter && schedule.template_type !== typeFilter) {
+          return false;
+        }
+
+        // Process filter
+        if (processFilter && schedule.process !== processFilter) {
+          return false;
+        }
+
+        // Entity filter - check all entity fields
+        if (entityFilter) {
+          const entityMatch =
+            (schedule.district_name || '').toLowerCase().includes(entityFilter) ||
+            (schedule.region_name || '').toLowerCase().includes(entityFilter) ||
+            (schedule.subsidiary_name || '').toLowerCase().includes(entityFilter);
+          if (!entityMatch) return false;
+        }
+
+        // Email group filter
+        if (emailGroupFilter) {
+          const groupNames = (schedule.email_group_ids || []).map(gid => {
+            const group = emailGroups.find(g => g.id === gid);
+            return group ? group.name.toLowerCase() : '';
+          });
+          const groupMatch = groupNames.some(name => name.includes(emailGroupFilter));
+          if (!groupMatch) return false;
+        }
+
+        // Status filter
+        if (statusFilter) {
+          const isEnabled = schedule.enabled !== false;
+          if (statusFilter === 'enabled' && !isEnabled) return false;
+          if (statusFilter === 'disabled' && isEnabled) return false;
+        }
+
+        return true;
+      });
+
+      renderReportSchedulesTable();
+    }
+
+    function clearColumnFilters() {
+      document.getElementById('filterTemplateName').value = '';
+      document.getElementById('filterType').value = '';
+      document.getElementById('filterProcess').value = '';
+      document.getElementById('filterEntity').value = '';
+      document.getElementById('filterEmailGroup').value = '';
+      document.getElementById('filterStatus').value = '';
+
+      filteredSchedules = [...reportSchedules];
+      renderReportSchedulesTable();
+    }
+
+    function toggleFilterRow() {
+      const filterRow = document.querySelector('.column-filter-row');
+      const toggleBtn = document.getElementById('filterToggleBtn');
+
+      if (filterRow.classList.contains('visible')) {
+        filterRow.classList.remove('visible');
+        toggleBtn.innerHTML = '🔍 Show Filters';
+        // Clear filters when hiding
+        clearColumnFilters();
+      } else {
+        filterRow.classList.add('visible');
+        toggleBtn.innerHTML = '🔍 Hide Filters';
+      }
+    }
+
+    // ============================================
+    // Resizable Columns
+    // ============================================
+
+    function initResizableColumns() {
+      const table = document.querySelector('#reportSchedulesBody')?.closest('table');
+      if (!table) return;
+
+      const handles = table.querySelectorAll('.resize-handle');
+
+      handles.forEach(handle => {
+        let startX, startWidth, th;
+
+        handle.addEventListener('mousedown', function(e) {
+          th = this.parentElement;
+          startX = e.pageX;
+          startWidth = th.offsetWidth;
+
+          this.classList.add('resizing');
+          document.body.style.cursor = 'col-resize';
+          document.body.style.userSelect = 'none';
+
+          document.addEventListener('mousemove', onMouseMove);
+          document.addEventListener('mouseup', onMouseUp);
+        });
+
+        function onMouseMove(e) {
+          const diff = e.pageX - startX;
+          const newWidth = Math.max(50, startWidth + diff);
+          th.style.width = newWidth + 'px';
+        }
+
+        function onMouseUp() {
+          handle.classList.remove('resizing');
+          document.body.style.cursor = '';
+          document.body.style.userSelect = '';
+          document.removeEventListener('mousemove', onMouseMove);
+          document.removeEventListener('mouseup', onMouseUp);
+        }
+      });
     }
 
     // ============================================
@@ -1998,9 +2476,307 @@
     }
 
     // ============================================
+    // Schedule Edit Modal Functions
+    // ============================================
+
+    let currentEditingSchedule = null;
+    let modalEmailGroupIds = [];
+
+    function openScheduleEditModal(scheduleId) {
+      const schedule = reportSchedules.find(s => s.id === scheduleId);
+      if (!schedule) return;
+
+      currentEditingSchedule = schedule;
+      modalEmailGroupIds = [...(schedule.email_group_ids || [])];
+
+      document.getElementById('scheduleEditModalTitle').textContent = 'Edit Report Schedule';
+      document.getElementById('editScheduleId').value = schedule.id;
+
+      // Populate basic info
+      document.getElementById('editTemplateName').value = schedule.template_name || '';
+      document.getElementById('editTemplateType').value = schedule.template_type || '';
+      document.getElementById('editProcess').value = schedule.process || '';
+
+      // Populate entity dropdowns
+      populateEntityDropdowns();
+      document.getElementById('editDistrictId').value = schedule.district_id || '';
+      document.getElementById('editRegionId').value = schedule.region_id || '';
+      document.getElementById('editSubsidiaryId').value = schedule.subsidiary_id || '';
+
+      // Update entity visibility
+      onEditTemplateTypeChange();
+
+      // Populate email groups
+      renderModalEmailGroups();
+      populateEmailGroupSelect();
+
+      // Populate status
+      document.getElementById('editEnabled').checked = schedule.enabled !== false;
+
+      // Show status info
+      let statusHtml = '';
+      if (schedule.last_sent_at) {
+        statusHtml += `<div><strong>Last sent:</strong> ${formatDate(schedule.last_sent_at)}</div>`;
+      }
+      if (schedule.next_send_at) {
+        statusHtml += `<div><strong>Next send:</strong> ${formatDate(schedule.next_send_at)}</div>`;
+      }
+      if (!statusHtml) {
+        statusHtml = '<div>This schedule has not been run yet.</div>';
+      }
+      document.getElementById('editScheduleStatus').innerHTML = statusHtml;
+
+      document.getElementById('scheduleEditModal').classList.add('active');
+    }
+
+    function openNewScheduleModal() {
+      currentEditingSchedule = null;
+      modalEmailGroupIds = [];
+
+      document.getElementById('scheduleEditModalTitle').textContent = 'Create New Schedule';
+      document.getElementById('editScheduleId').value = '';
+
+      // Reset form
+      document.getElementById('editTemplateName').value = '';
+      document.getElementById('editTemplateType').value = '';
+      document.getElementById('editProcess').value = '';
+
+      // Populate entity dropdowns
+      populateEntityDropdowns();
+      document.getElementById('editDistrictId').value = '';
+      document.getElementById('editRegionId').value = '';
+      document.getElementById('editSubsidiaryId').value = '';
+
+      // Update entity visibility
+      onEditTemplateTypeChange();
+
+      // Reset email groups
+      renderModalEmailGroups();
+      populateEmailGroupSelect();
+
+      // Reset status
+      document.getElementById('editEnabled').checked = true;
+      document.getElementById('editScheduleStatus').innerHTML = '<div>New schedule - not yet saved.</div>';
+
+      document.getElementById('scheduleEditModal').classList.add('active');
+    }
+
+    function closeScheduleEditModal() {
+      document.getElementById('scheduleEditModal').classList.remove('active');
+      currentEditingSchedule = null;
+      modalEmailGroupIds = [];
+    }
+
+    function populateEntityDropdowns() {
+      // Populate district dropdown
+      const districtSelect = document.getElementById('editDistrictId');
+      districtSelect.innerHTML = '<option value="">Select district...</option>' +
+        districtOptions.map(d => `<option value="${escapeHtml(d.id)}">${escapeHtml(d.label)}</option>`).join('');
+
+      // Populate region dropdown
+      const regionSelect = document.getElementById('editRegionId');
+      regionSelect.innerHTML = '<option value="">Select region...</option>' +
+        regionOptions.map(r => `<option value="${escapeHtml(r.id)}">${escapeHtml(r.label)}</option>`).join('');
+
+      // Populate subsidiary dropdown
+      const subsidiarySelect = document.getElementById('editSubsidiaryId');
+      subsidiarySelect.innerHTML = '<option value="">Select subsidiary...</option>' +
+        subsidiaryOptions.map(s => `<option value="${escapeHtml(s.id)}">${escapeHtml(s.label)}</option>`).join('');
+    }
+
+    function onEditTemplateTypeChange() {
+      const type = document.getElementById('editTemplateType').value;
+
+      // Get entity select elements
+      const districtSelect = document.getElementById('editDistrictId');
+      const regionSelect = document.getElementById('editRegionId');
+      const subsidiarySelect = document.getElementById('editSubsidiaryId');
+
+      // Get entity group containers for styling
+      const districtGroup = document.getElementById('editDistrictGroup');
+      const regionGroup = document.getElementById('editRegionGroup');
+      const subsidiaryGroup = document.getElementById('editSubsidiaryGroup');
+
+      // Enable/disable based on template type:
+      // - District: only district editable
+      // - Region: region and subsidiary editable
+      // - Subsidiary: only subsidiary editable
+
+      const isDistrict = type === 'district';
+      const isRegion = type === 'region';
+      const isSubsidiary = type === 'subsidiary';
+
+      // District: enabled only for district type
+      districtSelect.disabled = !isDistrict;
+      districtGroup.style.opacity = isDistrict ? '1' : '0.5';
+      if (!isDistrict) districtSelect.value = '';
+
+      // Region: enabled for region type
+      regionSelect.disabled = !isRegion;
+      regionGroup.style.opacity = isRegion ? '1' : '0.5';
+      if (!isRegion) regionSelect.value = '';
+
+      // Subsidiary: enabled for region or subsidiary type
+      subsidiarySelect.disabled = !(isRegion || isSubsidiary);
+      subsidiaryGroup.style.opacity = (isRegion || isSubsidiary) ? '1' : '0.5';
+      if (!(isRegion || isSubsidiary)) subsidiarySelect.value = '';
+    }
+
+    function onEditEntityChange(entityType) {
+      // Get the selected option's text for the name
+      const selectId = `edit${entityType.charAt(0).toUpperCase() + entityType.slice(1)}Id`;
+      const select = document.getElementById(selectId);
+      const selectedOption = select.options[select.selectedIndex];
+      // The name will be saved when we save the schedule
+    }
+
+    function populateEmailGroupSelect() {
+      const select = document.getElementById('editEmailGroupSelect');
+      select.innerHTML = '<option value="">+ Add email group...</option>' +
+        emailGroups.map(g => {
+          const disabled = modalEmailGroupIds.includes(g.id) ? 'disabled' : '';
+          return `<option value="${g.id}" ${disabled}>${escapeHtml(g.name)}</option>`;
+        }).join('');
+    }
+
+    function renderModalEmailGroups() {
+      const container = document.getElementById('editEmailGroupsContainer');
+
+      if (modalEmailGroupIds.length === 0) {
+        container.innerHTML = '<span style="color: #a0aec0; font-size: 12px;">No email groups selected</span>';
+        return;
+      }
+
+      container.innerHTML = modalEmailGroupIds.map(gid => {
+        const group = emailGroups.find(g => g.id === gid);
+        if (!group) return '';
+        return `
+          <span class="modal-email-tag">
+            ${escapeHtml(group.name)}
+            <button onclick="removeEmailGroupInModal(${gid})" title="Remove">&times;</button>
+          </span>
+        `;
+      }).join('');
+    }
+
+    function addEmailGroupInModal(groupId) {
+      if (!groupId) return;
+      const gid = parseInt(groupId);
+      if (modalEmailGroupIds.includes(gid)) return;
+
+      modalEmailGroupIds.push(gid);
+      renderModalEmailGroups();
+      populateEmailGroupSelect();
+    }
+
+    function removeEmailGroupInModal(groupId) {
+      modalEmailGroupIds = modalEmailGroupIds.filter(id => id !== groupId);
+      renderModalEmailGroups();
+      populateEmailGroupSelect();
+    }
+
+    async function saveScheduleFromModal() {
+      const templateName = document.getElementById('editTemplateName').value.trim();
+      const templateType = document.getElementById('editTemplateType').value;
+      const process = document.getElementById('editProcess').value;
+
+      // Validation
+      if (!templateName) {
+        alert('Please enter a template name');
+        return;
+      }
+      if (!templateType) {
+        alert('Please select a report type');
+        return;
+      }
+      if (!process) {
+        alert('Please select a P&L process');
+        return;
+      }
+
+      // Get entity values and names
+      let districtId = null, districtName = null;
+      let regionId = null, regionName = null;
+      let subsidiaryId = null, subsidiaryName = null;
+
+      if (templateType === 'district') {
+        // District type: only district field is editable
+        const select = document.getElementById('editDistrictId');
+        districtId = select.value || null;
+        if (districtId) {
+          const opt = districtOptions.find(d => d.id === districtId);
+          districtName = opt ? opt.label : null;
+        }
+      } else if (templateType === 'region') {
+        // Region type: region and subsidiary fields are editable
+        const regionSelect = document.getElementById('editRegionId');
+        regionId = regionSelect.value || null;
+        if (regionId) {
+          const opt = regionOptions.find(r => r.id === regionId);
+          regionName = opt ? opt.label : null;
+        }
+        const subsidiarySelect = document.getElementById('editSubsidiaryId');
+        subsidiaryId = subsidiarySelect.value || null;
+        if (subsidiaryId) {
+          const opt = subsidiaryOptions.find(s => s.id === subsidiaryId);
+          subsidiaryName = opt ? opt.label : null;
+        }
+      } else if (templateType === 'subsidiary') {
+        // Subsidiary type: only subsidiary field is editable
+        const select = document.getElementById('editSubsidiaryId');
+        subsidiaryId = select.value || null;
+        if (subsidiaryId) {
+          const opt = subsidiaryOptions.find(s => s.id === subsidiaryId);
+          subsidiaryName = opt ? opt.label : null;
+        }
+      }
+
+      const data = {
+        template_name: templateName,
+        template_type: templateType,
+        process: process,
+        district_id: districtId,
+        district_name: districtName,
+        region_id: regionId,
+        region_name: regionName,
+        subsidiary_id: subsidiaryId,
+        subsidiary_name: subsidiaryName,
+        email_group_ids: modalEmailGroupIds,
+        enabled: document.getElementById('editEnabled').checked
+      };
+
+      try {
+        let response;
+        if (currentEditingSchedule) {
+          // Update existing
+          response = await fetch(`/api/report-schedules/${currentEditingSchedule.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+          });
+        } else {
+          // Create new
+          response = await fetch('/api/report-schedules', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+          });
+        }
+
+        if (!response.ok) throw new Error('Failed to save schedule');
+
+        closeScheduleEditModal();
+        await loadReportSchedules();
+      } catch (error) {
+        console.error('Error saving schedule:', error);
+        alert('Failed to save schedule: ' + error.message);
+      }
+    }
+
+    // ============================================
     // Report Schedule Inline Editing Functions
     // ============================================
-    
+
     async function addNewReportSchedule() {
       // Create a new empty schedule
       const newSchedule = {
@@ -2796,43 +3572,6 @@
     // Filtering Functions
     // ============================================
     
-    function filterReportSchedules() {
-      const filterInput = document.getElementById('scheduleFilterInput');
-      const query = filterInput.value.toLowerCase().trim();
-      
-      if (!query) {
-        filteredSchedules = [...reportSchedules];
-      } else {
-        filteredSchedules = reportSchedules.filter(schedule => {
-          // Get all email group names for this schedule
-          const groupNames = (schedule.email_group_ids || [])
-            .map(groupId => emailGroups.find(g => g.id === groupId)?.name || '')
-            .join(' ');
-          
-          // Search in multiple fields
-          const searchableText = [
-            schedule.template_name || '',
-            schedule.template_type || '',
-            schedule.process || '',
-            schedule.district_name || '',
-            schedule.region_name || '',
-            schedule.subsidiary_name || '',
-            groupNames
-          ].join(' ').toLowerCase();
-          
-          return searchableText.includes(query);
-        });
-      }
-      
-      renderReportSchedulesTable();
-    }
-    
-    function clearScheduleFilter() {
-      document.getElementById('scheduleFilterInput').value = '';
-      filteredSchedules = [...reportSchedules];
-      renderReportSchedulesTable();
-    }
-
     // ============================================
     // Send Email Functions
     // ============================================

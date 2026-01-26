@@ -922,7 +922,7 @@
       <div class="nav-item" onclick="window.location.href='/'">P&L View</div>
       <div class="nav-item active">Dimension Config</div>
       <div class="nav-item" onclick="window.location.href='/email-config'">Email Config</div>
-      <div class="nav-item disabled">User Management</div>
+      <div class="nav-item" onclick="window.location.href='/run-log'">Run Log</div>
     </nav>
   </div>
 
@@ -2125,21 +2125,21 @@
           await loadAndRenderUnmappedCustomers();
         } else {
           // Standard dimension loading
-          if (!AppState.dimensions[dimensionType]) {
-            await loadDimension(dimensionType);
-          }
-          
-          // Auto-expand all on initial load
-          if (!AppState.trees[dimensionType]) {
-            const data = AppState.dimensions[dimensionType];
-            if (data) {
-              for (const id of Object.keys(data)) {
-                AppState.expandedNodes.add(id);
-              }
+        if (!AppState.dimensions[dimensionType]) {
+          await loadDimension(dimensionType);
+        }
+        
+        // Auto-expand all on initial load
+        if (!AppState.trees[dimensionType]) {
+          const data = AppState.dimensions[dimensionType];
+          if (data) {
+            for (const id of Object.keys(data)) {
+              AppState.expandedNodes.add(id);
             }
           }
-          
-          renderCurrentDimension();
+        }
+        
+        renderCurrentDimension();
         }
       } catch (error) {
         showErrorState(error.message);
@@ -2508,7 +2508,7 @@
       
       // Populate parent dropdown (except for department/subsidiary)
       if (!isDepartmentTab) {
-        populateParentDropdown(node);
+      populateParentDropdown(node);
       }
       
       // Show sidebar
@@ -3232,15 +3232,15 @@
         const accounts = await response.json();
         
         // Clear loading state
-        dropdown.innerHTML = '';
-        
-        // Create "No account mapped" option
-        const noMapOption = document.createElement('div');
-        noMapOption.className = 'custom-select-option';
-        noMapOption.textContent = '(No account mapped)';
-        noMapOption.dataset.value = '';
-        dropdown.appendChild(noMapOption);
-        
+      dropdown.innerHTML = '';
+      
+      // Create "No account mapped" option
+      const noMapOption = document.createElement('div');
+      noMapOption.className = 'custom-select-option';
+      noMapOption.textContent = '(No account mapped)';
+      noMapOption.dataset.value = '';
+      dropdown.appendChild(noMapOption);
+      
         // Get all already-mapped account IDs (excluding current node)
         const currentData = AppState.dimensions[AppState.currentDimension];
         const mappedAccountIds = new Set();
@@ -3254,7 +3254,7 @@
         // Add all account options
         let selectedText = '';
         accounts.forEach(account => {
-          const option = document.createElement('div');
+        const option = document.createElement('div');
           option.className = 'custom-select-option';
           const baseText = account.display_name_with_id || `${account.display_name} (${account.account_id})`;
           option.textContent = baseText;
@@ -3277,7 +3277,7 @@
             selectedText = baseText;
           }
           
-          dropdown.appendChild(option);
+        dropdown.appendChild(option);
         });
         
         // Set input value and hint
@@ -3285,27 +3285,27 @@
           input.value = selectedText;
           input.dataset.selectedValue = node.account_internal_id;
           hint.textContent = `Mapped to account ID: ${node.account_internal_id}`;
-          hint.style.display = 'block';
-        } else {
-          input.value = '';
+        hint.style.display = 'block';
+      } else {
+        input.value = '';
           input.dataset.selectedValue = '';
-          noMapOption.classList.add('selected');
-          hint.style.display = 'none';
-        }
+        noMapOption.classList.add('selected');
+        hint.style.display = 'none';
+      }
         
         input.setAttribute('readonly', 'readonly');
-        
-        // Setup dropdown behavior
-        setupCustomDropdown(input, dropdown, (value, text) => {
-          input.value = text;
+      
+      // Setup dropdown behavior
+      setupCustomDropdown(input, dropdown, (value, text) => {
+        input.value = text;
           input.dataset.selectedValue = value;
-          if (value) {
+        if (value) {
             hint.textContent = `Mapped to account ID: ${value}`;
-            hint.style.display = 'block';
-          } else {
-            hint.style.display = 'none';
-          }
-        });
+          hint.style.display = 'block';
+        } else {
+          hint.style.display = 'none';
+        }
+      });
       } catch (error) {
         console.error('Error loading accounts:', error);
         dropdown.innerHTML = '';
@@ -3494,8 +3494,8 @@
       
       // Function to close dropdown and restore value
       function closeDropdown() {
-        dropdown.classList.remove('show');
-        input.style.borderRadius = '4px';
+          dropdown.classList.remove('show');
+          input.style.borderRadius = '4px';
         input.value = originalValue;
         input.setAttribute('readonly', 'readonly');
         
