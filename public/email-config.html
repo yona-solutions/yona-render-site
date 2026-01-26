@@ -1249,48 +1249,52 @@
         console.log('  Regions:', Object.keys(regionsData || {}).length, 'items');
         console.log('  Subsidiaries:', Object.keys(subsidiariesData || {}).length, 'items');
 
-        // Process districts - these come as an object with IDs as keys
+        // Process districts - these come as an array from the API
         districtOptions = [];
-        if (typeof districtsData === 'object' && districtsData !== null) {
-          districtOptions = Object.entries(districtsData)
-            .filter(([id, data]) => {
+        if (Array.isArray(districtsData)) {
+          // API returns an array of {id, label, type} objects
+          districtOptions = districtsData
+            .filter(item => {
               // Filter logic from P&L page
-              if (data.districtReportingExcluded) return false;
-              if (data.districtTags && data.districtTags.includes('not available')) return false;
-              if (data.tags && data.tags.includes('not available')) return false;
+              if (item.type === 'tag') return true; // Keep tags
+              if (item.districtReportingExcluded) return false;
+              if (item.districtTags && item.districtTags.includes('not available')) return false;
+              if (item.tags && item.tags.includes('not available')) return false;
               return true;
             })
-            .map(([id, data]) => ({
-              id: id,
-              label: data.label || id,
-              isTag: data.isDistrict || false,
-              tags: data.districtTags || data.tags || []
-            }))
-            .sort((a, b) => a.label.localeCompare(b.label));
+            .map(item => ({
+              id: item.id,  // Use the id field from the API response
+              label: item.label || item.id,
+              isTag: item.type === 'tag',
+              tags: item.tags || []
+            }));
+          // Already sorted by API
         }
 
-        // Process regions
+        // Process regions - these come as an array from the API
         regionOptions = [];
-        if (typeof regionsData === 'object' && regionsData !== null) {
-          regionOptions = Object.entries(regionsData)
-            .filter(([id, data]) => !data.displayExcluded)
-            .map(([id, data]) => ({
-              id: id,
-              label: data.label || id
-            }))
-            .sort((a, b) => a.label.localeCompare(b.label));
+        if (Array.isArray(regionsData)) {
+          // API returns an array of {id, label, type} objects
+          regionOptions = regionsData
+            .filter(item => !item.displayExcluded)
+            .map(item => ({
+              id: item.id,  // Use the id field from the API response
+              label: item.label || item.id
+            }));
+          // Already sorted by API
         }
 
-        // Process subsidiaries (departments)
+        // Process subsidiaries (departments) - these come as an array from the API
         subsidiaryOptions = [];
-        if (typeof subsidiariesData === 'object' && subsidiariesData !== null) {
-          subsidiaryOptions = Object.entries(subsidiariesData)
-            .filter(([id, data]) => !data.displayExcluded)
-            .map(([id, data]) => ({
-              id: id,
-              label: data.label || id
-            }))
-            .sort((a, b) => a.label.localeCompare(b.label));
+        if (Array.isArray(subsidiariesData)) {
+          // API returns an array of {id, label, type} objects
+          subsidiaryOptions = subsidiariesData
+            .filter(item => !item.displayExcluded)
+            .map(item => ({
+              id: item.id,  // Use the id field from the API response
+              label: item.label || item.id
+            }));
+          // Already sorted by API
         }
 
         console.log('📊 Loaded hierarchy options:');
@@ -1299,7 +1303,7 @@
         console.log('  Subsidiaries:', subsidiaryOptions.length);
 
         if (districtOptions.length > 0) {
-          console.log('📊 Sample district options:', districtOptions.slice(0, 3).map(o => o.label));
+          console.log('📊 Sample district options:', districtOptions.slice(0, 3));
         }
         if (regionOptions.length > 0) {
           console.log('📊 Sample region options:', regionOptions.slice(0, 3).map(o => o.label));
