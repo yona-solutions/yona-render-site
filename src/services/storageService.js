@@ -572,30 +572,41 @@ class StorageService {
    */
   async groupCustomersByDistrict(customers) {
     const configData = await this.getFileAsJson('customer_config.json');
-    
+
+    // Build config order map (preserves JSON file order)
+    const configOrder = {};
+    let orderIdx = 0;
+    for (const configId of Object.keys(configData)) {
+      configOrder[configId] = orderIdx++;
+    }
+
     // Build reverse lookup: customer_internal_id -> config entry
     const customerIdToConfig = {};
     for (const [configId, config] of Object.entries(configData)) {
       if (config.customer_internal_id != null) {
         customerIdToConfig[config.customer_internal_id] = {
           configId,
+          configOrderIndex: configOrder[configId],
           ...config
         };
       }
     }
-    
-    // Collect all unique district tags and districts
+
+    // Collect all unique district tags and districts (with their config order)
     const districtTags = new Set();
     const districtConfigs = {};
-    
+
     for (const [configId, config] of Object.entries(configData)) {
       if (config.isDistrict && !config.displayExcluded) {
-        districtConfigs[configId] = config;
+        districtConfigs[configId] = {
+          ...config,
+          configOrderIndex: configOrder[configId]
+        };
         const tags = config.tags || [];
         tags.forEach(tag => districtTags.add(tag));
       }
     }
-    
+
     // Build map of tag -> district IDs
     const tagToDistricts = {};
     for (const tag of districtTags) {
@@ -607,42 +618,42 @@ class StorageService {
         }
       }
     }
-    
+
     console.log(`📊 Found ${Object.keys(districtConfigs).length} districts, ${districtTags.size} unique tags`);
-    
+
     // Track which districts have been assigned to tags
     const districtsInTags = new Set();
     for (const districtIds of Object.values(tagToDistricts)) {
       districtIds.forEach(id => districtsInTags.add(id));
     }
-    
+
     // Build groups (tags + individual districts not in any tag)
     const groups = [];
-    let orderIndex = 0;
-    
-    // First, create groups for district tags
+
+    // First, create groups for district tags (order by first district's config position)
     for (const [tag, districtIds] of Object.entries(tagToDistricts)) {
+      // Use the minimum config order of districts in this tag for sorting
+      const minOrder = Math.min(...districtIds.map(id => districtConfigs[id]?.configOrderIndex ?? Infinity));
       groups.push({
         districtId: `tag_${tag}`,
         districtLabel: tag,
         isTag: true,
-        districtIds: districtIds, // Array of district IDs in this tag
+        districtIds: districtIds,
         customers: [],
-        order: orderIndex++
+        configOrderIndex: minOrder
       });
     }
-    
+
     // Then, create groups for individual districts NOT in any tag
-    // These should respect districtReportingExcluded
     for (const [districtId, config] of Object.entries(districtConfigs)) {
       if (!districtsInTags.has(districtId) && !config.districtReportingExcluded) {
         groups.push({
           districtId: districtId,
           districtLabel: config.label,
           isTag: false,
-          districtIds: [districtId], // Single district
+          districtIds: [districtId],
           customers: [],
-          order: orderIndex++
+          configOrderIndex: config.configOrderIndex
         });
       }
     }
@@ -686,16 +697,21 @@ class StorageService {
       }
     }
     
-    // Filter out groups with no customers and sort by order
+    // Sort customers within each group by config file order
+    for (const group of groups) {
+      group.customers.sort((a, b) => (a.configOrderIndex ?? Infinity) - (b.configOrderIndex ?? Infinity));
+    }
+
+    // Filter out groups with no customers and sort by config file order
     const result = groups
       .filter(group => group.customers.length > 0)
-      .sort((a, b) => a.order - b.order);
-    
+      .sort((a, b) => (a.configOrderIndex ?? Infinity) - (b.configOrderIndex ?? Infinity));
+
     console.log(`✅ Grouped ${customers.length} customers into ${result.length} groups (tags + districts)`);
     result.forEach(district => {
       console.log(`   - ${district.districtLabel}: ${district.customers.length} customers`);
     });
-    
+
     return result;
   }
 

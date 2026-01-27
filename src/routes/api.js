@@ -13,6 +13,7 @@ const accountService = require('../services/accountService');
 const pnlRenderService = require('../services/pnlRenderService');
 const googleSheetsService = require('../services/googleSheetsService');
 const censusService = require('../services/censusService');
+const fivetranService = require('../services/fivetranService');
 
 /**
  * Configure API routes
@@ -1616,6 +1617,63 @@ function createApiRoutes(storageService, bigQueryService) {
       console.error('Error fetching census:', error);
       res.status(500).json({
         error: 'Failed to fetch census',
+        message: error.message
+      });
+    }
+  });
+
+  // ============================================
+  // Fivetran API Endpoints
+  // ============================================
+
+  /**
+   * Get full pipeline status (connectors + transformation)
+   *
+   * GET /api/fivetran/status
+   */
+  router.get('/fivetran/status', async (req, res) => {
+    try {
+      if (!fivetranService.isConfigured()) {
+        return res.status(503).json({
+          error: 'Fivetran service not configured',
+          message: 'FIVETRAN_API_KEY and FIVETRAN_API_SECRET environment variables are required'
+        });
+      }
+
+      const status = await fivetranService.getPipelineStatus();
+      res.json({ success: true, ...status });
+    } catch (error) {
+      console.error('Error fetching Fivetran pipeline status:', error);
+      res.status(500).json({
+        error: 'Failed to fetch pipeline status',
+        message: error.message
+      });
+    }
+  });
+
+  /**
+   * Trigger a manual sync for a single connector
+   *
+   * POST /api/fivetran/connectors/:connectorId/sync
+   */
+  router.post('/fivetran/connectors/:connectorId/sync', async (req, res) => {
+    try {
+      if (!fivetranService.isConfigured()) {
+        return res.status(503).json({ error: 'Fivetran service not configured' });
+      }
+
+      const { connectorId } = req.params;
+      const result = await fivetranService.triggerSync(connectorId);
+
+      res.json({
+        success: true,
+        message: `Sync triggered for connector ${connectorId}`,
+        result
+      });
+    } catch (error) {
+      console.error(`Error triggering sync for ${req.params.connectorId}:`, error);
+      res.status(500).json({
+        error: 'Failed to trigger sync',
         message: error.message
       });
     }

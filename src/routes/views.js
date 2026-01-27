@@ -64,6 +64,15 @@ function createViewRoutes() {
     res.sendFile(path.join(publicPath, 'run-log.html'));
   });
 
+  /**
+   * Fivetran Sync page
+   *
+   * GET /fivetran-sync
+   */
+  router.get('/fivetran-sync', (req, res) => {
+    res.sendFile(path.join(publicPath, 'fivetran-sync.html'));
+  });
+
   // Future routes can be added here:
   // router.get('/reports', ...) 
   // router.get('/settings', ...)
