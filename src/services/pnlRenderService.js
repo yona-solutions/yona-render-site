@@ -242,7 +242,7 @@ function renderAccountRows(
     // Still render children
     kids.forEach(c => {
       html += renderAccountRows(
-        c, level, labelToConfig, childrenMap, valMonthAct, valMonthBud,
+        c, level + 1, labelToConfig, childrenMap, valMonthAct, valMonthBud,
         valYtdAct, valYtdBud, incomeTotals, isOperational, sectionAccounts
       );
     });
@@ -274,7 +274,7 @@ function renderAccountRows(
     : '';
   
   // Bold if has children OR is a top-level section account
-  const shouldBold = kids.length > 0 || sectionAccounts.has(accountLabel);
+  const shouldBold = kids.length > 0 || sectionAccounts.has(accountLabel) || cfg.doubleLines;
   
   // Calculate percentages relative to Income
   const pctMonthAct = incomeTotals.act ? (act / incomeTotals.act * 100) : null;
