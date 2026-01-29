@@ -2439,6 +2439,26 @@
       openEditSidebar(newNode);
     }
 
+    // Auto-fill the Name field when a mapping is selected
+    // Only fills if name is empty or a default value like "New Account", "New Customer", etc.
+    function autoFillNameFromMapping(displayName) {
+      if (!displayName) return;
+
+      const nameInput = document.getElementById('editName');
+      const currentName = nameInput.value.trim();
+
+      // Check if name is empty or a default value
+      const isDefault = !currentName ||
+        currentName === 'New Account' ||
+        currentName === 'New Customer' ||
+        currentName === 'New Subsidiary' ||
+        currentName.startsWith('New ');
+
+      if (isDefault) {
+        nameInput.value = displayName;
+      }
+    }
+
     // Edit Sidebar Functions
     async function openEditSidebar(node) {
       AppState.editingNode = node;
@@ -3013,6 +3033,8 @@
           if (value) {
             hint.textContent = `Mapped to customer ID: ${value}`;
             hint.style.display = 'block';
+            // Auto-fill name field if empty or default
+            autoFillNameFromMapping(displayName);
           } else {
             hint.style.display = 'none';
           }
@@ -3212,6 +3234,8 @@
           if (value) {
             hint.textContent = `Mapped to subsidiary ID: ${value}`;
             hint.style.display = 'block';
+            // Auto-fill name field if empty or default
+            autoFillNameFromMapping(displayName);
           } else {
             hint.style.display = 'none';
           }
@@ -3270,12 +3294,14 @@
         
         // Add all account options
         let selectedText = '';
+        let selectedDisplayName = '';
         accounts.forEach(account => {
         const option = document.createElement('div');
           option.className = 'custom-select-option';
           const baseText = account.display_name_with_id || `${account.display_name} (${account.account_id})`;
           option.textContent = baseText;
           option.dataset.value = account.account_id;
+          option.dataset.displayName = account.display_name;
           
           // Check if this is the currently selected account
           const isCurrentSelection = node.account_internal_id && parseInt(node.account_internal_id) === parseInt(account.account_id);
@@ -3313,12 +3339,14 @@
         input.setAttribute('readonly', 'readonly');
       
       // Setup dropdown behavior
-      setupCustomDropdown(input, dropdown, (value, text) => {
+      setupCustomDropdown(input, dropdown, (value, text, displayName) => {
         input.value = text;
           input.dataset.selectedValue = value;
         if (value) {
             hint.textContent = `Mapped to account ID: ${value}`;
           hint.style.display = 'block';
+          // Auto-fill name field if empty or default
+          autoFillNameFromMapping(displayName);
         } else {
           hint.style.display = 'none';
         }
