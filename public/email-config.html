@@ -2639,7 +2639,20 @@
       const selectId = `edit${entityType.charAt(0).toUpperCase() + entityType.slice(1)}Id`;
       const select = document.getElementById(selectId);
       const selectedOption = select.options[select.selectedIndex];
-      // The name will be saved when we save the schedule
+
+      // Auto-fill template name if empty or default
+      const nameInput = document.getElementById('editTemplateName');
+      const currentName = nameInput.value.trim();
+      const isDefault = !currentName || currentName === 'New Report Schedule';
+
+      if (isDefault && selectedOption && selectedOption.value) {
+        // Remove parenthetical prefix like "(123) " from entity name
+        const entityLabel = selectedOption.text;
+        const cleanName = entityLabel.replace(/^\([^)]+\)\s*/, '').trim();
+        if (cleanName) {
+          nameInput.value = cleanName;
+        }
+      }
     }
 
     function populateEmailGroupSelect() {
