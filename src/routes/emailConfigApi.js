@@ -719,6 +719,16 @@ router.post('/report-schedules/:id/send-email', async (req, res) => {
     const datesResponse = await fetch('http://localhost:' + (process.env.PORT || 3000) + '/api/pl/dates', {
       headers: internalHeaders
     });
+
+    if (!datesResponse.ok) {
+      const errorText = await datesResponse.text();
+      console.error('Failed to fetch dates:', datesResponse.status, errorText.substring(0, 200));
+      return res.status(400).json({
+        error: 'Failed to fetch dates',
+        message: `Internal API error: ${datesResponse.status}`
+      });
+    }
+
     const dates = await datesResponse.json();
 
     if (!dates || !Array.isArray(dates) || dates.length === 0) {
@@ -1181,6 +1191,19 @@ router.post('/report-schedules/:id/process', requireApiKey, async (req, res) => 
     const datesResponse = await fetch('http://localhost:' + (process.env.PORT || 3000) + '/api/pl/dates', {
       headers: internalHeaders
     });
+
+    if (!datesResponse.ok) {
+      const errorText = await datesResponse.text();
+      console.error('Failed to fetch dates:', datesResponse.status, errorText.substring(0, 200));
+      return res.status(400).json({
+        error: 'Failed to fetch dates',
+        message: `Internal API error: ${datesResponse.status}`,
+        scheduleId: parseInt(id),
+        scheduleName: schedule.template_name,
+        status: 'error'
+      });
+    }
+
     const dates = await datesResponse.json();
 
     if (!dates || !Array.isArray(dates) || dates.length === 0) {

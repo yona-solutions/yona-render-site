@@ -458,6 +458,13 @@ class EmailSchedulerService {
       const datesResponse = await fetch(`http://localhost:${port}/api/pl/dates`, {
         headers: internalHeaders
       });
+
+      if (!datesResponse.ok) {
+        const errorText = await datesResponse.text();
+        console.error('Failed to fetch dates:', datesResponse.status, errorText.substring(0, 200));
+        throw new Error(`Failed to fetch dates: ${datesResponse.status}`);
+      }
+
       const dates = await datesResponse.json();
 
       if (!dates || !Array.isArray(dates) || dates.length === 0) {
