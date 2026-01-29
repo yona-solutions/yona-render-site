@@ -764,9 +764,12 @@ router.post('/report-schedules/:id/send-email', async (req, res) => {
     console.log(`   HTML content length: ${htmlContent.length}`);
 
     // Parse and filter HTML (reuse logic from download)
-    const parser = new (require('jsdom').JSDOM)(htmlContent).window.DOMParser;
-    const doc = new parser().parseFromString(`<div id="root">${htmlContent}</div>`, "text/html");
+    console.log(`   Creating JSDOM parser...`);
+    const { JSDOM } = require('jsdom');
+    const dom = new JSDOM(`<div id="root">${htmlContent}</div>`);
+    const doc = dom.window.document;
     const root = doc.getElementById("root");
+    console.log(`   JSDOM parser created, root found: ${!!root}`);
     
     // Helper function to check if a report has non-zero income
     function hasNonZeroIncome(container) {
@@ -811,10 +814,12 @@ router.post('/report-schedules/:id/send-email', async (req, res) => {
     console.log(`   Filtered to ${kept.length} reports with non-zero income`);
 
     // Build complete PDF HTML (reuse from download logic)
+    console.log(`   Building PDF HTML...`);
     const fullHTML = buildPDFHTML(filteredHtmlContent);
-    
-    console.log(`   Generating PDF...`);
-    
+    console.log(`   PDF HTML length: ${fullHTML.length}`);
+
+    console.log(`   Generating PDF via PDFShift...`);
+
     // Convert to PDF using PDFShift
     const pdfResponse = await fetch('https://api.pdfshift.io/v3/convert/pdf', {
       method: 'POST',
