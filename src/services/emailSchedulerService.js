@@ -455,7 +455,7 @@ class EmailSchedulerService {
         ? { 'X-API-Key': process.env.SCHEDULER_API_KEY }
         : {};
 
-      const datesResponse = await fetch(`http://localhost:${port}/api/pl/dates`, {
+      const datesResponse = await fetch(`http://127.0.0.1:${port}/api/pl/dates`, {
         headers: internalHeaders
       });
 
@@ -474,7 +474,7 @@ class EmailSchedulerService {
       const latestDate = dates[0].time || dates[0].formatted;
 
       // Fetch P&L data
-      const dataUrl = `http://localhost:${port}/api/pl/data?hierarchy=${schedule.template_type}&selectedId=${encodeURIComponent(entityId)}&date=${latestDate}&plType=${schedule.process}`;
+      const dataUrl = `http://127.0.0.1:${port}/api/pl/data?hierarchy=${schedule.template_type}&selectedId=${encodeURIComponent(entityId)}&date=${latestDate}&plType=${schedule.process}`;
       const dataResponse = await fetch(dataUrl, { headers: internalHeaders });
       
       if (!dataResponse.ok) {

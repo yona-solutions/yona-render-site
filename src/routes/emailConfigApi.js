@@ -716,7 +716,7 @@ router.post('/report-schedules/:id/send-email', async (req, res) => {
       : {};
 
     // Get latest available date
-    const datesResponse = await fetch('http://localhost:' + (process.env.PORT || 3000) + '/api/pl/dates', {
+    const datesResponse = await fetch('http://127.0.0.1:' + (process.env.PORT || 3000) + '/api/pl/dates', {
       headers: internalHeaders
     });
 
@@ -742,7 +742,7 @@ router.post('/report-schedules/:id/send-email', async (req, res) => {
     console.log(`   Using date: ${latestDate}`);
 
     // Fetch P&L data
-    const dataUrl = `http://localhost:${process.env.PORT || 3000}/api/pl/data?hierarchy=${schedule.template_type}&selectedId=${encodeURIComponent(entityId)}&date=${latestDate}&plType=${schedule.process}`;
+    const dataUrl = `http://127.0.0.1:${process.env.PORT || 3000}/api/pl/data?hierarchy=${schedule.template_type}&selectedId=${encodeURIComponent(entityId)}&date=${latestDate}&plType=${schedule.process}`;
     console.log(`   Fetching data from: ${dataUrl}`);
 
     const dataResponse = await fetch(dataUrl, { headers: internalHeaders });
@@ -1188,7 +1188,7 @@ router.post('/report-schedules/:id/process', requireApiKey, async (req, res) => 
       : {};
 
     // Get latest available date
-    const datesResponse = await fetch('http://localhost:' + (process.env.PORT || 3000) + '/api/pl/dates', {
+    const datesResponse = await fetch('http://127.0.0.1:' + (process.env.PORT || 3000) + '/api/pl/dates', {
       headers: internalHeaders
     });
 
@@ -1220,7 +1220,7 @@ router.post('/report-schedules/:id/process', requireApiKey, async (req, res) => 
     console.log(`   Using date: ${latestDate}`);
 
     // Fetch P&L data
-    const dataUrl = `http://localhost:${process.env.PORT || 3000}/api/pl/data?hierarchy=${schedule.template_type}&selectedId=${encodeURIComponent(entityId)}&date=${latestDate}&plType=${schedule.process}`;
+    const dataUrl = `http://127.0.0.1:${process.env.PORT || 3000}/api/pl/data?hierarchy=${schedule.template_type}&selectedId=${encodeURIComponent(entityId)}&date=${latestDate}&plType=${schedule.process}`;
     console.log(`   Fetching data...`);
 
     const dataResponse = await fetch(dataUrl, { headers: internalHeaders });
