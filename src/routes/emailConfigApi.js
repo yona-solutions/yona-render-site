@@ -753,7 +753,7 @@ router.post('/report-schedules/:id/send-email', async (req, res) => {
     console.log(`   Fetching data from: ${dataUrl}`);
 
     const controller2 = new AbortController();
-    const timeout2 = setTimeout(() => controller2.abort(), 60000);
+    const timeout2 = setTimeout(() => controller2.abort(), 600000); // 10 minutes
 
     let dataResponse;
     try {
