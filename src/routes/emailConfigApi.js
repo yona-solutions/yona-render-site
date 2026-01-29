@@ -895,6 +895,7 @@ router.post('/report-schedules/:id/send-email', async (req, res) => {
 /**
  * Filter P&L report HTML to only include reports with non-zero income
  * Uses regex instead of JSDOM to avoid memory issues
+ * Checks BOTH Actuals and Budget - excludes only if both are zero
  */
 function filterReportsWithIncome(htmlContent) {
   // Match each pnl-report-container div
@@ -906,35 +907,36 @@ function filterReportsWithIncome(htmlContent) {
     return htmlContent;
   }
 
-  // Filter to only containers with non-zero income
+  // Helper to parse accounting format to number
+  function parseValue(str) {
+    if (!str || str === '—' || str === '-' || str === '$0' || str === '$0.00') return 0;
+    let cleaned = str.trim().replace(/[$,\s]/g, '');
+    if (cleaned.startsWith('(') && cleaned.endsWith(')')) {
+      cleaned = '-' + cleaned.slice(1, -1);
+    }
+    const num = parseFloat(cleaned);
+    return isNaN(num) ? 0 : num;
+  }
+
+  // Filter to only containers with non-zero income (Actuals OR Budget)
   const kept = containers.filter(container => {
-    // Look for the Income row and its value
-    // Pattern: <td...>Income</td><td...>$X,XXX</td> or similar
-    const incomeMatch = container.match(/<td[^>]*>\s*Income\s*<\/td>\s*<td[^>]*>([^<]*)<\/td>/i);
+    // Look for the Income row and capture Actuals and Budget values
+    // Pattern: <td...>Income</td><td...>ACTUALS</td><td...>BUDGET</td>
+    const incomeMatch = container.match(/<td[^>]*>\s*Income\s*<\/td>\s*<td[^>]*>([^<]*)<\/td>\s*<td[^>]*>([^<]*)<\/td>/i);
 
     if (!incomeMatch) {
       // No income row found, keep the report
       return true;
     }
 
-    const valueText = incomeMatch[1].trim();
+    const actualsValue = parseValue(incomeMatch[1]);
+    const budgetValue = parseValue(incomeMatch[2]);
 
-    // Parse the accounting value
-    if (!valueText || valueText === '—' || valueText === '-' || valueText === '$0' || valueText === '$0.00') {
-      return false;
-    }
-
-    // Remove $ and , and parse
-    let cleaned = valueText.replace(/[$,\s]/g, '');
-    if (cleaned.startsWith('(') && cleaned.endsWith(')')) {
-      cleaned = '-' + cleaned.slice(1, -1);
-    }
-    const num = parseFloat(cleaned);
-
-    return !isNaN(num) && num !== 0;
+    // Keep if EITHER Actuals OR Budget is non-zero
+    return actualsValue !== 0 || budgetValue !== 0;
   });
 
-  console.log(`   Filtered: ${kept.length} of ${containers.length} reports have non-zero income`);
+  console.log(`   Filtered: ${kept.length} of ${containers.length} reports have non-zero income (Actuals or Budget)`);
 
   if (kept.length === 0) {
     // If all filtered out, keep at least the first one

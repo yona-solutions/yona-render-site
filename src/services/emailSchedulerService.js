@@ -544,20 +544,21 @@ class EmailSchedulerService {
 
   /**
    * Check if a report container has non-zero income
+   * Checks BOTH Actuals (cells[1]) and Budget (cells[2])
+   * Returns true if EITHER has non-zero income
    */
   hasNonZeroIncome(container) {
     const table = container.querySelector("table");
     if (!table) return false;
-    
+
     const rows = Array.from(table.querySelectorAll("tr"));
     for (const row of rows) {
       const cells = Array.from(row.querySelectorAll("td"));
       if (cells.length > 0 && cells[0].textContent.trim() === "Income") {
-        if (cells.length > 1) {
-          const valueText = cells[1].textContent.trim();
-          const numValue = this.parseAccountingToNumber(valueText);
-          return numValue !== 0;
-        }
+        const actualsValue = cells.length > 1 ? this.parseAccountingToNumber(cells[1].textContent.trim()) : 0;
+        const budgetValue = cells.length > 2 ? this.parseAccountingToNumber(cells[2].textContent.trim()) : 0;
+        // Keep if EITHER Actuals OR Budget is non-zero
+        return actualsValue !== 0 || budgetValue !== 0;
       }
     }
     return false;
