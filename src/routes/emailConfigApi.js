@@ -781,10 +781,12 @@ router.post('/report-schedules/:id/send-email', async (req, res) => {
 
     console.log(`   HTML content length: ${htmlContent.length}`);
 
-    // Skip JSDOM filtering for now - just use raw HTML content
-    // This avoids memory issues with large HTML on Render's starter plan
-    const filteredHtmlContent = htmlContent;
-    console.log(`   Using raw HTML content (JSDOM filtering disabled)`);
+    // Filter P&L reports to only include those with non-zero income
+    // Using regex instead of JSDOM to avoid memory issues on Render
+    console.log(`   Filtering reports with non-zero income...`);
+
+    const filteredHtmlContent = filterReportsWithIncome(htmlContent);
+    console.log(`   Filtered HTML length: ${filteredHtmlContent.length}`);
 
     // Build complete PDF HTML (reuse from download logic)
     console.log(`   Building PDF HTML...`);
@@ -889,6 +891,58 @@ router.post('/report-schedules/:id/send-email', async (req, res) => {
     });
   }
 });
+
+/**
+ * Filter P&L report HTML to only include reports with non-zero income
+ * Uses regex instead of JSDOM to avoid memory issues
+ */
+function filterReportsWithIncome(htmlContent) {
+  // Match each pnl-report-container div
+  const containerRegex = /<div class="pnl-report-container[^"]*"[\s\S]*?<\/div>\s*(?=<div class="pnl-report-container|$)/g;
+  const containers = htmlContent.match(containerRegex) || [];
+
+  if (containers.length === 0) {
+    // No containers found, return original content
+    return htmlContent;
+  }
+
+  // Filter to only containers with non-zero income
+  const kept = containers.filter(container => {
+    // Look for the Income row and its value
+    // Pattern: <td...>Income</td><td...>$X,XXX</td> or similar
+    const incomeMatch = container.match(/<td[^>]*>\s*Income\s*<\/td>\s*<td[^>]*>([^<]*)<\/td>/i);
+
+    if (!incomeMatch) {
+      // No income row found, keep the report
+      return true;
+    }
+
+    const valueText = incomeMatch[1].trim();
+
+    // Parse the accounting value
+    if (!valueText || valueText === '—' || valueText === '-' || valueText === '$0' || valueText === '$0.00') {
+      return false;
+    }
+
+    // Remove $ and , and parse
+    let cleaned = valueText.replace(/[$,\s]/g, '');
+    if (cleaned.startsWith('(') && cleaned.endsWith(')')) {
+      cleaned = '-' + cleaned.slice(1, -1);
+    }
+    const num = parseFloat(cleaned);
+
+    return !isNaN(num) && num !== 0;
+  });
+
+  console.log(`   Filtered: ${kept.length} of ${containers.length} reports have non-zero income`);
+
+  if (kept.length === 0) {
+    // If all filtered out, keep at least the first one
+    return containers[0] || htmlContent;
+  }
+
+  return kept.join('\n');
+}
 
 // Helper function to build PDF HTML (matches exact styling from frontend download)
 function buildPDFHTML(content) {
