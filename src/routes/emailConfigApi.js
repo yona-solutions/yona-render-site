@@ -781,55 +781,10 @@ router.post('/report-schedules/:id/send-email', async (req, res) => {
 
     console.log(`   HTML content length: ${htmlContent.length}`);
 
-    // Parse and filter HTML (reuse logic from download)
-    console.log(`   Creating JSDOM parser...`);
-    const { JSDOM } = require('jsdom');
-    const dom = new JSDOM(`<div id="root">${htmlContent}</div>`);
-    const doc = dom.window.document;
-    const root = doc.getElementById("root");
-    console.log(`   JSDOM parser created, root found: ${!!root}`);
-    
-    // Helper function to check if a report has non-zero income
-    function hasNonZeroIncome(container) {
-      const table = container.querySelector("table");
-      if (!table) return false;
-      
-      const rows = Array.from(table.querySelectorAll("tr"));
-      for (const row of rows) {
-        const cells = Array.from(row.querySelectorAll("td"));
-        if (cells.length > 0 && cells[0].textContent.trim() === "Income") {
-          if (cells.length > 1) {
-            const valueText = cells[1].textContent.trim();
-            const numValue = parseAccountingToNumber(valueText);
-            return numValue !== 0;
-          }
-        }
-      }
-      return false;
-    }
-    
-    function parseAccountingToNumber(str) {
-      if (!str || str === "—" || str === "-") return 0;
-      let cleaned = str.replace(/[$,\s]/g, "");
-      if (cleaned.startsWith("(") && cleaned.endsWith(")")) {
-        cleaned = "-" + cleaned.slice(1, -1);
-      }
-      const num = parseFloat(cleaned);
-      return isNaN(num) ? 0 : num;
-    }
-    
-    // Filter pages
-    const kept = [];
-    root.querySelectorAll(".pnl-report-container").forEach(container => {
-      if (hasNonZeroIncome(container)) {
-        kept.push(container.outerHTML);
-      }
-    });
-    
-    const filteredHtmlContent = kept.length ? kept.join("\n") : 
-      (root.querySelector(".pnl-report-container")?.outerHTML || htmlContent);
-    
-    console.log(`   Filtered to ${kept.length} reports with non-zero income`);
+    // Skip JSDOM filtering for now - just use raw HTML content
+    // This avoids memory issues with large HTML on Render's starter plan
+    const filteredHtmlContent = htmlContent;
+    console.log(`   Using raw HTML content (JSDOM filtering disabled)`);
 
     // Build complete PDF HTML (reuse from download logic)
     console.log(`   Building PDF HTML...`);
