@@ -2818,6 +2818,38 @@
       }
     }
 
+    // Auto-fill template_name when entity is selected
+    // Removes parenthetical prefix like "(123) " from entity name
+    function autoFillTemplateName(schedule, scheduleId, entityLabel, changes) {
+      if (!entityLabel) return;
+
+      // Only auto-fill if name is empty or default
+      const currentName = schedule.template_name || '';
+      const isDefault = !currentName || currentName === 'New Report Schedule' || currentName.trim() === '';
+
+      if (!isDefault) return;
+
+      // Remove parenthetical prefix like "(123) " or "(ABC) "
+      let cleanName = entityLabel.replace(/^\([^)]+\)\s*/, '').trim();
+
+      if (cleanName) {
+        // Update the schedule object
+        schedule.template_name = cleanName;
+        // Track the change
+        changes.template_name = cleanName;
+
+        // Update the input field in the UI
+        const row = document.querySelector(`tr[data-schedule-id="${scheduleId}"]`);
+        if (row) {
+          const nameInput = row.querySelector('input[type="text"]');
+          if (nameInput) {
+            nameInput.value = cleanName;
+            nameInput.classList.remove('required-field');
+          }
+        }
+      }
+    }
+
     function updateScheduleField(scheduleId, fieldName, value) {
       const schedule = reportSchedules.find(s => s.id === scheduleId);
       if (!schedule) return;
@@ -2833,15 +2865,19 @@
       changes[fieldName] = value;
 
       // If we're updating entity fields, also include the entity name
+      // and auto-fill template_name if it's empty or default
       if (fieldName === 'district_id') {
         const option = districtOptions.find(o => o.id === value);
         changes.district_name = option ? option.label : null;
+        autoFillTemplateName(schedule, scheduleId, option?.label, changes);
       } else if (fieldName === 'region_id') {
         const option = regionOptions.find(o => o.id === value);
         changes.region_name = option ? option.label : null;
+        autoFillTemplateName(schedule, scheduleId, option?.label, changes);
       } else if (fieldName === 'subsidiary_id') {
         const option = subsidiaryOptions.find(o => o.id === value);
         changes.subsidiary_name = option ? option.label : null;
+        autoFillTemplateName(schedule, scheduleId, option?.label, changes);
       }
 
       // Mark row as changed
