@@ -135,7 +135,7 @@ Your SPHERE account has been created.
 Email: ${normalizedEmail}
 Password: ${password}
 
-Please sign in at: ${process.env.APP_URL || 'https://sphere.yonasolutions.com'}/login.html
+Please sign in at: ${process.env.APP_URL || 'https://yona-render-site.onrender.com'}/login.html
 
 We recommend changing your password after your first login.
 
@@ -147,7 +147,7 @@ Yona Solutions`;
         <p>Your SPHERE account has been created.</p>
         <p><strong>Email:</strong> ${normalizedEmail}<br>
         <strong>Password:</strong> <code style="background:#f0f0f0;padding:2px 6px;border-radius:3px;">${password}</code></p>
-        <p>Please sign in at: <a href="${process.env.APP_URL || 'https://sphere.yonasolutions.com'}/login.html">SPHERE Login</a></p>
+        <p>Please sign in at: <a href="${process.env.APP_URL || 'https://yona-render-site.onrender.com'}/login.html">SPHERE Login</a></p>
         <p>We recommend changing your password after your first login.</p>
         <p>Best regards,<br>Yona Solutions</p>
       `;
@@ -246,7 +246,7 @@ Your SPHERE password has been reset.
 Email: ${normalizedEmail}
 New Password: ${password}
 
-Please sign in at: ${process.env.APP_URL || 'https://sphere.yonasolutions.com'}/login.html
+Please sign in at: ${process.env.APP_URL || 'https://yona-render-site.onrender.com'}/login.html
 
 Best regards,
 Yona Solutions`;
@@ -256,7 +256,7 @@ Yona Solutions`;
         <p>Your SPHERE password has been reset.</p>
         <p><strong>Email:</strong> ${normalizedEmail}<br>
         <strong>New Password:</strong> <code style="background:#f0f0f0;padding:2px 6px;border-radius:3px;">${password}</code></p>
-        <p>Please sign in at: <a href="${process.env.APP_URL || 'https://sphere.yonasolutions.com'}/login.html">SPHERE Login</a></p>
+        <p>Please sign in at: <a href="${process.env.APP_URL || 'https://yona-render-site.onrender.com'}/login.html">SPHERE Login</a></p>
         <p>Best regards,<br>Yona Solutions</p>
       `;
 
