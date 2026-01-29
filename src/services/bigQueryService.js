@@ -462,7 +462,8 @@ class BigQueryService {
         customer_id,
         customer_code,
         display_name,
-        display_name_with_id
+        display_name_with_id,
+        start_date_est
       FROM \`${this.dataset}.dim_customers\`
       WHERE customer_id IS NOT NULL
       ORDER BY display_name
@@ -473,12 +474,13 @@ class BigQueryService {
         query: query,
         location: 'US'
       });
-      
+
       return rows.map(row => ({
         customer_id: row.customer_id,
         customer_code: row.customer_code || '',
         display_name: row.display_name,
-        display_name_with_id: row.display_name_with_id
+        display_name_with_id: row.display_name_with_id,
+        start_date_est: row.start_date_est ? row.start_date_est.value : null
       }));
     } catch (error) {
       console.error('Error fetching customers from BigQuery:', error);

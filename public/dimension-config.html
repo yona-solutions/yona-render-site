@@ -2979,6 +2979,7 @@
           option.textContent = baseText;
           option.dataset.value = customer.customer_id;
           option.dataset.displayName = customer.display_name;
+          option.dataset.startDateEst = customer.startDateEst || customer.start_date_est || '';
           
           // Check if this is the currently selected customer
           const isCurrentSelection = nodeCustomerId && parseInt(nodeCustomerId) === parseInt(customer.customer_id);
@@ -3022,17 +3023,23 @@
         input.setAttribute('readonly', 'readonly');
         
         // Setup dropdown behavior
-        setupCustomDropdown(input, dropdown, (value, text, displayName) => {
+        setupCustomDropdown(input, dropdown, (value, text, displayName, startDateEst) => {
           input.value = text;
           input.dataset.selectedValue = value;
           input.dataset.selectedDisplayName = displayName || '';
           if (value) {
             hint.textContent = `Mapped to customer ID: ${value}`;
             hint.style.display = 'block';
-            // Auto-fill name field if empty or default
+            // Auto-fill name field
             autoFillNameFromMapping(displayName);
+            // Auto-fill start date from customer data
+            if (startDateEst) {
+              document.getElementById('editStartDate').value = startDateEst;
+            }
           } else {
             hint.style.display = 'none';
+            // Clear start date when no customer selected
+            document.getElementById('editStartDate').value = '';
           }
         });
       } catch (error) {
@@ -3529,6 +3536,7 @@
           const value = e.target.dataset.value;
           const text = e.target.textContent;
           const displayName = e.target.dataset.displayName || '';
+          const startDateEst = e.target.dataset.startDateEst || '';
           
           // Update selected state
           dropdown.querySelectorAll('.custom-select-option').forEach(opt => {
@@ -3547,7 +3555,7 @@
           
           // Call onChange callback if provided
           if (onChange) {
-            onChange(value, text, displayName);
+            onChange(value, text, displayName, startDateEst);
           }
           
           // Close dropdown
