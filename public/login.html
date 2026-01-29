@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SPHERE - Sign In</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+      display: flex; align-items: center; justify-content: center;
+      min-height: 100vh; background: #f8f9fa;
+    }
+    .login-card {
+      background: white; border-radius: 8px; padding: 48px 40px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08); border: 1px solid #e2e8f0;
+      text-align: center; max-width: 400px; width: 100%;
+    }
+    .logo { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 32px; }
+    .logo-icon {
+      width: 36px; height: 36px;
+      background: linear-gradient(135deg, #3b5998 0%, #2d4373 100%);
+      border-radius: 8px; display: flex; align-items: center; justify-content: center;
+      color: white; font-size: 18px; font-weight: bold;
+    }
+    .logo span { font-size: 24px; font-weight: 600; color: #1a202c; letter-spacing: -0.3px; }
+    .login-card h2 { font-size: 18px; color: #2d3748; margin-bottom: 8px; font-weight: 500; }
+    .login-card p { font-size: 14px; color: #718096; margin-bottom: 24px; }
+
+    /* Form styles */
+    .form-group { margin-bottom: 16px; text-align: left; }
+    .form-group label { display: block; font-size: 13px; color: #4a5568; margin-bottom: 6px; font-weight: 500; }
+    .form-group input {
+      width: 100%; padding: 10px 12px; border: 1px solid #cbd5e0; border-radius: 6px;
+      font-size: 14px; transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .form-group input:focus { outline: none; border-color: #4a7c9e; box-shadow: 0 0 0 3px rgba(74,124,158,0.1); }
+
+    .btn-primary {
+      width: 100%; padding: 12px; border: none; border-radius: 6px;
+      background: #4a7c9e; color: white; font-size: 14px; font-weight: 500;
+      cursor: pointer; transition: background 0.2s;
+    }
+    .btn-primary:hover { background: #3d6a88; }
+    .btn-primary:disabled { background: #a0aec0; cursor: not-allowed; }
+
+    .divider {
+      display: flex; align-items: center; margin: 24px 0;
+      color: #a0aec0; font-size: 12px;
+    }
+    .divider::before, .divider::after {
+      content: ''; flex: 1; height: 1px; background: #e2e8f0;
+    }
+    .divider span { padding: 0 12px; }
+
+    #google-signin-btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 12px;
+      width: 100%; padding: 12px; border: 1px solid #cbd5e0; border-radius: 6px;
+      background: white; cursor: pointer; font-size: 14px; font-weight: 500;
+      color: #2d3748; transition: all 0.2s;
+    }
+    #google-signin-btn:hover { background: #f7fafc; border-color: #a0aec0; box-shadow: 0 2px 4px rgba(0,0,0,0.06); }
+    #google-signin-btn svg { width: 20px; height: 20px; }
+
+    .links { margin-top: 20px; font-size: 13px; }
+    .links a { color: #4a7c9e; text-decoration: none; }
+    .links a:hover { text-decoration: underline; }
+
+    .error-msg { color: #c53030; font-size: 13px; margin-top: 16px; display: none; }
+    .success-msg { color: #2f855a; font-size: 13px; margin-top: 16px; display: none; }
+
+    /* View switching */
+    .view { display: none; }
+    .view.active { display: block; }
+
+    .back-link { margin-bottom: 20px; text-align: left; }
+    .back-link a { color: #718096; font-size: 13px; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; }
+    .back-link a:hover { color: #4a5568; }
+
+    .info-text { background: #f0f4f8; padding: 12px; border-radius: 6px; font-size: 13px; color: #4a5568; margin-bottom: 20px; text-align: left; }
+  </style>
+</head>
+<body>
+  <div class="login-card">
+    <div class="logo">
+      <div class="logo-icon">&#9672;</div>
+      <span>SPHERE</span>
+    </div>
+
+    <!-- Login View -->
+    <div id="loginView" class="view active">
+      <h2>Sign in to continue</h2>
+      <p>Use your email and password or Google account</p>
+
+      <form id="emailLoginForm">
+        <div class="form-group">
+          <label for="loginEmail">Email</label>
+          <input type="email" id="loginEmail" placeholder="you@company.com" required>
+        </div>
+        <div class="form-group">
+          <label for="loginPassword">Password</label>
+          <input type="password" id="loginPassword" placeholder="Your password" required>
+        </div>
+        <button type="submit" class="btn-primary" id="loginBtn">Sign In</button>
+      </form>
+
+      <div class="divider"><span>or</span></div>
+
+      <button id="google-signin-btn">
+        <svg viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+        Sign in with Google
+      </button>
+
+      <div class="links">
+        <a href="#" onclick="showView('requestAccess'); return false;">Request Access</a>
+        &nbsp;&bull;&nbsp;
+        <a href="#" onclick="showView('forgotPassword'); return false;">Forgot Password</a>
+      </div>
+
+      <div class="error-msg" id="loginError"></div>
+    </div>
+
+    <!-- Request Access View -->
+    <div id="requestAccessView" class="view">
+      <div class="back-link"><a href="#" onclick="showView('login'); return false;">&larr; Back to login</a></div>
+      <h2>Request Access</h2>
+      <p>Create a new account</p>
+
+      <div class="info-text">
+        Only @flowsensesolutions.com, @yonasolutions.com, @qualitativ.ai, and @gmail.com emails can create accounts.
+      </div>
+
+      <form id="requestAccessForm">
+        <div class="form-group">
+          <label for="accessEmail">Work Email</label>
+          <input type="email" id="accessEmail" placeholder="you@company.com" required>
+        </div>
+        <button type="submit" class="btn-primary" id="requestBtn">Request Access</button>
+      </form>
+
+      <div class="error-msg" id="accessError"></div>
+      <div class="success-msg" id="accessSuccess"></div>
+    </div>
+
+    <!-- Forgot Password View -->
+    <div id="forgotPasswordView" class="view">
+      <div class="back-link"><a href="#" onclick="showView('login'); return false;">&larr; Back to login</a></div>
+      <h2>Forgot Password</h2>
+      <p>We'll send you a new password</p>
+
+      <form id="forgotPasswordForm">
+        <div class="form-group">
+          <label for="forgotEmail">Email</label>
+          <input type="email" id="forgotEmail" placeholder="you@company.com" required>
+        </div>
+        <button type="submit" class="btn-primary" id="forgotBtn">Send New Password</button>
+      </form>
+
+      <div class="error-msg" id="forgotError"></div>
+      <div class="success-msg" id="forgotSuccess"></div>
+    </div>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script>
+    firebase.initializeApp({
+      apiKey: "AIzaSyAlaEV7cmVnh6cQ6oovPjib5blRr2jTKdw",
+      authDomain: "yona-solutions-poc.firebaseapp.com",
+      projectId: "yona-solutions-poc",
+      appId: "1:940808232688:web:08ab5ea195f2be06e9ec35"
+    });
+
+    // If already signed in, redirect
+    firebase.auth().onAuthStateChanged(user => {
+      if (user) {
+        window.location.replace('/');
+      }
+    });
+
+    // View switching
+    function showView(viewName) {
+      document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+      document.getElementById(viewName + 'View').classList.add('active');
+      // Clear messages
+      document.querySelectorAll('.error-msg, .success-msg').forEach(el => {
+        el.style.display = 'none';
+        el.textContent = '';
+      });
+    }
+
+    // Show error message
+    function showError(elementId, message) {
+      const el = document.getElementById(elementId);
+      el.textContent = message;
+      el.style.display = 'block';
+    }
+
+    // Show success message
+    function showSuccess(elementId, message) {
+      const el = document.getElementById(elementId);
+      el.textContent = message;
+      el.style.display = 'block';
+    }
+
+    // Email/Password Login
+    document.getElementById('emailLoginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('loginEmail').value.trim();
+      const password = document.getElementById('loginPassword').value;
+      const btn = document.getElementById('loginBtn');
+      const errorEl = document.getElementById('loginError');
+
+      errorEl.style.display = 'none';
+      btn.disabled = true;
+      btn.textContent = 'Signing in...';
+
+      try {
+        await firebase.auth().signInWithEmailAndPassword(email, password);
+        // onAuthStateChanged will handle redirect
+      } catch (error) {
+        let message = error.message;
+        if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+          message = 'Invalid email or password';
+        } else if (error.code === 'auth/too-many-requests') {
+          message = 'Too many failed attempts. Please try again later.';
+        }
+        showError('loginError', message);
+        btn.disabled = false;
+        btn.textContent = 'Sign In';
+      }
+    });
+
+    // Google Sign In
+    document.getElementById('google-signin-btn').addEventListener('click', async () => {
+      try {
+        const provider = new firebase.auth.GoogleAuthProvider();
+        await firebase.auth().signInWithPopup(provider);
+      } catch (error) {
+        showError('loginError', error.message);
+      }
+    });
+
+    // Request Access
+    document.getElementById('requestAccessForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('accessEmail').value.trim();
+      const btn = document.getElementById('requestBtn');
+
+      document.getElementById('accessError').style.display = 'none';
+      document.getElementById('accessSuccess').style.display = 'none';
+      btn.disabled = true;
+      btn.textContent = 'Creating account...';
+
+      try {
+        const response = await fetch('/api/auth/request-access', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.message || 'Failed to create account');
+        }
+
+        showSuccess('accessSuccess', data.message);
+        document.getElementById('accessEmail').value = '';
+
+      } catch (error) {
+        showError('accessError', error.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Request Access';
+      }
+    });
+
+    // Forgot Password
+    document.getElementById('forgotPasswordForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('forgotEmail').value.trim();
+      const btn = document.getElementById('forgotBtn');
+
+      document.getElementById('forgotError').style.display = 'none';
+      document.getElementById('forgotSuccess').style.display = 'none';
+      btn.disabled = true;
+      btn.textContent = 'Sending...';
+
+      try {
+        const response = await fetch('/api/auth/forgot-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.message || 'Failed to reset password');
+        }
+
+        showSuccess('forgotSuccess', data.message);
+        document.getElementById('forgotEmail').value = '';
+
+      } catch (error) {
+        showError('forgotError', error.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Send New Password';
+      }
+    });
+  </script>
+</body>
+</html>

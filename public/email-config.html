@@ -26,6 +26,12 @@
       display: flex;
       flex-direction: column;
       box-shadow: 1px 0 0 rgba(0,0,0,0.02);
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 100vh;
+      overflow-y: auto;
+      z-index: 100;
     }
 
     .logo {
@@ -92,6 +98,7 @@
       flex-direction: column;
       overflow: hidden;
       background: #f8f9fa;
+      margin-left: 195px;
     }
 
     /* Header */
@@ -1630,6 +1637,10 @@
     </div>
   </div>
 
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="/auth.js"></script>
+
   <script>
     // ============================================
     // State Management
@@ -1680,7 +1691,7 @@
     
     async function loadEmailGroups() {
       try {
-        const response = await fetch('/api/email-groups');
+        const response = await authFetch('/api/email-groups');
         if (!response.ok) throw new Error('Failed to load email groups');
         
         emailGroups = await response.json();
@@ -1693,7 +1704,7 @@
 
     async function loadReportSchedules() {
       try {
-        const response = await fetch('/api/report-schedules');
+        const response = await authFetch('/api/report-schedules');
         if (!response.ok) throw new Error('Failed to load report schedules');
         
         reportSchedules = await response.json();
@@ -1801,9 +1812,9 @@
       try {
         // Load districts, regions, and subsidiaries in parallel
         const [districtsData, regionsData, subsidiariesData] = await Promise.all([
-          fetch('/api/storage/districts').then(r => r.json()),
-          fetch('/api/storage/regions').then(r => r.json()),
-          fetch('/api/storage/departments').then(r => r.json())
+          authFetch('/api/storage/districts').then(r => r.json()),
+          authFetch('/api/storage/regions').then(r => r.json()),
+          authFetch('/api/storage/departments').then(r => r.json())
         ]);
 
         console.log('📊 Raw data loaded:');
@@ -2356,7 +2367,7 @@
       document.getElementById('groupDescription').value = group.description || '';
       
       // Load emails for this group
-      fetch(`/api/email-groups/${id}/contacts`)
+      authFetch(`/api/email-groups/${id}/contacts`)
         .then(r => r.json())
         .then(contacts => {
           currentEmailList = contacts.map(c => c.email);
@@ -2393,7 +2404,7 @@
         
         const method = editingEmailGroupId ? 'PUT' : 'POST';
         
-        const response = await fetch(url, {
+        const response = await authFetch(url, {
           method,
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(data)
@@ -2416,7 +2427,7 @@
       }
 
       try {
-        const response = await fetch(`/api/email-groups/${id}`, {
+        const response = await authFetch(`/api/email-groups/${id}`, {
           method: 'DELETE'
         });
 
@@ -2750,14 +2761,14 @@
         let response;
         if (currentEditingSchedule) {
           // Update existing
-          response = await fetch(`/api/report-schedules/${currentEditingSchedule.id}`, {
+          response = await authFetch(`/api/report-schedules/${currentEditingSchedule.id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
           });
         } else {
           // Create new
-          response = await fetch('/api/report-schedules', {
+          response = await authFetch('/api/report-schedules', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
@@ -2792,7 +2803,7 @@
       };
 
       try {
-        const response = await fetch('/api/report-schedules', {
+        const response = await authFetch('/api/report-schedules', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(newSchedule)
@@ -2960,7 +2971,7 @@
           // Check if this is a new schedule (negative ID) or existing (positive ID)
           if (scheduleId < 0) {
             // Create new schedule
-            response = await fetch('/api/report-schedules', {
+            response = await authFetch('/api/report-schedules', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(changes)
@@ -2980,7 +2991,7 @@
             newSchedulesCreated++;
           } else {
             // Update existing schedule
-            response = await fetch(`/api/report-schedules/${scheduleId}`, {
+            response = await authFetch(`/api/report-schedules/${scheduleId}`, {
               method: 'PUT',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(changes)
@@ -3165,7 +3176,7 @@
       }
 
       try {
-        const response = await fetch(`/api/report-schedules/${id}`, {
+        const response = await authFetch(`/api/report-schedules/${id}`, {
           method: 'DELETE'
         });
 
@@ -3278,7 +3289,7 @@
         // Step 1: Get the most recent date available
         updateLoadingStep(1);
         console.log('📅 Fetching available dates...');
-        const datesResponse = await fetch('/api/pl/dates');
+        const datesResponse = await authFetch('/api/pl/dates');
         if (!datesResponse.ok) throw new Error('Failed to fetch dates');
         const dates = await datesResponse.json();
         if (!dates || dates.length === 0) {
@@ -3300,7 +3311,7 @@
         // Fetch P&L data
         const dataUrl = `/api/pl/data?hierarchy=${schedule.template_type}&selectedId=${encodeURIComponent(entityId)}&date=${latestDate}`;
         console.log('   URL:', dataUrl);
-        const dataResponse = await fetch(dataUrl);
+        const dataResponse = await authFetch(dataUrl);
         
         if (!dataResponse.ok) {
           const errorText = await dataResponse.text();
@@ -3713,7 +3724,7 @@
         console.log('   Calling send-email API...');
         console.log('   Recipient:', recipientEmail);
         
-        const response = await fetch(`/api/report-schedules/${scheduleId}/send-email`, {
+        const response = await authFetch(`/api/report-schedules/${scheduleId}/send-email`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ recipientEmail: recipientEmail })
@@ -3805,7 +3816,7 @@
         // Update each schedule
         for (const schedule of monthlySchedules) {
           try {
-            const response = await fetch(`/api/report-schedules/${schedule.id}`, {
+            const response = await authFetch(`/api/report-schedules/${schedule.id}`, {
               method: 'PUT',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -3878,7 +3889,7 @@
           let recipients = [];
           for (const groupId of emailGroupIds) {
             try {
-              const response = await fetch(`/api/email-groups/${groupId}/contacts`);
+              const response = await authFetch(`/api/email-groups/${groupId}/contacts`);
               if (response.ok) {
                 const contacts = await response.json();
                 recipients.push(...contacts.map(c => c.email));
@@ -4038,7 +4049,7 @@
     
     async function pollSchedulerStatus(startStats) {
       try {
-        const response = await fetch('/api/email-scheduler/status');
+        const response = await authFetch('/api/email-scheduler/status');
         if (!response.ok) return;
         
         const stats = await response.json();
@@ -4079,7 +4090,7 @@
         btn.innerHTML = '⏳ Processing...';
         
         // Get initial stats
-        const initialStatsResponse = await fetch('/api/email-scheduler/status');
+        const initialStatsResponse = await authFetch('/api/email-scheduler/status');
         const startStats = await initialStatsResponse.json();
         
         // Show progress modal (fetches schedules and builds UI)
@@ -4094,7 +4105,7 @@
         document.getElementById('schedulerStatusText').textContent = 'Processing schedules...';
         
         // Trigger the scheduler (this will take a while)
-        const response = await fetch('/api/email-scheduler/run-now', {
+        const response = await authFetch('/api/email-scheduler/run-now', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'

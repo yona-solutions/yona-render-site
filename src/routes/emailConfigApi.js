@@ -710,14 +710,21 @@ router.post('/report-schedules/:id/send-email', async (req, res) => {
 
     console.log(`📧 Generating and sending email for schedule: ${schedule.template_name}`);
 
+    // Headers for internal server-to-server calls
+    const internalHeaders = process.env.SCHEDULER_API_KEY
+      ? { 'X-API-Key': process.env.SCHEDULER_API_KEY }
+      : {};
+
     // Get latest available date
-    const datesResponse = await fetch('http://localhost:' + (process.env.PORT || 3000) + '/api/pl/dates');
+    const datesResponse = await fetch('http://localhost:' + (process.env.PORT || 3000) + '/api/pl/dates', {
+      headers: internalHeaders
+    });
     const dates = await datesResponse.json();
-    
-    if (!dates || dates.length === 0) {
+
+    if (!dates || !Array.isArray(dates) || dates.length === 0) {
       return res.status(400).json({
         error: 'No P&L data available',
-        message: 'Cannot generate report: no data available'
+        message: dates?.error || 'Cannot generate report: no data available'
       });
     }
 
@@ -727,8 +734,8 @@ router.post('/report-schedules/:id/send-email', async (req, res) => {
     // Fetch P&L data
     const dataUrl = `http://localhost:${process.env.PORT || 3000}/api/pl/data?hierarchy=${schedule.template_type}&selectedId=${encodeURIComponent(entityId)}&date=${latestDate}&plType=${schedule.process}`;
     console.log(`   Fetching data from: ${dataUrl}`);
-    
-    const dataResponse = await fetch(dataUrl);
+
+    const dataResponse = await fetch(dataUrl, { headers: internalHeaders });
     
     if (!dataResponse.ok) {
       throw new Error(`Failed to fetch P&L data: ${dataResponse.status}`);
@@ -1165,14 +1172,21 @@ router.post('/report-schedules/:id/process', requireApiKey, async (req, res) => 
     console.log(`   Process: ${schedule.process}`);
     console.log(`   Recipients: ${allRecipients.size}`);
 
+    // Headers for internal server-to-server calls
+    const internalHeaders = process.env.SCHEDULER_API_KEY
+      ? { 'X-API-Key': process.env.SCHEDULER_API_KEY }
+      : {};
+
     // Get latest available date
-    const datesResponse = await fetch('http://localhost:' + (process.env.PORT || 3000) + '/api/pl/dates');
+    const datesResponse = await fetch('http://localhost:' + (process.env.PORT || 3000) + '/api/pl/dates', {
+      headers: internalHeaders
+    });
     const dates = await datesResponse.json();
 
-    if (!dates || dates.length === 0) {
+    if (!dates || !Array.isArray(dates) || dates.length === 0) {
       return res.status(400).json({
         error: 'No P&L data available',
-        message: 'Cannot generate report: no data available',
+        message: dates?.error || 'Cannot generate report: no data available',
         scheduleId: parseInt(id),
         scheduleName: schedule.template_name,
         status: 'error'
@@ -1186,7 +1200,7 @@ router.post('/report-schedules/:id/process', requireApiKey, async (req, res) => 
     const dataUrl = `http://localhost:${process.env.PORT || 3000}/api/pl/data?hierarchy=${schedule.template_type}&selectedId=${encodeURIComponent(entityId)}&date=${latestDate}&plType=${schedule.process}`;
     console.log(`   Fetching data...`);
 
-    const dataResponse = await fetch(dataUrl);
+    const dataResponse = await fetch(dataUrl, { headers: internalHeaders });
 
     if (!dataResponse.ok) {
       throw new Error(`Failed to fetch P&L data: ${dataResponse.status}`);

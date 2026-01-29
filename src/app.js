@@ -17,7 +17,9 @@ const emailService = require('./services/emailService');
 const googleSheetsService = require('./services/googleSheetsService');
 const createApiRoutes = require('./routes/api');
 const emailConfigApiRoutes = require('./routes/emailConfigApi');
+const authApiRoutes = require('./routes/authApi');
 const createViewRoutes = require('./routes/views');
+const { createRequireAuth, initializeUserRolesTable } = require('./middleware/auth');
 
 /**
  * Create and configure Express application
@@ -55,6 +57,28 @@ async function createApp() {
   } else {
     console.warn('⚠️  DATABASE_URL not set - email configuration features disabled');
   }
+
+  // Initialize user_roles table and auth middleware
+  let requireAuth = (req, res, next) => next(); // no-op fallback
+  if (process.env.DATABASE_URL && emailConfigService.isAvailable()) {
+    try {
+      await initializeUserRolesTable(emailConfigService.pool);
+      requireAuth = createRequireAuth(emailConfigService.pool);
+    } catch (error) {
+      console.warn('⚠️  Auth middleware not available:', error.message);
+    }
+  }
+
+  // Public auth routes (no authentication required)
+  app.use('/api/auth', authApiRoutes);
+
+  // GET /api/me - returns current user info (must be before requireAuth applies)
+  app.get('/api/me', requireAuth, (req, res) => {
+    res.json({ email: req.user.email, role: req.user.role });
+  });
+
+  // Apply auth middleware to all /api routes (except /api/auth which is already registered)
+  app.use('/api', requireAuth);
 
   // Register routes
   app.use('/api', createApiRoutes(storageService, bigQueryService));

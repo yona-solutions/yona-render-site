@@ -27,6 +27,12 @@
       display: flex;
       flex-direction: column;
       box-shadow: 1px 0 0 rgba(0,0,0,0.02);
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 100vh;
+      overflow-y: auto;
+      z-index: 100;
     }
 
     .logo {
@@ -93,6 +99,7 @@
       flex-direction: column;
       overflow: hidden;
       background: #ffffff;
+      margin-left: 195px;
     }
 
     /* Header Tabs */
@@ -978,6 +985,13 @@
       <button class="btn-close" onclick="closeEditSidebar()">✕</button>
     </div>
 
+    <!-- Loading overlay shown while mapping dropdowns load -->
+    <div id="editSidebarLoading" style="display:none; position:absolute; top:48px; left:0; right:0; bottom:0; background:rgba(255,255,255,0.92); z-index:10; display:none; align-items:center; justify-content:center; flex-direction:column; gap:12px;">
+      <div style="width:28px; height:28px; border:3px solid #e2e8f0; border-top-color:#4a7c9e; border-radius:50%; animation:editSpinner 0.7s linear infinite;"></div>
+      <span style="font-size:13px; color:#718096;">Loading...</span>
+    </div>
+    <style>@keyframes editSpinner { to { transform: rotate(360deg); } }</style>
+
     <div class="edit-sidebar-content">
       <div class="field-group">
         <label class="field-label">Name</label>
@@ -1299,6 +1313,9 @@
     </div>
   </div>
 
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="/auth.js"></script>
   <script>
     // State Management
     const AppState = {
@@ -1312,7 +1329,7 @@
 
     // API Functions
     async function loadDimension(dimensionType) {
-      const response = await fetch(`/api/config/${dimensionType}`);
+      const response = await authFetch(`/api/config/${dimensionType}`);
       if (!response.ok) throw new Error(`Failed to load ${dimensionType}`);
       const data = await response.json();
       AppState.dimensions[dimensionType] = data;
@@ -1613,26 +1630,28 @@
         actionsDiv.appendChild(addBtn);
       }
       
-      const editBtn = document.createElement('button');
-      editBtn.className = 'btn-edit';
-      editBtn.innerHTML = '✏️';
-      editBtn.title = 'Edit';
-      editBtn.onclick = (e) => {
-        e.stopPropagation();
-        openEditSidebar(node);
-      };
-      actionsDiv.appendChild(editBtn);
-      
-      // Add delete button
-      const deleteBtn = document.createElement('button');
-      deleteBtn.className = 'btn-delete';
-      deleteBtn.innerHTML = '🗑️';
-      deleteBtn.title = 'Delete';
-      deleteBtn.onclick = (e) => {
-        e.stopPropagation();
-        deleteItem(node);
-      };
-      actionsDiv.appendChild(deleteBtn);
+      // Add edit and delete buttons (not for region and vendor tabs)
+      if (AppState.currentDimension !== 'region' && AppState.currentDimension !== 'vendor') {
+        const editBtn = document.createElement('button');
+        editBtn.className = 'btn-edit';
+        editBtn.innerHTML = '✏️';
+        editBtn.title = 'Edit';
+        editBtn.onclick = (e) => {
+          e.stopPropagation();
+          openEditSidebar(node);
+        };
+        actionsDiv.appendChild(editBtn);
+
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'btn-delete';
+        deleteBtn.innerHTML = '🗑️';
+        deleteBtn.title = 'Delete';
+        deleteBtn.onclick = (e) => {
+          e.stopPropagation();
+          deleteItem(node);
+        };
+        actionsDiv.appendChild(deleteBtn);
+      }
       
       div.appendChild(actionsDiv);
       
@@ -1757,7 +1776,7 @@
       if (!currentData) return;
       
       try {
-        const response = await fetch(`/api/config/${AppState.currentDimension}`, {
+        const response = await authFetch(`/api/config/${AppState.currentDimension}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -1864,7 +1883,7 @@
     // Load and render unmapped accounts
     async function loadAndRenderUnmappedAccounts() {
       try {
-        const response = await fetch('/api/bq/unmapped-accounts');
+        const response = await authFetch('/api/bq/unmapped-accounts');
         if (!response.ok) throw new Error('Failed to load unmapped accounts');
         const data = await response.json();
         
@@ -1881,7 +1900,7 @@
     // Load and render unmapped customers
     async function loadAndRenderUnmappedCustomers() {
       try {
-        const response = await fetch('/api/bq/unmapped-customers');
+        const response = await authFetch('/api/bq/unmapped-customers');
         if (!response.ok) throw new Error('Failed to load unmapped customers');
         const data = await response.json();
         
@@ -2340,7 +2359,7 @@
       
       // Save to server
       try {
-        const response = await fetch(`/api/config/${dimension}`, {
+        const response = await authFetch(`/api/config/${dimension}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(configData)
@@ -2423,65 +2442,50 @@
     // Edit Sidebar Functions
     async function openEditSidebar(node) {
       AppState.editingNode = node;
-      
+
       // Populate fields
       document.getElementById('editName').value = node.label || '';
-      
+
       // Show/hide sections based on dimension type
       const isAccountTab = AppState.currentDimension === 'account';
       const isCustomerTab = AppState.currentDimension === 'customer';
       const isRegionTab = AppState.currentDimension === 'region';
       const isDepartmentTab = AppState.currentDimension === 'department';
-      
+
       document.getElementById('accountMappingSection').style.display = isAccountTab ? 'block' : 'none';
       document.getElementById('accountCheckboxesSection').style.display = isAccountTab ? 'block' : 'none';
-      
+
       document.getElementById('customerMappingSection').style.display = isCustomerTab ? 'block' : 'none';
       document.getElementById('customerCheckboxesSection').style.display = isCustomerTab ? 'block' : 'none';
       document.getElementById('customerStartDateSection').style.display = isCustomerTab ? 'block' : 'none';
       document.getElementById('districtTagsSection').style.display = isCustomerTab ? 'block' : 'none';
       document.getElementById('customerTagsSection').style.display = isCustomerTab ? 'block' : 'none';
-      
+
       document.getElementById('regionMappingSection').style.display = isRegionTab ? 'block' : 'none';
       document.getElementById('regionTagsSection').style.display = isRegionTab ? 'block' : 'none';
-      
+
       document.getElementById('departmentMappingSection').style.display = isDepartmentTab ? 'block' : 'none';
       document.getElementById('departmentTagsSection').style.display = isDepartmentTab ? 'block' : 'none';
-      
+
       // Hide parent section for department tab (subsidiaries are managed in BigQuery)
       document.getElementById('parentSection').style.display = isDepartmentTab ? 'none' : 'block';
-      
+
+      // Populate synchronous fields immediately
       if (isAccountTab) {
-        // Populate account mapping dropdown (async)
-        await populateAccountMappingDropdown(node);
-        
-        // Set checkboxes
         document.getElementById('editDisplayExcluded').checked = node.displayExcluded || false;
         document.getElementById('editDoubleLines').checked = node.doubleLines || false;
         document.getElementById('editOperationalExcluded').checked = node.operationalExcluded || false;
       }
-      
+
       if (isCustomerTab) {
-        // Populate customer mapping dropdown (async)
-        await populateCustomerMappingDropdown(node);
-        
-        // Set customer checkboxes
         const isDistrict = node.isDistrict || false;
         document.getElementById('editIsDistrict').checked = isDistrict;
         document.getElementById('editDistrictReportingExcluded').checked = node.districtReportingExcluded || false;
-        
-        // Show/hide district reporting excluded checkbox based on isDistrict
         const districtReportingLabel = document.getElementById('districtReportingExcludedLabel');
         districtReportingLabel.style.display = isDistrict ? 'block' : 'none';
-        
-        // Set start date
         document.getElementById('editStartDate').value = node.start_date_est || '';
-        
-        // Populate tags
         populateDistrictTags(node.districtTags || []);
         populateCustomerTags(node.customerTags || node.tags || []);
-        
-        // Setup isDistrict checkbox listener
         document.getElementById('editIsDistrict').onchange = function(e) {
           const isChecked = e.target.checked;
           districtReportingLabel.style.display = isChecked ? 'block' : 'none';
@@ -2490,30 +2494,42 @@
           }
         };
       }
-      
+
       if (isRegionTab) {
-        // Populate region mapping dropdown (async)
-        await populateRegionMappingDropdown(node);
-        
-        // Populate tags
         populateRegionTags(node.tags || []);
       }
-      
+
       if (isDepartmentTab) {
-        // Populate department mapping dropdown (async)
-        await populateDepartmentMappingDropdown(node);
-        
-        // Populate tags
         populateDepartmentTags(node.tags || []);
       }
-      
+
       // Populate parent dropdown (except for department/subsidiary)
       if (!isDepartmentTab) {
       populateParentDropdown(node);
       }
-      
-      // Show sidebar
+
+      // Show sidebar immediately with loading overlay
+      const loadingOverlay = document.getElementById('editSidebarLoading');
+      loadingOverlay.style.display = 'flex';
       document.getElementById('editSidebar').classList.add('open');
+
+      // Load mapping dropdowns in the background, then hide overlay
+      let loadPromise;
+      if (isAccountTab) {
+        loadPromise = populateAccountMappingDropdown(node);
+      } else if (isCustomerTab) {
+        loadPromise = populateCustomerMappingDropdown(node);
+      } else if (isRegionTab) {
+        loadPromise = populateRegionMappingDropdown(node);
+      } else if (isDepartmentTab) {
+        loadPromise = populateDepartmentMappingDropdown(node);
+      }
+
+      if (loadPromise) {
+        loadPromise.finally(() => { loadingOverlay.style.display = 'none'; });
+      } else {
+        loadingOverlay.style.display = 'none';
+      }
     }
 
     function closeEditSidebar() {
@@ -2637,7 +2653,7 @@
 
       // Save to backend
       try {
-        const response = await fetch(`/api/config/${dimension}`, {
+        const response = await authFetch(`/api/config/${dimension}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -2910,7 +2926,7 @@
       
       try {
         // Fetch customers from API
-        const response = await fetch('/api/customers');
+        const response = await authFetch('/api/customers');
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
@@ -3025,7 +3041,7 @@
       dropdown.appendChild(loadingOption);
       
       try {
-        const response = await fetch('/api/bq/regions');
+        const response = await authFetch('/api/bq/regions');
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
@@ -3123,7 +3139,7 @@
       dropdown.appendChild(loadingOption);
       
       try {
-        const response = await fetch('/api/bq/subsidiaries');
+        const response = await authFetch('/api/bq/subsidiaries');
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
@@ -3226,7 +3242,7 @@
       
       try {
         // Fetch accounts from API
-        const response = await fetch('/api/accounts');
+        const response = await authFetch('/api/accounts');
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
@@ -3376,10 +3392,20 @@
     }
 
     function setupCustomDropdown(input, dropdown, onChange) {
+      // Clone and replace the input to remove all previous event listeners
+      const freshInput = input.cloneNode(true);
+      input.parentNode.replaceChild(freshInput, input);
+      input = freshInput;
+
+      // Also clone and replace the dropdown to remove stale listeners
+      const freshDropdown = dropdown.cloneNode(true);
+      dropdown.parentNode.replaceChild(freshDropdown, dropdown);
+      dropdown = freshDropdown;
+
       // Store the selected value for restoration
       let originalValue = input.value;
       let isInputHandlerAdded = false;
-      
+
       // Toggle dropdown on input click
       input.addEventListener('click', (e) => {
         e.stopPropagation();

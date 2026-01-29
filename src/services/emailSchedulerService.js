@@ -449,18 +449,26 @@ class EmailSchedulerService {
     try {
       // Get latest available date
       const port = process.env.PORT || 3000;
-      const datesResponse = await fetch(`http://localhost:${port}/api/pl/dates`);
+
+      // Headers for internal server-to-server calls
+      const internalHeaders = process.env.SCHEDULER_API_KEY
+        ? { 'X-API-Key': process.env.SCHEDULER_API_KEY }
+        : {};
+
+      const datesResponse = await fetch(`http://localhost:${port}/api/pl/dates`, {
+        headers: internalHeaders
+      });
       const dates = await datesResponse.json();
-      
-      if (!dates || dates.length === 0) {
-        throw new Error('No P&L data available');
+
+      if (!dates || !Array.isArray(dates) || dates.length === 0) {
+        throw new Error(dates?.error || 'No P&L data available');
       }
 
       const latestDate = dates[0].time || dates[0].formatted;
 
       // Fetch P&L data
       const dataUrl = `http://localhost:${port}/api/pl/data?hierarchy=${schedule.template_type}&selectedId=${encodeURIComponent(entityId)}&date=${latestDate}&plType=${schedule.process}`;
-      const dataResponse = await fetch(dataUrl);
+      const dataResponse = await fetch(dataUrl, { headers: internalHeaders });
       
       if (!dataResponse.ok) {
         throw new Error(`Failed to fetch P&L data: ${dataResponse.status}`);

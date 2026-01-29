@@ -180,6 +180,50 @@ Yona Solutions
       throw new Error(`Failed to send email: ${error.message}`);
     }
   }
+
+  /**
+   * Send a simple text/HTML email (no attachments)
+   *
+   * @param {string} to - Recipient email address
+   * @param {string} subject - Email subject
+   * @param {string} text - Plain text content
+   * @param {string} html - HTML content (optional)
+   * @returns {Promise<Object>} Send result
+   */
+  async sendEmail(to, subject, text, html = null) {
+    if (!this.isAvailable()) {
+      throw new Error('Email service not initialized');
+    }
+
+    try {
+      const msg = {
+        to,
+        from: {
+          email: this.senderEmail,
+          name: 'Yona Solutions SPHERE'
+        },
+        subject,
+        text,
+        html: html || text.replace(/\n/g, '<br>')
+      };
+
+      console.log(`📧 Sending email to ${to}...`);
+      console.log(`   Subject: ${subject}`);
+
+      await sgMail.send(msg);
+
+      console.log(`✅ Email sent successfully to ${to}`);
+
+      return { success: true, recipient: to, subject };
+
+    } catch (error) {
+      console.error('❌ Failed to send email:', error.message);
+      if (error.response) {
+        console.error('   SendGrid Error:', error.response.body);
+      }
+      throw new Error(`Failed to send email: ${error.message}`);
+    }
+  }
 }
 
 // Create singleton instance
