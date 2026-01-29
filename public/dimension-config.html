@@ -2440,23 +2440,12 @@
     }
 
     // Auto-fill the Name field when a mapping is selected
-    // Only fills if name is empty or a default value like "New Account", "New Customer", etc.
+    // Always fills with the mapped entity's display name (user can still edit)
     function autoFillNameFromMapping(displayName) {
       if (!displayName) return;
 
       const nameInput = document.getElementById('editName');
-      const currentName = nameInput.value.trim();
-
-      // Check if name is empty or a default value
-      const isDefault = !currentName ||
-        currentName === 'New Account' ||
-        currentName === 'New Customer' ||
-        currentName === 'New Subsidiary' ||
-        currentName.startsWith('New ');
-
-      if (isDefault) {
-        nameInput.value = displayName;
-      }
+      nameInput.value = displayName;
     }
 
     // Edit Sidebar Functions
@@ -2965,9 +2954,12 @@
         // Get all already-mapped customer IDs (excluding current node)
         const currentData = AppState.dimensions[AppState.currentDimension];
         const mappedCustomerIds = new Set();
-        
+        // Store the current node's original mapping so we never disable it
+        const nodeOriginalCustomerId = node.customer_internal_id || node.customer_id;
+
         for (const [itemId, itemData] of Object.entries(currentData)) {
-          if (itemId !== node.id) {
+          // Exclude current node (compare as strings to handle type mismatches)
+          if (String(itemId) !== String(node.id)) {
             const custId = itemData.customer_internal_id || itemData.customer_id;
             if (custId) {
               mappedCustomerIds.add(parseInt(custId));
@@ -2990,11 +2982,15 @@
           
           // Check if this is the currently selected customer
           const isCurrentSelection = nodeCustomerId && parseInt(nodeCustomerId) === parseInt(customer.customer_id);
-          
+
+          // Check if this is the node's original mapping (should never be disabled)
+          const isNodeOriginalMapping = nodeOriginalCustomerId && parseInt(nodeOriginalCustomerId) === parseInt(customer.customer_id);
+
           // Check if this customer is already mapped to another item
           const isAlreadyMapped = mappedCustomerIds.has(parseInt(customer.customer_id));
-          
-          if (isAlreadyMapped) {
+
+          // Only disable if mapped elsewhere AND not the node's original mapping
+          if (isAlreadyMapped && !isNodeOriginalMapping) {
             option.classList.add('disabled');
             option.textContent += ' (already mapped)';
           }
@@ -3177,16 +3173,19 @@
         
         const currentData = AppState.dimensions[AppState.currentDimension];
         const mappedSubsidiaryIds = new Set();
-        
+        // Store the current node's original mapping so we never disable it
+        const nodeOriginalSubsidiaryId = node.subsidiary_internal_id;
+
         for (const [itemId, itemData] of Object.entries(currentData)) {
-          if (itemId !== node.id && itemData.subsidiary_internal_id) {
+          // Exclude current node (compare as strings to handle type mismatches)
+          if (String(itemId) !== String(node.id) && itemData.subsidiary_internal_id) {
             mappedSubsidiaryIds.add(parseInt(itemData.subsidiary_internal_id));
           }
         }
-        
+
         let selectedText = '';
         const nodeSubsidiaryId = node.subsidiary_internal_id;
-        
+
         subsidiaries.forEach(subsidiary => {
           const option = document.createElement('div');
           option.className = 'custom-select-option';
@@ -3194,11 +3193,14 @@
           option.textContent = baseText;
           option.dataset.value = subsidiary.subsidiary_id;
           option.dataset.displayName = subsidiary.display_name;
-          
+
           const isCurrentSelection = nodeSubsidiaryId && parseInt(nodeSubsidiaryId) === parseInt(subsidiary.subsidiary_id);
+          // Check if this is the node's original mapping (should never be disabled)
+          const isNodeOriginalMapping = nodeOriginalSubsidiaryId && parseInt(nodeOriginalSubsidiaryId) === parseInt(subsidiary.subsidiary_id);
           const isAlreadyMapped = mappedSubsidiaryIds.has(parseInt(subsidiary.subsidiary_id));
-          
-          if (isAlreadyMapped) {
+
+          // Only disable if mapped elsewhere AND not the node's original mapping
+          if (isAlreadyMapped && !isNodeOriginalMapping) {
             option.classList.add('disabled');
             option.textContent += ' (already mapped)';
           }
@@ -3285,13 +3287,16 @@
         // Get all already-mapped account IDs (excluding current node)
         const currentData = AppState.dimensions[AppState.currentDimension];
         const mappedAccountIds = new Set();
-        
+        // Store the current node's original mapping so we never disable it
+        const nodeOriginalAccountId = node.account_internal_id;
+
         for (const [itemId, itemData] of Object.entries(currentData)) {
-          if (itemId !== node.id && itemData.account_internal_id) {
+          // Exclude current node (compare as strings to handle type mismatches)
+          if (String(itemId) !== String(node.id) && itemData.account_internal_id) {
             mappedAccountIds.add(parseInt(itemData.account_internal_id));
           }
         }
-        
+
         // Add all account options
         let selectedText = '';
         let selectedDisplayName = '';
@@ -3302,14 +3307,18 @@
           option.textContent = baseText;
           option.dataset.value = account.account_id;
           option.dataset.displayName = account.display_name;
-          
+
           // Check if this is the currently selected account
           const isCurrentSelection = node.account_internal_id && parseInt(node.account_internal_id) === parseInt(account.account_id);
-          
+
+          // Check if this is the node's original mapping (should never be disabled)
+          const isNodeOriginalMapping = nodeOriginalAccountId && parseInt(nodeOriginalAccountId) === parseInt(account.account_id);
+
           // Check if this account is already mapped to another item
           const isAlreadyMapped = mappedAccountIds.has(parseInt(account.account_id));
-          
-          if (isAlreadyMapped) {
+
+          // Only disable if mapped elsewhere AND not the node's original mapping
+          if (isAlreadyMapped && !isNodeOriginalMapping) {
             option.classList.add('disabled');
             option.textContent += ' (already mapped)';
           }
