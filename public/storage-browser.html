@@ -138,6 +138,10 @@
     <ul id="file-list" class="file-list" style="display: none;"></ul>
   </div>
 
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="/auth.js"></script>
+
   <script>
     let currentPrefix = '';
 
@@ -178,7 +182,7 @@
       updateBreadcrumb(prefix);
 
       try {
-        const response = await fetch(`/api/storage/list?prefix=${encodeURIComponent(prefix)}`);
+        const response = await authFetch(`/api/storage/list?prefix=${encodeURIComponent(prefix)}`);
         const data = await response.json();
         
         if (!response.ok) {

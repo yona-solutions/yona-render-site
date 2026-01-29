@@ -5,12 +5,16 @@
  */
 
 const express = require('express');
-const router = express.Router();
 const emailConfigService = require('../services/emailConfigService');
 const mockEmailData = require('../services/mockEmailData');
 const emailService = require('../services/emailService');
-const bigQueryService = require('../services/bigQueryService');
 const emailSchedulerService = require('../services/emailSchedulerService');
+
+// Store reference to bigQueryService instance (set via createEmailConfigRoutes)
+let bigQueryServiceInstance = null;
+
+// Create router instance
+const router = express.Router();
 
 // ============================================
 // API Key Authentication Middleware
@@ -710,47 +714,61 @@ router.post('/report-schedules/:id/send-email', async (req, res) => {
 
     console.log(`📧 Generating and sending email for schedule: ${schedule.template_name}`);
 
-    // Headers for internal server-to-server calls
-    const internalHeaders = process.env.SCHEDULER_API_KEY
-      ? { 'X-API-Key': process.env.SCHEDULER_API_KEY }
-      : {};
-
-    // Get latest available date
-    const datesResponse = await fetch('http://127.0.0.1:' + (process.env.PORT || 3000) + '/api/pl/dates', {
-      headers: internalHeaders
-    });
-
-    if (!datesResponse.ok) {
-      const errorText = await datesResponse.text();
-      console.error('Failed to fetch dates:', datesResponse.status, errorText.substring(0, 200));
-      return res.status(400).json({
+    // Get latest available date directly from BigQuery service
+    console.log(`   Fetching available dates...`);
+    let dates;
+    try {
+      if (!bigQueryServiceInstance) {
+        throw new Error('BigQuery service not initialized');
+      }
+      dates = await bigQueryServiceInstance.getAvailableDates();
+    } catch (err) {
+      console.error('Failed to fetch dates:', err.message);
+      return res.status(500).json({
         error: 'Failed to fetch dates',
-        message: `Internal API error: ${datesResponse.status}`
+        message: err.message
       });
     }
-
-    const dates = await datesResponse.json();
 
     if (!dates || !Array.isArray(dates) || dates.length === 0) {
       return res.status(400).json({
         error: 'No P&L data available',
-        message: dates?.error || 'Cannot generate report: no data available'
+        message: 'Cannot generate report: no data available'
       });
     }
 
     const latestDate = dates[0].time || dates[0].formatted;
     console.log(`   Using date: ${latestDate}`);
 
-    // Fetch P&L data
-    const dataUrl = `http://127.0.0.1:${process.env.PORT || 3000}/api/pl/data?hierarchy=${schedule.template_type}&selectedId=${encodeURIComponent(entityId)}&date=${latestDate}&plType=${schedule.process}`;
+    // Headers for internal server-to-server calls (still needed for P&L data)
+    const internalHeaders = process.env.SCHEDULER_API_KEY
+      ? { 'X-API-Key': process.env.SCHEDULER_API_KEY }
+      : {};
+
+    // Fetch P&L data - use external URL in production, localhost in development
+    const baseUrl = process.env.NODE_ENV === 'production'
+      ? (process.env.RENDER_EXTERNAL_URL || 'https://yona-render-site.onrender.com')
+      : `http://127.0.0.1:${process.env.PORT || 3000}`;
+    const dataUrl = `${baseUrl}/api/pl/data?hierarchy=${schedule.template_type}&selectedId=${encodeURIComponent(entityId)}&date=${latestDate}&plType=${schedule.process}`;
     console.log(`   Fetching data from: ${dataUrl}`);
 
-    const dataResponse = await fetch(dataUrl, { headers: internalHeaders });
-    
+    const controller2 = new AbortController();
+    const timeout2 = setTimeout(() => controller2.abort(), 60000);
+
+    let dataResponse;
+    try {
+      dataResponse = await fetch(dataUrl, { headers: internalHeaders, signal: controller2.signal });
+    } catch (fetchErr) {
+      clearTimeout(timeout2);
+      console.error('Data fetch error:', fetchErr.message);
+      throw new Error(`Network error fetching P&L data: ${fetchErr.message}`);
+    }
+    clearTimeout(timeout2);
+
     if (!dataResponse.ok) {
       throw new Error(`Failed to fetch P&L data: ${dataResponse.status}`);
     }
-    
+
     const jsonData = await dataResponse.json();
     const htmlContent = jsonData.html;
     
@@ -1187,34 +1205,29 @@ router.post('/report-schedules/:id/process', requireApiKey, async (req, res) => 
     console.log(`   Process: ${schedule.process}`);
     console.log(`   Recipients: ${allRecipients.size}`);
 
-    // Headers for internal server-to-server calls
-    const internalHeaders = process.env.SCHEDULER_API_KEY
-      ? { 'X-API-Key': process.env.SCHEDULER_API_KEY }
-      : {};
-
-    // Get latest available date
-    const datesResponse = await fetch('http://127.0.0.1:' + (process.env.PORT || 3000) + '/api/pl/dates', {
-      headers: internalHeaders
-    });
-
-    if (!datesResponse.ok) {
-      const errorText = await datesResponse.text();
-      console.error('Failed to fetch dates:', datesResponse.status, errorText.substring(0, 200));
-      return res.status(400).json({
+    // Get latest available date directly from BigQuery service
+    console.log(`   Fetching available dates...`);
+    let dates;
+    try {
+      if (!bigQueryServiceInstance) {
+        throw new Error('BigQuery service not initialized');
+      }
+      dates = await bigQueryServiceInstance.getAvailableDates();
+    } catch (err) {
+      console.error('Failed to fetch dates:', err.message);
+      return res.status(500).json({
         error: 'Failed to fetch dates',
-        message: `Internal API error: ${datesResponse.status}`,
+        message: err.message,
         scheduleId: parseInt(id),
         scheduleName: schedule.template_name,
         status: 'error'
       });
     }
 
-    const dates = await datesResponse.json();
-
     if (!dates || !Array.isArray(dates) || dates.length === 0) {
       return res.status(400).json({
         error: 'No P&L data available',
-        message: dates?.error || 'Cannot generate report: no data available',
+        message: 'Cannot generate report: no data available',
         scheduleId: parseInt(id),
         scheduleName: schedule.template_name,
         status: 'error'
@@ -1224,8 +1237,16 @@ router.post('/report-schedules/:id/process', requireApiKey, async (req, res) => 
     const latestDate = dates[0].time || dates[0].formatted;
     console.log(`   Using date: ${latestDate}`);
 
-    // Fetch P&L data
-    const dataUrl = `http://127.0.0.1:${process.env.PORT || 3000}/api/pl/data?hierarchy=${schedule.template_type}&selectedId=${encodeURIComponent(entityId)}&date=${latestDate}&plType=${schedule.process}`;
+    // Headers for internal server-to-server calls (still needed for P&L data)
+    const internalHeaders = process.env.SCHEDULER_API_KEY
+      ? { 'X-API-Key': process.env.SCHEDULER_API_KEY }
+      : {};
+
+    // Fetch P&L data - use external URL in production, localhost in development
+    const baseUrl = process.env.NODE_ENV === 'production'
+      ? (process.env.RENDER_EXTERNAL_URL || 'https://yona-render-site.onrender.com')
+      : `http://127.0.0.1:${process.env.PORT || 3000}`;
+    const dataUrl = `${baseUrl}/api/pl/data?hierarchy=${schedule.template_type}&selectedId=${encodeURIComponent(entityId)}&date=${latestDate}&plType=${schedule.process}`;
     console.log(`   Fetching data...`);
 
     const dataResponse = await fetch(dataUrl, { headers: internalHeaders });
@@ -1608,5 +1629,17 @@ router.delete('/run-logs/cleanup', async (req, res) => {
   }
 });
 
-module.exports = router;
+/**
+ * Initialize the email config routes with required services
+ * @param {Object} bigQueryService - BigQuery service instance for direct data access
+ */
+function initializeEmailConfigRoutes(bigQueryService) {
+  bigQueryServiceInstance = bigQueryService;
+  console.log('✅ Email config routes initialized with BigQuery service');
+}
+
+module.exports = {
+  router,
+  initializeEmailConfigRoutes
+};
 

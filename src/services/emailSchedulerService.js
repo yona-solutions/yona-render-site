@@ -447,15 +447,19 @@ class EmailSchedulerService {
    */
   async generateReport(schedule, entityId) {
     try {
-      // Get latest available date
-      const port = process.env.PORT || 3000;
-
       // Headers for internal server-to-server calls
       const internalHeaders = process.env.SCHEDULER_API_KEY
         ? { 'X-API-Key': process.env.SCHEDULER_API_KEY }
         : {};
 
-      const datesResponse = await fetch(`http://127.0.0.1:${port}/api/pl/dates`, {
+      // Use external URL in production, localhost in development
+      const port = process.env.PORT || 3000;
+      const baseUrl = process.env.NODE_ENV === 'production'
+        ? (process.env.RENDER_EXTERNAL_URL || 'https://yona-render-site.onrender.com')
+        : `http://127.0.0.1:${port}`;
+
+      // Get latest available date
+      const datesResponse = await fetch(`${baseUrl}/api/pl/dates`, {
         headers: internalHeaders
       });
 
@@ -474,7 +478,7 @@ class EmailSchedulerService {
       const latestDate = dates[0].time || dates[0].formatted;
 
       // Fetch P&L data
-      const dataUrl = `http://127.0.0.1:${port}/api/pl/data?hierarchy=${schedule.template_type}&selectedId=${encodeURIComponent(entityId)}&date=${latestDate}&plType=${schedule.process}`;
+      const dataUrl = `${baseUrl}/api/pl/data?hierarchy=${schedule.template_type}&selectedId=${encodeURIComponent(entityId)}&date=${latestDate}&plType=${schedule.process}`;
       const dataResponse = await fetch(dataUrl, { headers: internalHeaders });
       
       if (!dataResponse.ok) {

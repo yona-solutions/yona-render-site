@@ -16,7 +16,7 @@ const emailConfigService = require('./services/emailConfigService');
 const emailService = require('./services/emailService');
 const googleSheetsService = require('./services/googleSheetsService');
 const createApiRoutes = require('./routes/api');
-const emailConfigApiRoutes = require('./routes/emailConfigApi');
+const { router: emailConfigApiRoutes, initializeEmailConfigRoutes } = require('./routes/emailConfigApi');
 const authApiRoutes = require('./routes/authApi');
 const createViewRoutes = require('./routes/views');
 const { createRequireAuth, initializeUserRolesTable } = require('./middleware/auth');
@@ -38,6 +38,9 @@ async function createApp() {
   
   const bigquery = initializeBigQuery();
   const bigQueryService = new BigQueryService(bigquery);
+
+  // Initialize email config routes with bigQueryService
+  initializeEmailConfigRoutes(bigQueryService);
 
   // Initialize email service (SendGrid)
   emailService.initialize();
