@@ -122,12 +122,20 @@ function createRequireAuth(pool) {
     }
 
     // Firebase token verification
+    // Support both Authorization header and query param (for SSE which doesn't support headers)
     const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'Authentication required' });
+    let token = null;
+
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.substring(7);
+    } else if (req.query.token) {
+      // Allow token in query param for SSE endpoints
+      token = req.query.token;
     }
 
-    const token = authHeader.substring(7);
+    if (!token) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
 
     try {
       const decoded = await admin.auth().verifyIdToken(token);

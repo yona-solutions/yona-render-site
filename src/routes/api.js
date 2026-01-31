@@ -232,15 +232,384 @@ function createApiRoutes(storageService, bigQueryService) {
   });
 
   /**
+   * Get P&L HTML for subsidiary with Server-Sent Events for progress updates
+   *
+   * GET /api/pl/data-stream?hierarchy=subsidiary&selectedId=101&date=2025-12-01
+   *
+   * This endpoint streams progress updates while generating the P&L report.
+   * Only supports subsidiary hierarchy; other hierarchies should use /api/pl/data
+   *
+   * SSE Events:
+   *   - progress: { type: "progress", step: "step-id", message: "...", detail: "..." }
+   *   - complete: { type: "complete", result: {...} }
+   *   - error: { type: "error", error: "..." }
+   */
+  router.get('/pl/data-stream', async (req, res) => {
+    // Set up SSE headers
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders();
+
+    // Helper to send SSE events
+    const sendProgress = (step, message, detail = null) => {
+      const data = { type: 'progress', step, message, detail };
+      res.write(`data: ${JSON.stringify(data)}\n\n`);
+    };
+
+    const sendComplete = (result) => {
+      const data = { type: 'complete', result };
+      res.write(`data: ${JSON.stringify(data)}\n\n`);
+      res.end();
+    };
+
+    const sendError = (error) => {
+      const data = { type: 'error', error: error.message || error };
+      res.write(`data: ${JSON.stringify(data)}\n\n`);
+      res.end();
+    };
+
+    try {
+      const { hierarchy, selectedId, date, plType } = req.query;
+
+      // Validate required parameters
+      if (!hierarchy || !selectedId || !date) {
+        return sendError('Missing required parameters: hierarchy, selectedId, date');
+      }
+
+      // Only support subsidiary hierarchy for streaming
+      if (hierarchy !== 'subsidiary') {
+        return sendError('Streaming only supported for subsidiary hierarchy');
+      }
+
+      const reportPlType = plType === 'operational' ? 'Operational' : 'Standard';
+      console.log(`📊 [SSE] Generating P&L report: hierarchy=${hierarchy}, selectedId=${selectedId}, date=${date}`);
+
+      // Parse selectedId
+      let actualId, selectedLabel;
+      if (selectedId.startsWith('tag_')) {
+        actualId = selectedId;
+        selectedLabel = selectedId.substring(4);
+      } else if (selectedId.includes(' - ')) {
+        const parts = selectedId.split(' - ');
+        actualId = parts[0];
+        selectedLabel = parts.slice(1).join(' - ');
+      } else {
+        actualId = selectedId;
+        selectedLabel = selectedId;
+      }
+
+      // Load configurations
+      const accountConfig = await storageService.getFileAsJson('account_config.json');
+      const childrenMap = accountService.buildChildrenMap(accountConfig);
+      const sectionConfig = accountService.getSectionConfig();
+
+      // Step 1: Get subsidiary internal ID(s)
+      sendProgress('subsidiary-summary', 'Fetching subsidiary summary...');
+
+      const subsidiaryResult = await storageService.getSubsidiaryInternalId(actualId);
+      if (!subsidiaryResult) {
+        return sendError(`Subsidiary not found: ${actualId}`);
+      }
+
+      const { subsidiaryIds, subsidiaryName, isTag } = subsidiaryResult;
+      const subsidiaryId = subsidiaryIds.length === 1 ? subsidiaryIds[0] : subsidiaryIds;
+      if (!selectedLabel || selectedLabel === actualId) {
+        selectedLabel = subsidiaryName;
+      }
+
+      // Get customers in subsidiary
+      const customersInSubsidiary = await bigQueryService.getCustomersInSubsidiary(subsidiaryIds);
+      if (!customersInSubsidiary || customersInSubsidiary.length === 0) {
+        return sendError(`No customers found for subsidiary: ${selectedLabel}`);
+      }
+
+      // Group customers by region and district
+      const regionGroups = await storageService.groupCustomersByRegionAndDistrict(customersInSubsidiary);
+
+      // Query subsidiary summary
+      const subsidiaryMonthData = await bigQueryService.getPLData({
+        hierarchy: 'subsidiary',
+        subsidiaryId,
+        date,
+        accountConfig,
+        ytd: false
+      });
+      const subsidiaryYtdData = await bigQueryService.getPLData({
+        hierarchy: 'subsidiary',
+        subsidiaryId,
+        date,
+        accountConfig,
+        ytd: true
+      });
+
+      // Step 2: Fetch all customer data
+      sendProgress('customer-data', 'Fetching customer data...');
+
+      const allCustomerIds = regionGroups.flatMap(region =>
+        region.districts.flatMap(district =>
+          district.customers.map(c => c.customer_internal_id)
+        )
+      );
+
+      const allCustomersMonthData = await bigQueryService.getPLData({
+        hierarchy: 'district',
+        customerIds: allCustomerIds,
+        date,
+        accountConfig,
+        ytd: false
+      });
+      const allCustomersYtdData = await bigQueryService.getPLData({
+        hierarchy: 'district',
+        customerIds: allCustomerIds,
+        date,
+        accountConfig,
+        ytd: true
+      });
+
+      // Step 3: Generate subsidiary report
+      sendProgress('generating-subsidiary', 'Generating subsidiary report...');
+
+      let totalRegionCount = 0;
+      let totalDistrictCount = 0;
+      let totalFacilityCount = 0;
+
+      const subsidiaryMeta = {
+        typeLabel: isTag ? 'Subsidiary Tag' : 'Subsidiary',
+        entityName: selectedLabel,
+        monthLabel: date,
+        plType: reportPlType,
+        regionCount: 0,
+        districtCount: 0,
+        facilityCount: 0
+      };
+
+      const subsidiaryResultReport = await pnlRenderService.generatePNLReport(
+        subsidiaryMonthData,
+        subsidiaryYtdData,
+        subsidiaryMeta,
+        accountConfig,
+        childrenMap,
+        sectionConfig
+      );
+
+      if (subsidiaryResultReport.noRevenue) {
+        return sendComplete({
+          html: subsidiaryResultReport.html,
+          noRevenue: true,
+          hierarchy,
+          selectedId,
+          selectedLabel,
+          date,
+          meta: subsidiaryMeta
+        });
+      }
+
+      // Step 4: Process regions
+      const regionReports = [];
+      const totalRegions = regionGroups.length;
+
+      for (let regionIdx = 0; regionIdx < regionGroups.length; regionIdx++) {
+        const region = regionGroups[regionIdx];
+
+        sendProgress('processing-regions', 'Processing regions...', `Region ${regionIdx + 1} of ${totalRegions}: ${region.regionLabel}`);
+
+        const regionMonthData = await bigQueryService.getPLData({
+          hierarchy: 'region',
+          regionId: region.regionInternalId,
+          subsidiaryId: subsidiaryId,
+          date,
+          accountConfig,
+          ytd: false
+        });
+        const regionYtdData = await bigQueryService.getPLData({
+          hierarchy: 'region',
+          regionId: region.regionInternalId,
+          subsidiaryId: subsidiaryId,
+          date,
+          accountConfig,
+          ytd: true
+        });
+
+        const regionMeta = {
+          typeLabel: 'Region',
+          entityName: region.regionLabel,
+          monthLabel: date,
+          plType: reportPlType,
+          districtCount: 0,
+          facilityCount: 0
+        };
+
+        const regionResult = await pnlRenderService.generatePNLReport(
+          regionMonthData,
+          regionYtdData,
+          regionMeta,
+          accountConfig,
+          childrenMap,
+          sectionConfig
+        );
+
+        if (regionResult.noRevenue) {
+          continue;
+        }
+
+        totalRegionCount++;
+        let regionDistrictCount = 0;
+        let regionFacilityCount = 0;
+
+        const districtReports = [];
+
+        for (const district of region.districts) {
+          const districtCustomerIds = district.customers.map(c => c.customer_internal_id);
+          const districtMonthData = accountService.filterDataByCustomers(allCustomersMonthData, districtCustomerIds);
+          const districtYtdData = accountService.filterDataByCustomers(allCustomersYtdData, districtCustomerIds);
+
+          const districtMeta = {
+            typeLabel: 'District',
+            entityName: district.districtLabel,
+            monthLabel: date,
+            plType: reportPlType,
+            facilityCount: 0
+          };
+
+          const districtResult = await pnlRenderService.generatePNLReport(
+            districtMonthData,
+            districtYtdData,
+            districtMeta,
+            accountConfig,
+            childrenMap,
+            sectionConfig
+          );
+
+          if (districtResult.noRevenue) {
+            continue;
+          }
+
+          totalDistrictCount++;
+          regionDistrictCount++;
+          const facilityReports = [];
+          let districtFacilityCount = 0;
+
+          for (const customer of district.customers) {
+            const facilityMonthData = accountService.filterDataByCustomers(allCustomersMonthData, [customer.customer_internal_id]);
+            const facilityYtdData = accountService.filterDataByCustomers(allCustomersYtdData, [customer.customer_internal_id]);
+
+            let census = { actual: null, budget: null };
+            if (censusService.isAvailable() && customer.customer_code) {
+              try {
+                census = await censusService.getCensusForCustomer(customer.customer_code, date);
+              } catch (error) {
+                console.warn(`   ⚠️  Could not fetch census for ${customer.customer_code}:`, error.message);
+              }
+            }
+
+            const facilityMeta = {
+              typeLabel: 'Facility',
+              entityName: customer.label,
+              monthLabel: date,
+              plType: reportPlType,
+              actualCensus: census.actual,
+              budgetCensus: census.budget,
+              startDateEst: customer.start_date_est
+            };
+
+            const facilityResult = await pnlRenderService.generatePNLReport(
+              facilityMonthData,
+              facilityYtdData,
+              facilityMeta,
+              accountConfig,
+              childrenMap,
+              sectionConfig
+            );
+
+            if (facilityResult.noRevenue) {
+              continue;
+            }
+
+            facilityReports.push(facilityResult.html);
+            districtFacilityCount++;
+            regionFacilityCount++;
+            totalFacilityCount++;
+          }
+
+          // Update district header with facility count
+          districtMeta.facilityCount = districtFacilityCount;
+          const updatedDistrictHeaderHtml = await pnlRenderService.generateHeader(districtMeta);
+
+          const districtParts = districtResult.html.split('<hr class="pnl-divider">');
+          const districtContentHtml = districtParts[1];
+          const completeDistrictHtml = `    <div class="pnl-report-container page-break">
+      ${updatedDistrictHeaderHtml}
+      <hr class="pnl-divider">${districtContentHtml}`;
+
+          districtReports.push(completeDistrictHtml);
+          districtReports.push(...facilityReports);
+        }
+
+        // Update region header
+        regionMeta.districtCount = regionDistrictCount;
+        regionMeta.facilityCount = regionFacilityCount;
+        const updatedRegionHeaderHtml = await pnlRenderService.generateHeader(regionMeta);
+
+        const regionParts = regionResult.html.split('<hr class="pnl-divider">');
+        const regionContentHtml = regionParts[1];
+        const completeRegionHtml = `    <div class="pnl-report-container page-break">
+      ${updatedRegionHeaderHtml}
+      <hr class="pnl-divider">${regionContentHtml}`;
+
+        regionReports.push(completeRegionHtml);
+        regionReports.push(...districtReports);
+      }
+
+      // Step 5: Finalize
+      sendProgress('finalizing', 'Finalizing reports...');
+
+      // Update subsidiary header
+      subsidiaryMeta.regionCount = totalRegionCount;
+      subsidiaryMeta.districtCount = totalDistrictCount;
+      subsidiaryMeta.facilityCount = totalFacilityCount;
+      const updatedSubsidiaryHeaderHtml = await pnlRenderService.generateHeader(subsidiaryMeta);
+
+      const subsidiaryParts = subsidiaryResultReport.html.split('<hr class="pnl-divider">');
+      const subsidiaryContentHtml = subsidiaryParts[1];
+      const completeSubsidiaryHtml = `    <div class="pnl-report-container page-break">
+      ${updatedSubsidiaryHeaderHtml}
+      <hr class="pnl-divider">${subsidiaryContentHtml}`;
+
+      const finalHtml = [completeSubsidiaryHtml, ...regionReports].join('\n\n');
+
+      console.log(`✅ [SSE] Multi-level subsidiary P&L complete!`);
+      console.log(`   Summary: ${totalRegionCount} regions, ${totalDistrictCount} districts, ${totalFacilityCount} facilities`);
+
+      sendComplete({
+        html: finalHtml,
+        noRevenue: false,
+        hierarchy,
+        selectedId,
+        selectedLabel,
+        date,
+        regionCount: totalRegionCount,
+        districtCount: totalDistrictCount,
+        facilityCount: totalFacilityCount,
+        meta: subsidiaryMeta
+      });
+
+    } catch (error) {
+      console.error('[SSE] Error generating P&L report:', error);
+      sendError(error.message || 'Failed to generate P&L report');
+    }
+  });
+
+  /**
    * Get P&L HTML for a specific hierarchy and period
-   * 
+   *
    * GET /api/pl/data?hierarchy=district&selectedId=101&date=2025-12-01
-   * 
+   *
    * Query Parameters:
    *   - hierarchy: "district", "region", or "subsidiary"
    *   - selectedId: ID of the selected hierarchy item (includes label in format "id - label")
    *   - date: Date in YYYY-MM-DD format
-   * 
+   *
    * Response:
    *   {
    *     html: "<div>...</div>", // Rendered P&L HTML

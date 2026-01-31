@@ -399,6 +399,75 @@
       color: #718096;
     }
 
+    /* Progress Steps */
+    .loading-steps {
+      margin-top: 20px;
+      text-align: left;
+      width: 100%;
+      max-width: 320px;
+    }
+
+    .loading-step {
+      display: flex;
+      align-items: center;
+      padding: 8px 0;
+      font-size: 13px;
+      color: #a0aec0;
+      transition: color 0.3s ease;
+    }
+
+    .loading-step.active {
+      color: #4a7c9e;
+      font-weight: 500;
+    }
+
+    .loading-step.completed {
+      color: #48bb78;
+    }
+
+    .loading-step-icon {
+      width: 20px;
+      height: 20px;
+      margin-right: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .loading-step.active .loading-step-icon::before {
+      content: '';
+      width: 8px;
+      height: 8px;
+      background: #4a7c9e;
+      border-radius: 50%;
+      animation: pulse 1s ease-in-out infinite;
+    }
+
+    .loading-step.completed .loading-step-icon::before {
+      content: '✓';
+      font-size: 14px;
+    }
+
+    .loading-step:not(.active):not(.completed) .loading-step-icon::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      background: #cbd5e0;
+      border-radius: 50%;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.8); }
+    }
+
+    .loading-step-detail {
+      font-size: 11px;
+      color: #718096;
+      margin-left: 30px;
+      margin-top: 2px;
+    }
+
     /* Report Content */
     .report-content {
       flex: 1;
@@ -1265,22 +1334,61 @@
       }
       
       try {
-        // Show loading state with spinner
+        // Show loading state with spinner and progress steps
         const resultsSection = document.getElementById('bigqueryResults');
         resultsSection.style.display = 'flex';
         document.getElementById('resultsMetadata').textContent = 'Generating P&L Report...';
         document.getElementById('queryInfo').innerHTML = '<em>Fetching data...</em>';
+
+        // Build progress steps based on hierarchy type
+        const getProgressSteps = (hierarchyType) => {
+          if (hierarchyType === 'subsidiary') {
+            return [
+              { id: 'subsidiary-summary', label: 'Fetching subsidiary summary' },
+              { id: 'customer-data', label: 'Fetching customer data' },
+              { id: 'generating-subsidiary', label: 'Generating subsidiary report' },
+              { id: 'processing-regions', label: 'Processing regions', hasDetail: true },
+              { id: 'finalizing', label: 'Finalizing reports' }
+            ];
+          } else if (hierarchyType === 'region') {
+            return [
+              { id: 'region-summary', label: 'Fetching region summary' },
+              { id: 'customer-data', label: 'Fetching customer data' },
+              { id: 'processing-districts', label: 'Processing districts', hasDetail: true },
+              { id: 'finalizing', label: 'Finalizing reports' }
+            ];
+          } else {
+            return [
+              { id: 'district-summary', label: 'Fetching district summary' },
+              { id: 'processing-facilities', label: 'Processing facilities', hasDetail: true },
+              { id: 'finalizing', label: 'Finalizing reports' }
+            ];
+          }
+        };
+
+        const progressSteps = getProgressSteps(hierarchy);
+        const stepsHtml = progressSteps.map(step => `
+          <div class="loading-step" data-step="${step.id}">
+            <span class="loading-step-icon"></span>
+            <span>${step.label}</span>
+          </div>
+          ${step.hasDetail ? `<div class="loading-step-detail" data-step-detail="${step.id}"></div>` : ''}
+        `).join('');
+
         document.getElementById('pnlContent').innerHTML = `
           <div class="loading-overlay">
             <div class="spinner"></div>
             <div class="loading-text">Generating P&L Report</div>
             <div class="loading-subtext">This may take a few moments...</div>
+            <div class="loading-steps">
+              ${stepsHtml}
+            </div>
           </div>
         `;
         
-        // Fetch data from API
+        // Build API URL
         let url = `/api/pl/data?hierarchy=${hierarchy}&selectedId=${encodeURIComponent(selectedId)}&date=${selectedDate}&plType=${plType}`;
-        
+
         // Add subsidiary filter if Region hierarchy and a subsidiary is selected
         if (hierarchy === 'region' && subsidiaryFilterSelect && subsidiaryFilterSelect.selectedValue) {
           const subsidiaryFilter = subsidiaryFilterSelect.selectedValue;
@@ -1290,25 +1398,101 @@
             console.log(`   📎 Applying subsidiary filter: ${subsidiaryFilterSelect.selectedLabel || subsidiaryFilter}`);
           }
         }
-        
-        console.log(`📡 API Request: ${url}`);
-        
-        const response = await authFetch(url);
-        
-        console.log(`📥 Response status: ${response.status} ${response.statusText}`);
-        
-        if (!response.ok) {
-          const errorData = await response.json();
-          console.error('❌ API Error:', errorData);
-          throw new Error(errorData.error || 'Failed to fetch data');
+
+        // Helper to update progress UI
+        const updateProgressStep = (stepId, status, detail = null) => {
+          const stepEl = document.querySelector(`[data-step="${stepId}"]`);
+          if (stepEl) {
+            // Remove previous status classes
+            stepEl.classList.remove('active', 'completed');
+            stepEl.classList.add(status);
+          }
+          if (detail) {
+            const detailEl = document.querySelector(`[data-step-detail="${stepId}"]`);
+            if (detailEl) {
+              detailEl.textContent = detail;
+            }
+          }
+        };
+
+        // Mark first step as active
+        const firstStep = progressSteps[0];
+        if (firstStep) {
+          updateProgressStep(firstStep.id, 'active');
         }
-        
-        const result = await response.json();
-        
-        console.log(`✅ Received P&L HTML (noRevenue: ${result.noRevenue})`);
-        
-        // Display P&L report
-        displayPNLReport(result);
+
+        console.log(`📡 API Request: ${url}`);
+
+        // Use SSE for progress updates if subsidiary hierarchy
+        if (hierarchy === 'subsidiary') {
+          // Get auth token for SSE (EventSource doesn't support custom headers)
+          const authToken = await getAuthToken();
+
+          // Use streaming endpoint for subsidiary P&L
+          const streamUrl = url.replace('/api/pl/data', '/api/pl/data-stream') + `&token=${encodeURIComponent(authToken)}`;
+
+          const result = await new Promise((resolve, reject) => {
+            const eventSource = new EventSource(streamUrl);
+
+            eventSource.onmessage = (event) => {
+              const data = JSON.parse(event.data);
+
+              if (data.type === 'progress') {
+                console.log(`📊 Progress: ${data.step} - ${data.message}`);
+
+                // Mark previous steps as completed
+                progressSteps.forEach((step, idx) => {
+                  const currentIdx = progressSteps.findIndex(s => s.id === data.step);
+                  if (idx < currentIdx) {
+                    updateProgressStep(step.id, 'completed');
+                  } else if (idx === currentIdx) {
+                    updateProgressStep(step.id, 'active', data.detail || null);
+                  }
+                });
+              } else if (data.type === 'complete') {
+                console.log('✅ P&L generation complete');
+                eventSource.close();
+                // Mark all steps as completed
+                progressSteps.forEach(step => updateProgressStep(step.id, 'completed'));
+                resolve(data.result);
+              } else if (data.type === 'error') {
+                console.error('❌ SSE Error:', data.error);
+                eventSource.close();
+                reject(new Error(data.error));
+              }
+            };
+
+            eventSource.onerror = (error) => {
+              console.error('❌ SSE connection error:', error);
+              eventSource.close();
+              reject(new Error('Connection lost while generating report'));
+            };
+          });
+
+          console.log(`✅ Received P&L HTML (noRevenue: ${result.noRevenue})`);
+          displayPNLReport(result);
+        } else {
+          // Use regular fetch for other hierarchies
+          const response = await authFetch(url);
+
+          console.log(`📥 Response status: ${response.status} ${response.statusText}`);
+
+          if (!response.ok) {
+            const errorData = await response.json();
+            console.error('❌ API Error:', errorData);
+            throw new Error(errorData.error || 'Failed to fetch data');
+          }
+
+          const result = await response.json();
+
+          console.log(`✅ Received P&L HTML (noRevenue: ${result.noRevenue})`);
+
+          // Mark all steps as completed
+          progressSteps.forEach(step => updateProgressStep(step.id, 'completed'));
+
+          // Display P&L report
+          displayPNLReport(result);
+        }
         
       } catch (error) {
         console.error('❌ Error fetching P&L data:', error);
@@ -1567,6 +1751,23 @@
       border-bottom: 1px solid #fff;
       background: transparent;
       font-size: 7.5px;
+    }
+
+    .pnl-report-table .header-group-row th {
+      font-size: 9px;
+      padding: 4px 2px;
+      font-weight: 700;
+    }
+
+    .pnl-report-table .header-label-row th {
+      font-size: 7px;
+      padding: 2px;
+      border-bottom: 1px solid #ddd;
+    }
+
+    .pnl-report-table .section-header-row td {
+      padding-top: 8px;
+      padding-bottom: 3px;
     }
 
     .pnl-report-table td:first-child,

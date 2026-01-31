@@ -26,6 +26,154 @@ class EmailSchedulerService {
       failedSends: 0,
       lastError: null
     };
+
+    // Job tracking for manual runs
+    this.currentJob = null;
+  }
+
+  /**
+   * Get current job status (for persistent tracking)
+   */
+  getJobStatus() {
+    if (!this.currentJob) {
+      return { running: false };
+    }
+
+    return {
+      running: this.currentJob.status === 'running',
+      jobId: this.currentJob.jobId,
+      status: this.currentJob.status,
+      startTime: this.currentJob.startTime,
+      totalSchedules: this.currentJob.totalSchedules,
+      processedSchedules: this.currentJob.processedSchedules,
+      currentSchedule: this.currentJob.currentSchedule,
+      results: this.currentJob.results,
+      emailsSent: this.currentJob.emailsSent,
+      emailsFailed: this.currentJob.emailsFailed,
+      endTime: this.currentJob.endTime,
+      error: this.currentJob.error
+    };
+  }
+
+  /**
+   * Start a new manual job (async - returns immediately)
+   * @returns {Object} Job info with jobId, or error if already running
+   */
+  async startManualRun() {
+    // Check if a job is already running
+    if (this.currentJob && this.currentJob.status === 'running') {
+      return {
+        success: false,
+        error: 'A job is already running',
+        existingJob: this.getJobStatus()
+      };
+    }
+
+    // Create new job
+    const jobId = `job_${Date.now()}`;
+    this.currentJob = {
+      jobId,
+      status: 'running',
+      startTime: new Date().toISOString(),
+      totalSchedules: 0,
+      processedSchedules: 0,
+      currentSchedule: null,
+      results: [],
+      emailsSent: 0,
+      emailsFailed: 0,
+      endTime: null,
+      error: null
+    };
+
+    // Start processing in background (don't await)
+    this._runJobAsync(jobId).catch(error => {
+      console.error('Job error:', error);
+      if (this.currentJob && this.currentJob.jobId === jobId) {
+        this.currentJob.status = 'error';
+        this.currentJob.error = error.message;
+        this.currentJob.endTime = new Date().toISOString();
+      }
+    });
+
+    return {
+      success: true,
+      jobId,
+      message: 'Job started'
+    };
+  }
+
+  /**
+   * Internal async job runner
+   */
+  async _runJobAsync(jobId) {
+    console.log(`\n🚀 Starting manual job ${jobId}...`);
+
+    try {
+      // Get all enabled schedules
+      let schedules = await emailConfigService.getReportSchedules();
+      schedules = schedules.filter(s => s.enabled !== false);
+
+      this.currentJob.totalSchedules = schedules.length;
+      console.log(`📧 Found ${schedules.length} enabled schedule(s) to process`);
+
+      if (schedules.length === 0) {
+        this.currentJob.status = 'completed';
+        this.currentJob.endTime = new Date().toISOString();
+        return;
+      }
+
+      // Process each schedule
+      for (let i = 0; i < schedules.length; i++) {
+        const schedule = schedules[i];
+
+        // Check if job was cancelled
+        if (this.currentJob.jobId !== jobId || this.currentJob.status !== 'running') {
+          console.log('Job cancelled or replaced');
+          return;
+        }
+
+        this.currentJob.currentSchedule = {
+          id: schedule.id,
+          name: schedule.template_name,
+          index: i + 1
+        };
+
+        console.log(`\n📧 Processing schedule ${i + 1}/${schedules.length}: ${schedule.template_name}`);
+
+        const result = await this.processSchedule(schedule, 'manual');
+        this.currentJob.results.push(result);
+        this.currentJob.processedSchedules = i + 1;
+
+        if (result.status === 'success') {
+          this.currentJob.emailsSent += result.emailsSent || 0;
+          this.currentJob.emailsFailed += result.emailsFailed || 0;
+          this.stats.schedulesProcessed++;
+        }
+      }
+
+      this.currentJob.status = 'completed';
+      this.currentJob.endTime = new Date().toISOString();
+      this.currentJob.currentSchedule = null;
+
+      console.log(`\n✅ Job ${jobId} completed: ${this.currentJob.emailsSent} sent, ${this.currentJob.emailsFailed} failed`);
+
+    } catch (error) {
+      console.error(`❌ Job ${jobId} failed:`, error);
+      this.currentJob.status = 'error';
+      this.currentJob.error = error.message;
+      this.currentJob.endTime = new Date().toISOString();
+    }
+  }
+
+  /**
+   * Clear completed/failed job (allows starting a new one)
+   */
+  clearJob() {
+    if (this.currentJob && this.currentJob.status !== 'running') {
+      this.currentJob = null;
+      return { success: true };
+    }
+    return { success: false, error: 'Cannot clear a running job' };
   }
 
   /**
@@ -587,55 +735,97 @@ class EmailSchedulerService {
 <head>
   <meta charset="UTF-8">
   <style>
+    * { box-sizing: border-box; }
     body {
       font-family: Arial, sans-serif;
       margin: 0;
-      padding: 20px;
-      font-size: 11px;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-bottom: 30px;
-    }
-    th, td {
-      padding: 6px 8px;
-      text-align: left;
-      border-bottom: 1px solid #ddd;
-    }
-    th {
-      background-color: #f5f5f5;
-      font-weight: bold;
-    }
-    .pnl-report-header {
-      margin-bottom: 20px;
-      padding-bottom: 10px;
-      border-bottom: 2px solid #333;
-    }
-    .pnl-title {
-      font-size: 18px;
-      font-weight: bold;
-      margin-bottom: 5px;
-    }
-    .pnl-subtitle {
-      font-size: 14px;
-      color: #666;
-      margin-bottom: 10px;
-    }
-    .pnl-meta {
-      font-size: 10px;
-      color: #666;
-      margin-bottom: 3px;
+      padding: 10px;
+      font-size: 9px;
     }
     .pnl-report-container {
+      background: #ffffff;
+      width: 100%;
+      padding: 12px 20px;
       page-break-after: always;
-      margin-bottom: 30px;
     }
     .pnl-report-container:last-child {
       page-break-after: auto;
     }
+    .pnl-report-header {
+      text-align: center;
+      margin-bottom: 8px;
+      padding: 0;
+    }
+    .pnl-title {
+      font-size: 14px;
+      font-weight: 700;
+      margin: 0 0 2px 0;
+    }
+    .pnl-subtitle {
+      font-size: 11px;
+      font-weight: 600;
+      color: #444;
+      margin: 0 0 4px 0;
+    }
+    .pnl-meta {
+      font-size: 9px;
+      color: #666;
+      margin: 1px 0;
+    }
+    .pnl-divider {
+      border: none;
+      border-top: 1px solid #ccc;
+      margin: 6px 0 10px 0;
+    }
+    .pnl-report-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 8px;
+      table-layout: auto;
+    }
+    .pnl-report-table th,
+    .pnl-report-table td {
+      padding: 3px 4px;
+      border: none;
+      white-space: nowrap;
+      vertical-align: middle;
+    }
+    .pnl-report-table th {
+      font-weight: 600;
+      text-align: center;
+      font-size: 8px;
+    }
+    .pnl-report-table td:first-child,
+    .pnl-report-table th:first-child {
+      text-align: left;
+      white-space: normal;
+      word-wrap: break-word;
+      max-width: 150px;
+    }
+    .pnl-report-table td:not(:first-child),
+    .pnl-report-table th:not(:first-child) {
+      text-align: right;
+    }
+    .pnl-report-table .header-group-row th {
+      font-size: 9px;
+      padding: 5px 4px;
+    }
+    .pnl-report-table .header-label-row th {
+      font-size: 7px;
+      padding: 3px 4px;
+      border-bottom: 1px solid #ddd;
+    }
+    .pnl-report-table .section-header-row td {
+      padding-top: 10px;
+      padding-bottom: 4px;
+    }
+    .pnl-report-table td:empty::after {
+      content: "-";
+      color: #999;
+    }
     @media print {
-      body { margin: 0; padding: 10px; }
+      body { margin: 0; padding: 8px; }
+      .pnl-report-container { page-break-after: always; }
     }
   </style>
 </head>

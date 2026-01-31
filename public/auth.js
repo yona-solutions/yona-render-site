@@ -43,6 +43,19 @@ async function authFetch(url, options = {}) {
 }
 
 /**
+ * Get the current auth token for use with SSE (EventSource).
+ * EventSource doesn't support custom headers, so token must be passed as query param.
+ */
+async function getAuthToken() {
+  await _authReady;
+  const user = firebase.auth().currentUser;
+  if (!user) {
+    throw new Error('Not authenticated');
+  }
+  return user.getIdToken();
+}
+
+/**
  * One-time auth check on page load.
  * Uses the _authReady promise so we only act after Firebase has fully
  * restored the session from IndexedDB (avoiding the null-then-user flicker).

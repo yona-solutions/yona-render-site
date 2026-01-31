@@ -375,7 +375,7 @@ async function generatePNLReport(monthData, ytdData, meta, accountConfig, childr
     });
     
     rowsHtml += `
-      <tr>
+      <tr class="section-header-row">
         <td colspan="12" style="font-weight:700; text-decoration:underline; text-transform:uppercase; padding-top: 12px;">
           ${section}
         </td>

@@ -438,49 +438,91 @@ class EmailConfigService {
     // Only set enabled if explicitly provided, otherwise keep existing value (via COALESCE in SQL)
     const finalEnabled = enabled !== undefined ? enabled : (status !== undefined ? (status === 'active') : undefined);
 
+    // Build dynamic query - only update fields that were explicitly provided
+    const setClauses = [];
+    const values = [];
+    let paramIndex = 1;
+
+    if (template_name !== undefined) {
+      setClauses.push(`template_name = $${paramIndex++}`);
+      values.push(template_name);
+    }
+    if (finalTemplateType !== undefined) {
+      setClauses.push(`template_type = $${paramIndex++}`);
+      values.push(finalTemplateType);
+    }
+    if (finalProcess !== undefined) {
+      setClauses.push(`process = $${paramIndex++}`);
+      values.push(finalProcess);
+    }
+    // Entity fields - only update if explicitly provided
+    if (district_id !== undefined || (finalTemplateType === 'district' && entity_id !== undefined)) {
+      setClauses.push(`district_id = $${paramIndex++}`);
+      values.push(district_id !== undefined ? district_id : entity_id);
+    }
+    if (district_name !== undefined || (finalTemplateType === 'district' && entity_name !== undefined)) {
+      setClauses.push(`district_name = $${paramIndex++}`);
+      values.push(district_name !== undefined ? district_name : entity_name);
+    }
+    if (region_id !== undefined || (finalTemplateType === 'region' && entity_id !== undefined)) {
+      setClauses.push(`region_id = $${paramIndex++}`);
+      values.push(region_id !== undefined ? region_id : entity_id);
+    }
+    if (region_name !== undefined || (finalTemplateType === 'region' && entity_name !== undefined)) {
+      setClauses.push(`region_name = $${paramIndex++}`);
+      values.push(region_name !== undefined ? region_name : entity_name);
+    }
+    if (subsidiary_id !== undefined || (finalTemplateType === 'subsidiary' && entity_id !== undefined)) {
+      setClauses.push(`subsidiary_id = $${paramIndex++}`);
+      values.push(subsidiary_id !== undefined ? subsidiary_id : entity_id);
+    }
+    if (subsidiary_name !== undefined || (finalTemplateType === 'subsidiary' && entity_name !== undefined)) {
+      setClauses.push(`subsidiary_name = $${paramIndex++}`);
+      values.push(subsidiary_name !== undefined ? subsidiary_name : entity_name);
+    }
+    if (email_group_id !== undefined) {
+      setClauses.push(`email_group_id = $${paramIndex++}`);
+      values.push(email_group_id);
+    }
+    if (email_group_ids !== undefined) {
+      setClauses.push(`email_group_ids = $${paramIndex++}`);
+      values.push(email_group_ids);
+    }
+    if (frequency !== undefined) {
+      setClauses.push(`frequency = $${paramIndex++}`);
+      values.push(frequency);
+    }
+    if (day_of_week !== undefined) {
+      setClauses.push(`day_of_week = $${paramIndex++}`);
+      values.push(day_of_week);
+    }
+    if (day_of_month !== undefined) {
+      setClauses.push(`day_of_month = $${paramIndex++}`);
+      values.push(day_of_month);
+    }
+    if (time_of_day !== undefined) {
+      setClauses.push(`time_of_day = $${paramIndex++}`);
+      values.push(time_of_day);
+    }
+    if (finalEnabled !== undefined) {
+      setClauses.push(`enabled = $${paramIndex++}`);
+      values.push(finalEnabled);
+    }
+
+    // Always update updated_at
+    setClauses.push('updated_at = CURRENT_TIMESTAMP');
+
+    // Add the id as the last parameter
+    values.push(id);
+
     const query = `
       UPDATE report_schedules
-      SET
-        template_name = COALESCE($1, template_name),
-        template_type = COALESCE($2, template_type),
-        process = COALESCE($3, process),
-        district_id = $4,
-        district_name = $5,
-        region_id = $6,
-        region_name = $7,
-        subsidiary_id = $8,
-        subsidiary_name = $9,
-        email_group_id = COALESCE($10, email_group_id),
-        email_group_ids = COALESCE($11, email_group_ids),
-        frequency = COALESCE($12, frequency),
-        day_of_week = COALESCE($13, day_of_week),
-        day_of_month = COALESCE($14, day_of_month),
-        time_of_day = COALESCE($15, time_of_day),
-        enabled = COALESCE($16, enabled),
-        updated_at = CURRENT_TIMESTAMP
-      WHERE id = $17
+      SET ${setClauses.join(', ')}
+      WHERE id = $${paramIndex}
       RETURNING *
     `;
 
-    const result = await this.pool.query(query, [
-      template_name,
-      finalTemplateType,
-      finalProcess,
-      district_id !== undefined ? district_id : (finalTemplateType === 'district' ? entity_id : null),
-      district_name !== undefined ? district_name : (finalTemplateType === 'district' ? entity_name : null),
-      region_id !== undefined ? region_id : (finalTemplateType === 'region' ? entity_id : null),
-      region_name !== undefined ? region_name : (finalTemplateType === 'region' ? entity_name : null),
-      subsidiary_id !== undefined ? subsidiary_id : (finalTemplateType === 'subsidiary' ? entity_id : null),
-      subsidiary_name !== undefined ? subsidiary_name : (finalTemplateType === 'subsidiary' ? entity_name : null),
-      email_group_id,
-      email_group_ids,
-      frequency,
-      day_of_week,
-      day_of_month,
-      time_of_day,
-      finalEnabled,
-      id
-    ]);
+    const result = await this.pool.query(query, values);
 
     if (result.rows.length === 0) {
       throw new Error('Report schedule not found');
