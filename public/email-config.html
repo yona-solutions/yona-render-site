@@ -4248,19 +4248,49 @@
         const modal = document.getElementById('schedulerProgressModal');
         modal.classList.add('active');
 
-        // If we have results, populate schedulesToProcess from them
+        // Reset spinner and title based on status
+        const spinner = document.getElementById('schedulerSpinner');
+        const title = document.getElementById('schedulerTitle');
+        if (jobStatus.running) {
+          if (spinner) spinner.style.display = 'inline-block';
+          if (title) title.textContent = '⚙️ Running All Schedules...';
+        } else {
+          if (spinner) spinner.style.display = 'none';
+          if (title) title.textContent = jobStatus.status === 'completed'
+            ? '✅ All Schedules Complete'
+            : '❌ Job Failed';
+        }
+
+        // Always populate from ALL enabled schedules first, then update with results
+        const enabledSchedules = reportSchedules.filter(s => s.enabled);
+        schedulesToProcess = enabledSchedules.map(schedule => ({
+          id: schedule.id,
+          name: schedule.template_name,
+          entity: schedule.district_name || schedule.region_name || schedule.subsidiary_name || 'Unknown',
+          emailGroupName: schedule.email_group_name || 'Multiple Groups',
+          recipients: [],
+          status: 'pending'
+        }));
+
+        // Update with results from job (completed/skipped/error schedules)
         if (jobStatus.results && jobStatus.results.length > 0) {
-          schedulesToProcess = jobStatus.results.map(r => ({
-            id: r.scheduleId,
-            name: r.scheduleName || r.name || `Schedule ${r.scheduleId}`,
-            entity: r.entity || '',
-            emailGroupName: '',
-            recipients: [],
-            status: r.status || 'success',
-            emailsSent: r.emailsSent,
-            skipReason: r.skipReason,
-            error: r.error
-          }));
+          jobStatus.results.forEach(result => {
+            const schedule = schedulesToProcess.find(s => s.id === result.scheduleId);
+            if (schedule) {
+              schedule.status = result.status || 'success';
+              schedule.emailsSent = result.emailsSent;
+              schedule.skipReason = result.skipReason;
+              schedule.error = result.error;
+            }
+          });
+        }
+
+        // Mark current schedule as processing
+        if (jobStatus.running && jobStatus.currentSchedule) {
+          const currentSchedule = schedulesToProcess.find(s => s.id === jobStatus.currentSchedule.id);
+          if (currentSchedule && currentSchedule.status === 'pending') {
+            currentSchedule.status = 'processing';
+          }
         }
 
         // Populate with job data
