@@ -998,7 +998,7 @@ router.post('/report-schedules/:id/send-to-groups', async (req, res) => {
     const plType = schedule.process === 'Operational' ? 'operational' : 'standard';
 
     // Get available dates and use provided reportDate or default to latest
-    const dates = await bigQueryService.getAvailableDates();
+    const dates = await bigQueryServiceInstance.getAvailableDates();
     if (!dates || dates.length === 0) {
       return res.status(500).json({
         error: 'No dates available',
@@ -1011,7 +1011,11 @@ router.post('/report-schedules/:id/send-to-groups', async (req, res) => {
 
     // Fetch P&L data
     console.log(`   Fetching P&L data for ${schedule.template_type} ${entityId}...`);
-    const plResponse = await fetch(`http://localhost:${process.env.PORT || 3000}/api/pl/data?hierarchy=${schedule.template_type}&selectedId=${encodeURIComponent(entityId)}&date=${latestDate}&plType=${plType}`);
+    const plResponse = await fetch(`http://localhost:${process.env.PORT || 3000}/api/pl/data?hierarchy=${schedule.template_type}&selectedId=${encodeURIComponent(entityId)}&date=${latestDate}&plType=${plType}`, {
+      headers: {
+        'X-API-Key': process.env.SCHEDULER_API_KEY
+      }
+    });
 
     if (!plResponse.ok) {
       const errorData = await plResponse.json();
@@ -1025,14 +1029,14 @@ router.post('/report-schedules/:id/send-to-groups', async (req, res) => {
     const filteredHtml = filterReportsWithIncome(plData.html);
 
     // Wrap in full HTML document for PDF
-    const fullHtml = wrapHtmlForPdf(filteredHtml);
+    const fullHtml = buildPDFHTML(filteredHtml);
 
     // Generate PDF
     console.log(`   Generating PDF...`);
     const pdfResponse = await fetch('https://api.pdfshift.io/v3/convert/pdf', {
       method: 'POST',
       headers: {
-        'Authorization': 'Basic ' + Buffer.from('api:' + process.env.PDFSHIFT_API_KEY).toString('base64'),
+        'X-API-Key': 'sk_3df748acf1ce265988e07e04544b6452ece1b20e',
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -1069,14 +1073,7 @@ router.post('/report-schedules/:id/send-to-groups', async (req, res) => {
 
     for (const recipientEmail of recipientList) {
       try {
-        await emailService.sendPDFEmail({
-          to: recipientEmail,
-          subject: subject,
-          text: `Please find attached the ${schedule.process || 'Standard'} P&L report for ${entityName} (${monthName} ${year}).`,
-          html: `<p>Please find attached the <strong>${schedule.process || 'Standard'}</strong> P&L report for <strong>${entityName}</strong> (${monthName} ${year}).</p>`,
-          pdfBuffer: pdfBuffer,
-          filename: filename
-        });
+        await emailService.sendPDFEmail(schedule, pdfBuffer, recipientEmail, latestDate);
         emailsSent++;
         results.push({ email: recipientEmail, status: 'sent' });
         console.log(`      ✅ Sent to ${recipientEmail}`);
@@ -1096,7 +1093,7 @@ router.post('/report-schedules/:id/send-to-groups', async (req, res) => {
         schedule_id: parseInt(id),
         template_name: schedule.template_name,
         template_type: schedule.template_type,
-        process_type: schedule.process,
+        process: schedule.process,
         entity_id: entityId,
         entity_name: entityName,
         report_date: latestDate,
@@ -1109,6 +1106,10 @@ router.post('/report-schedules/:id/send-to-groups', async (req, res) => {
         pdf_size_bytes: pdfBuffer.length,
         duration_ms: duration
       });
+
+      // Update last_run_manual timestamp
+      await emailConfigService.updateScheduleSendTimestamps(schedule.id, new Date(), null, 'manual');
+      console.log(`   Updated last_run_manual timestamp`);
     }
 
     res.json({

@@ -812,7 +812,7 @@
       }
 
       tbody.innerHTML = logs.map(log => {
-        const runTime = new Date(log.run_started_at).toLocaleString();
+        const runTime = formatUtcTimestamp(log.run_started_at);
         const emailCount = (log.recipient_emails || []).length;
         const sentFailed = `${log.emails_sent || 0}/${log.emails_failed || 0}`;
 
@@ -882,8 +882,8 @@
         }
         const log = await response.json();
 
-        const runTime = new Date(log.run_started_at).toLocaleString();
-        const completedTime = log.run_completed_at ? new Date(log.run_completed_at).toLocaleString() : '-';
+        const runTime = formatUtcTimestamp(log.run_started_at);
+        const completedTime = formatUtcTimestamp(log.run_completed_at);
         const pdfSize = log.pdf_size_bytes ? `${(log.pdf_size_bytes / 1024).toFixed(1)} KB` : '-';
         const emails = log.recipient_emails || [];
 
@@ -980,6 +980,17 @@
         closeDetailModal();
       }
     });
+
+    // Format UTC timestamp to local time
+    function formatUtcTimestamp(timestamp) {
+      if (!timestamp) return '-';
+      // Ensure the timestamp is treated as UTC by appending 'Z' if not present
+      let utcString = timestamp;
+      if (typeof timestamp === 'string' && !timestamp.endsWith('Z') && !timestamp.includes('+')) {
+        utcString = timestamp + 'Z';
+      }
+      return new Date(utcString).toLocaleString();
+    }
 
     // Escape HTML helper
     function escapeHtml(str) {
