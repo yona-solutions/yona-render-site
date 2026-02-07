@@ -467,6 +467,28 @@
       color: #555;
     }
 
+    .tag-suggestions {
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      background: #ffffff;
+      box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
+      padding: 6px;
+      max-height: 160px;
+      overflow-y: auto;
+      margin-top: 6px;
+    }
+
+    .tag-suggestion-item {
+      padding: 6px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    .tag-suggestion-item:hover {
+      background: #edf2f7;
+    }
+
     .node-children {
       list-style: none;
       display: none;
@@ -1059,6 +1081,12 @@
         </label>
       </div>
 
+      <!-- District Region Field (Customers only, when marked as District) -->
+      <div id="districtRegionSection" class="field-group" style="display: none;">
+        <label class="field-label">District Region</label>
+        <input type="text" id="editDistrictRegion" class="field-input" placeholder="Enter region name...">
+      </div>
+
       <!-- Start Date Field (Customers only) -->
       <div id="customerStartDateSection" class="field-group" style="display: none;">
         <label class="field-label">Start Date (Estimated)</label>
@@ -1079,6 +1107,7 @@
           />
           <button class="btn" onclick="addDistrictTag()" style="padding: 6px 12px;">Add</button>
         </div>
+        <div id="districtTagSuggestions" class="tag-suggestions" style="display:none;"></div>
         <div id="districtTagsList" style="display: flex; flex-wrap: wrap; gap: 4px;"></div>
       </div>
 
@@ -1096,6 +1125,7 @@
           />
           <button class="btn" onclick="addCustomerTag()" style="padding: 6px 12px;">Add</button>
         </div>
+        <div id="customerTagSuggestions" class="tag-suggestions" style="display:none;"></div>
         <div id="customerTagsList" style="display: flex; flex-wrap: wrap; gap: 4px;"></div>
       </div>
 
@@ -2469,6 +2499,7 @@
       document.getElementById('customerStartDateSection').style.display = isCustomerTab ? 'block' : 'none';
       document.getElementById('districtTagsSection').style.display = isCustomerTab ? 'block' : 'none';
       document.getElementById('customerTagsSection').style.display = isCustomerTab ? 'block' : 'none';
+      document.getElementById('districtRegionSection').style.display = 'none';
 
       document.getElementById('regionMappingSection').style.display = isRegionTab ? 'block' : 'none';
       document.getElementById('regionTagsSection').style.display = isRegionTab ? 'block' : 'none';
@@ -2492,14 +2523,19 @@
         document.getElementById('editDistrictReportingExcluded').checked = node.districtReportingExcluded || false;
         const districtReportingLabel = document.getElementById('districtReportingExcludedLabel');
         districtReportingLabel.style.display = isDistrict ? 'block' : 'none';
+        document.getElementById('districtRegionSection').style.display = isDistrict ? 'block' : 'none';
+        document.getElementById('editDistrictRegion').value = node.districtRegion || node.region_label || '';
         document.getElementById('editStartDate').value = node.start_date_est || '';
         populateDistrictTags(node.districtTags || []);
         populateCustomerTags(node.customerTags || node.tags || []);
+        hideCustomerTagSuggestions();
         document.getElementById('editIsDistrict').onchange = function(e) {
           const isChecked = e.target.checked;
           districtReportingLabel.style.display = isChecked ? 'block' : 'none';
+          document.getElementById('districtRegionSection').style.display = isChecked ? 'block' : 'none';
           if (!isChecked) {
             document.getElementById('editDistrictReportingExcluded').checked = false;
+            document.getElementById('editDistrictRegion').value = '';
           }
         };
       }
@@ -2621,6 +2657,12 @@
         // Get checkbox values
         configData[nodeId].isDistrict = document.getElementById('editIsDistrict').checked;
         configData[nodeId].districtReportingExcluded = document.getElementById('editDistrictReportingExcluded').checked;
+        const districtRegionValue = document.getElementById('editDistrictRegion').value.trim();
+        if (configData[nodeId].isDistrict && districtRegionValue) {
+          configData[nodeId].districtRegion = districtRegionValue;
+        } else {
+          delete configData[nodeId].districtRegion;
+        }
 
         // Start date is read-only, so we don't update it here
         // It will be preserved from the original data
@@ -2735,6 +2777,108 @@
         container.appendChild(tagSpan);
       });
     }
+
+    function getUniqueCustomerTags(kind) {
+      const dimensionData = AppState.dimensions.customer || {};
+      const tagSet = new Set();
+
+      for (const node of Object.values(dimensionData)) {
+        if (!node) continue;
+        if (kind === 'district') {
+          (node.districtTags || []).forEach(tag => tagSet.add(tag));
+        } else {
+          const tags = node.customerTags || node.tags || [];
+          tags.forEach(tag => tagSet.add(tag));
+        }
+      }
+
+      return Array.from(tagSet).filter(Boolean).sort((a, b) => a.localeCompare(b));
+    }
+
+    function refreshCustomerTagSuggestions() {
+      renderTagSuggestions('newDistrictTag', 'districtTagSuggestions', 'district');
+      renderTagSuggestions('newCustomerTag', 'customerTagSuggestions', 'customer');
+    }
+
+    function hideCustomerTagSuggestions() {
+      const districtList = document.getElementById('districtTagSuggestions');
+      const customerList = document.getElementById('customerTagSuggestions');
+      if (districtList) districtList.style.display = 'none';
+      if (customerList) customerList.style.display = 'none';
+    }
+
+    function renderTagSuggestions(inputId, listId, kind) {
+      const input = document.getElementById(inputId);
+      const list = document.getElementById(listId);
+      if (!input || !list) return;
+
+      if (document.activeElement !== input) {
+        list.style.display = 'none';
+        return;
+      }
+
+      const query = input.value.trim().toLowerCase();
+      const tags = getUniqueCustomerTags(kind);
+      const node = AppState.editingNode;
+      const currentTags = kind === 'district'
+        ? (node?.districtTags || [])
+        : (node?.customerTags || node?.tags || []);
+
+      const filtered = tags.filter(tag => {
+        if (!tag) return false;
+        if (currentTags.includes(tag)) return false;
+        if (!query) return true;
+        return tag.toLowerCase().includes(query);
+      });
+
+      list.innerHTML = '';
+      if (!filtered.length) {
+        list.style.display = 'none';
+        return;
+      }
+
+      filtered.slice(0, 12).forEach(tag => {
+        const item = document.createElement('div');
+        item.className = 'tag-suggestion-item';
+        item.textContent = tag;
+        item.onclick = () => {
+          input.value = tag;
+          if (kind === 'district') {
+            addDistrictTag();
+          } else {
+            addCustomerTag();
+          }
+          input.focus();
+        };
+        list.appendChild(item);
+      });
+
+      list.style.display = 'block';
+    }
+
+    document.addEventListener('input', (e) => {
+      if (e.target && e.target.id === 'newDistrictTag') {
+        renderTagSuggestions('newDistrictTag', 'districtTagSuggestions', 'district');
+      }
+      if (e.target && e.target.id === 'newCustomerTag') {
+        renderTagSuggestions('newCustomerTag', 'customerTagSuggestions', 'customer');
+      }
+    });
+
+    document.addEventListener('focusin', (e) => {
+      if (e.target && e.target.id === 'newDistrictTag') {
+        renderTagSuggestions('newDistrictTag', 'districtTagSuggestions', 'district');
+      }
+      if (e.target && e.target.id === 'newCustomerTag') {
+        renderTagSuggestions('newCustomerTag', 'customerTagSuggestions', 'customer');
+      }
+    });
+
+    document.addEventListener('focusout', (e) => {
+      if (e.target && (e.target.id === 'newDistrictTag' || e.target.id === 'newCustomerTag')) {
+        setTimeout(hideCustomerTagSuggestions, 120);
+      }
+    });
     
     function addDistrictTag() {
       const input = document.getElementById('newDistrictTag');
@@ -2758,6 +2902,7 @@
       
       // Update display
       populateDistrictTags(newTags);
+      refreshCustomerTagSuggestions();
       input.value = '';
     }
     
@@ -2770,6 +2915,7 @@
       node.districtTags = newTags;
       
       populateDistrictTags(newTags);
+      refreshCustomerTagSuggestions();
     }
     
     function addCustomerTag() {
@@ -2794,6 +2940,7 @@
       
       // Update display
       populateCustomerTags(newTags);
+      refreshCustomerTagSuggestions();
       input.value = '';
     }
     
@@ -2806,6 +2953,7 @@
       node.customerTags = newTags;
       
       populateCustomerTags(newTags);
+      refreshCustomerTagSuggestions();
     }
 
     // Region tag management functions

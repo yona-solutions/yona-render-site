@@ -15,6 +15,62 @@ const googleSheetsService = require('../services/googleSheetsService');
 const censusService = require('../services/censusService');
 const fivetranService = require('../services/fivetranService');
 
+function normalizeCensusMonth(date) {
+  if (!date) return null;
+  return `${date.substring(0, 7)}-01`;
+}
+
+function getCustomerCodeFromLabel(label) {
+  if (!label) return null;
+  const parts = String(label).split(' - ');
+  return parts.length > 0 ? parts[0].trim() : null;
+}
+
+function collectCustomerCodes(customers) {
+  if (!Array.isArray(customers)) return [];
+  const codes = [];
+  for (const customer of customers) {
+    const code = customer?.customer_code || getCustomerCodeFromLabel(customer?.label);
+    if (code) codes.push(code);
+  }
+  return codes;
+}
+
+function sumCensusForCodes(censusRecords, customerCodes, date) {
+  const month = normalizeCensusMonth(date);
+  if (!month || !censusRecords || censusRecords.length === 0 || !customerCodes || customerCodes.length === 0) {
+    return { actual: null, budget: null };
+  }
+
+  const codeSet = new Set(customerCodes.filter(Boolean));
+  let actualTotal = 0;
+  let budgetTotal = 0;
+  let actualFound = false;
+  let budgetFound = false;
+
+  for (const record of censusRecords) {
+    if (!record || record.month !== month) continue;
+    if (!codeSet.has(record.customerCode)) continue;
+    if (record.type === 'Actuals') {
+      actualTotal += Number(record.value) || 0;
+      actualFound = true;
+    } else if (record.type === 'Budget') {
+      budgetTotal += Number(record.value) || 0;
+      budgetFound = true;
+    }
+  }
+
+  return {
+    actual: actualFound ? actualTotal : null,
+    budget: budgetFound ? budgetTotal : null
+  };
+}
+
+function sumCensusForCustomers(censusRecords, customers, date) {
+  const codes = collectCustomerCodes(customers);
+  return sumCensusForCodes(censusRecords, codes, date);
+}
+
 /**
  * Configure API routes
  * 
@@ -303,6 +359,7 @@ function createApiRoutes(storageService, bigQueryService) {
       const accountConfig = await storageService.getFileAsJson('account_config.json');
       const childrenMap = accountService.buildChildrenMap(accountConfig);
       const sectionConfig = accountService.getSectionConfig();
+      const censusRecords = censusService.isAvailable() ? await censusService.fetchCensusData() : [];
 
       // Step 1: Get subsidiary internal ID(s)
       sendProgress('subsidiary-summary', 'Fetching subsidiary summary...');
@@ -319,29 +376,30 @@ function createApiRoutes(storageService, bigQueryService) {
       }
 
       // Get customers in subsidiary
-      const customersInSubsidiary = await bigQueryService.getCustomersInSubsidiary(subsidiaryIds);
+      let customersInSubsidiary = await bigQueryService.getCustomersInSubsidiary(subsidiaryIds);
       if (!customersInSubsidiary || customersInSubsidiary.length === 0) {
         return sendError(`No customers found for subsidiary: ${selectedLabel}`);
+      }
+
+      // Optional district tag filter (subsidiary hierarchy only)
+      const districtTagFilter = req.query.districtTagFilter;
+      const hasDistrictTagFilter = Boolean(districtTagFilter && districtTagFilter !== 'all');
+      if (hasDistrictTagFilter) {
+        const tagResult = await storageService.getCustomersForDistrict(districtTagFilter);
+        const tagCustomerIds = new Set(tagResult.customers.map(c => c.customer_internal_id));
+        customersInSubsidiary = customersInSubsidiary.filter(c => tagCustomerIds.has(c.customer_internal_id));
+        
+        if (customersInSubsidiary.length === 0) {
+          return sendError('No customers found for selected district tag within subsidiary');
+        }
+        
+        console.log(`   📎 Applying district tag filter: ${tagResult.districtName} (${customersInSubsidiary.length} customers)`);
       }
 
       // Group customers by region and district
       const regionGroups = await storageService.groupCustomersByRegionAndDistrict(customersInSubsidiary);
 
-      // Query subsidiary summary
-      const subsidiaryMonthData = await bigQueryService.getPLData({
-        hierarchy: 'subsidiary',
-        subsidiaryId,
-        date,
-        accountConfig,
-        ytd: false
-      });
-      const subsidiaryYtdData = await bigQueryService.getPLData({
-        hierarchy: 'subsidiary',
-        subsidiaryId,
-        date,
-        accountConfig,
-        ytd: true
-      });
+      const subsidiaryCensus = sumCensusForCustomers(censusRecords, customersInSubsidiary, date);
 
       // Step 2: Fetch all customer data
       sendProgress('customer-data', 'Fetching customer data...');
@@ -367,6 +425,29 @@ function createApiRoutes(storageService, bigQueryService) {
         ytd: true
       });
 
+      // Query subsidiary summary (skip if district tag filter is active)
+      let subsidiaryMonthData;
+      let subsidiaryYtdData;
+      if (!hasDistrictTagFilter) {
+        subsidiaryMonthData = await bigQueryService.getPLData({
+          hierarchy: 'subsidiary',
+          subsidiaryId,
+          date,
+          accountConfig,
+          ytd: false
+        });
+        subsidiaryYtdData = await bigQueryService.getPLData({
+          hierarchy: 'subsidiary',
+          subsidiaryId,
+          date,
+          accountConfig,
+          ytd: true
+        });
+      } else {
+        subsidiaryMonthData = allCustomersMonthData;
+        subsidiaryYtdData = allCustomersYtdData;
+      }
+
       // Step 3: Generate subsidiary report
       sendProgress('generating-subsidiary', 'Generating subsidiary report...');
 
@@ -381,7 +462,10 @@ function createApiRoutes(storageService, bigQueryService) {
         plType: reportPlType,
         regionCount: 0,
         districtCount: 0,
-        facilityCount: 0
+        facilityCount: 0,
+        actualCensus: subsidiaryCensus.actual,
+        budgetCensus: subsidiaryCensus.budget,
+        headcount: null
       };
 
       const subsidiaryResultReport = await pnlRenderService.generatePNLReport(
@@ -414,22 +498,36 @@ function createApiRoutes(storageService, bigQueryService) {
 
         sendProgress('processing-regions', 'Processing regions...', `Region ${regionIdx + 1} of ${totalRegions}: ${region.regionLabel}`);
 
-        const regionMonthData = await bigQueryService.getPLData({
-          hierarchy: 'region',
-          regionId: region.regionInternalId,
-          subsidiaryId: subsidiaryId,
-          date,
-          accountConfig,
-          ytd: false
-        });
-        const regionYtdData = await bigQueryService.getPLData({
-          hierarchy: 'region',
-          regionId: region.regionInternalId,
-          subsidiaryId: subsidiaryId,
-          date,
-          accountConfig,
-          ytd: true
-        });
+        const regionCustomerIds = region.districts.flatMap(district =>
+          district.customers.map(c => c.customer_internal_id)
+        );
+
+        let regionMonthData;
+        let regionYtdData;
+        if (hasDistrictTagFilter) {
+          regionMonthData = accountService.filterDataByCustomers(allCustomersMonthData, regionCustomerIds);
+          regionYtdData = accountService.filterDataByCustomers(allCustomersYtdData, regionCustomerIds);
+        } else {
+          regionMonthData = await bigQueryService.getPLData({
+            hierarchy: 'region',
+            regionId: region.regionInternalId,
+            subsidiaryId: subsidiaryId,
+            date,
+            accountConfig,
+            ytd: false
+          });
+          regionYtdData = await bigQueryService.getPLData({
+            hierarchy: 'region',
+            regionId: region.regionInternalId,
+            subsidiaryId: subsidiaryId,
+            date,
+            accountConfig,
+            ytd: true
+          });
+        }
+
+        const regionCustomers = region.districts.flatMap(district => district.customers);
+        const regionCensus = sumCensusForCustomers(censusRecords, regionCustomers, date);
 
         const regionMeta = {
           typeLabel: 'Region',
@@ -437,7 +535,10 @@ function createApiRoutes(storageService, bigQueryService) {
           monthLabel: date,
           plType: reportPlType,
           districtCount: 0,
-          facilityCount: 0
+          facilityCount: 0,
+          actualCensus: regionCensus.actual,
+          budgetCensus: regionCensus.budget,
+          headcount: null
         };
 
         const regionResult = await pnlRenderService.generatePNLReport(
@@ -464,13 +565,19 @@ function createApiRoutes(storageService, bigQueryService) {
           const districtMonthData = accountService.filterDataByCustomers(allCustomersMonthData, districtCustomerIds);
           const districtYtdData = accountService.filterDataByCustomers(allCustomersYtdData, districtCustomerIds);
 
-          const districtMeta = {
-            typeLabel: 'District',
-            entityName: district.districtLabel,
-            monthLabel: date,
-            plType: reportPlType,
-            facilityCount: 0
-          };
+        const districtCensus = sumCensusForCustomers(censusRecords, district.customers, date);
+
+        const districtMeta = {
+          typeLabel: 'District',
+          entityName: district.districtLabel,
+          monthLabel: date,
+          plType: reportPlType,
+          facilityCount: 0,
+          parentRegion: district.districtRegion || region.regionLabel,
+          actualCensus: districtCensus.actual,
+          budgetCensus: districtCensus.budget,
+          headcount: null
+        };
 
           const districtResult = await pnlRenderService.generatePNLReport(
             districtMonthData,
@@ -494,14 +601,8 @@ function createApiRoutes(storageService, bigQueryService) {
             const facilityMonthData = accountService.filterDataByCustomers(allCustomersMonthData, [customer.customer_internal_id]);
             const facilityYtdData = accountService.filterDataByCustomers(allCustomersYtdData, [customer.customer_internal_id]);
 
-            let census = { actual: null, budget: null };
-            if (censusService.isAvailable() && customer.customer_code) {
-              try {
-                census = await censusService.getCensusForCustomer(customer.customer_code, date);
-              } catch (error) {
-                console.warn(`   ⚠️  Could not fetch census for ${customer.customer_code}:`, error.message);
-              }
-            }
+            const customerCode = customer.customer_code || getCustomerCodeFromLabel(customer.label);
+            const census = sumCensusForCodes(censusRecords, customerCode ? [customerCode] : [], date);
 
             const facilityMeta = {
               typeLabel: 'Facility',
@@ -510,7 +611,9 @@ function createApiRoutes(storageService, bigQueryService) {
               plType: reportPlType,
               actualCensus: census.actual,
               budgetCensus: census.budget,
-              startDateEst: customer.start_date_est
+              startDateEst: customer.start_date_est,
+              parentDistrict: district.districtLabel,
+              parentRegion: district.districtRegion || region.regionLabel
             };
 
             const facilityResult = await pnlRenderService.generatePNLReport(
@@ -685,6 +788,8 @@ function createApiRoutes(storageService, bigQueryService) {
       const childrenMap = accountService.buildChildrenMap(accountConfig);
       const sectionConfig = accountService.getSectionConfig();
 
+      const censusRecords = censusService.isAvailable() ? await censusService.fetchCensusData() : [];
+
       let queryParams = { hierarchy, date, accountConfig };
 
       // Get the appropriate IDs based on hierarchy type
@@ -692,7 +797,7 @@ function createApiRoutes(storageService, bigQueryService) {
         // Get full customer details for this district or district tag
         // Tags are treated as districts - they just aggregate multiple districts' customers
         const districtResult = await storageService.getCustomersForDistrict(actualId);
-        const { customers, districtName, isTag } = districtResult;
+        const { customers, districtName, isTag, districtRegion } = districtResult;
         
         if (customers.length === 0) {
           return res.status(404).json({ 
@@ -708,6 +813,7 @@ function createApiRoutes(storageService, bigQueryService) {
         queryParams.customerIds = customerIds;
         queryParams.customers = customers; // Store full customer details for facility P&Ls
         queryParams.isTag = isTag; // Store whether this is a tag for header generation
+        queryParams.districtRegion = districtRegion || '';
         console.log(`   Found ${customerIds.length} customer IDs for ${isTag ? 'tag' : 'district'}: ${districtName}`);
       } else if (hierarchy === 'region') {
         // Get region internal ID and name
@@ -800,7 +906,26 @@ function createApiRoutes(storageService, bigQueryService) {
         // Get customers in subsidiary/subsidiaries from dim_customers
         // For tags, this will fetch customers from ALL subsidiaries with that tag
         console.log(`   Fetching customers from dim_customers...`);
-        const customersInSubsidiary = await bigQueryService.getCustomersInSubsidiary(subsidiaryIds, regionId);
+        let customersInSubsidiary = await bigQueryService.getCustomersInSubsidiary(subsidiaryIds, regionId);
+
+        // Optional district tag filter (subsidiary hierarchy only)
+        const districtTagFilter = req.query.districtTagFilter;
+        if (districtTagFilter && districtTagFilter !== 'all') {
+          const tagResult = await storageService.getCustomersForDistrict(districtTagFilter);
+          const tagCustomerIds = new Set(tagResult.customers.map(c => c.customer_internal_id));
+          customersInSubsidiary = customersInSubsidiary.filter(c => tagCustomerIds.has(c.customer_internal_id));
+          
+          if (customersInSubsidiary.length === 0) {
+            return res.status(404).json({
+              error: 'No customers found for selected district tag within subsidiary',
+              code: 'NO_CUSTOMERS_FOUND'
+            });
+          }
+          
+          queryParams.districtTagFilter = districtTagFilter;
+          queryParams.districtTagLabel = tagResult.districtName;
+          console.log(`   📎 Applying district tag filter: ${tagResult.districtName} (${customersInSubsidiary.length} customers)`);
+        }
         
         // Group customers by region, then by district
         const regionGroups = await storageService.groupCustomersByRegionAndDistrict(customersInSubsidiary);
@@ -810,6 +935,7 @@ function createApiRoutes(storageService, bigQueryService) {
         queryParams.subsidiaryId = subsidiaryIds.length === 1 ? subsidiaryIds[0] : subsidiaryIds;
         queryParams.regionGroups = regionGroups;
         queryParams.isTag = isTag; // Store whether this is a tag for header generation
+        queryParams.customersInSubsidiary = customersInSubsidiary;
         
         const filterDesc = regionId 
           ? `subsidiary_internal_id IN [${subsidiaryIds.join(', ')}] AND region_internal_id=${regionId}`
@@ -857,13 +983,19 @@ function createApiRoutes(storageService, bigQueryService) {
         const districtData = await bigQueryService.getPLData({ ...queryParams, ytd: false });
         const districtYtdData = await bigQueryService.getPLData({ ...queryParams, ytd: true });
         
-        // District summaries don't show census (only individual facilities do)
+        const districtCensus = sumCensusForCustomers(censusRecords, queryParams.customers, date);
+
+        // District summaries include census rollup
         const districtMeta = {
           typeLabel: queryParams.isTag ? 'District Tag' : 'District',
           entityName: selectedLabel,
           monthLabel: date,
           facilityCount: 0, // Will be updated after processing
-          plType: reportPlType
+          plType: reportPlType,
+          parentRegion: queryParams.districtRegion || '',
+          actualCensus: districtCensus.actual,
+          budgetCensus: districtCensus.budget,
+          headcount: null
         };
         
         console.log('   Generating district summary P&L (header will be updated with actual counts)...');
@@ -905,25 +1037,15 @@ function createApiRoutes(storageService, bigQueryService) {
           const facilityMonthData = accountService.filterDataByCustomers(allCustomersMonthData, [customer.customer_internal_id]);
           const facilityYtdData = accountService.filterDataByCustomers(allCustomersYtdData, [customer.customer_internal_id]);
           
-          // Fetch census data for this facility
-          let census = { actual: null, budget: null };
-          if (censusService.isAvailable() && customer.customer_code) {
-            try {
-              console.log(`   📊 Fetching census for ${customer.customer_code}, date: ${date}`);
-              census = await censusService.getCensusForCustomer(customer.customer_code, date);
-              console.log(`   ✅ Census: Actual=${census.actual}, Budget=${census.budget}`);
-            } catch (error) {
-              console.warn(`   ⚠️  Could not fetch census for ${customer.customer_code}:`, error.message);
-            }
-          } else {
-            console.log(`   ⚠️  Census service not available or no customer_code. Available: ${censusService.isAvailable()}, Code: ${customer.customer_code}`);
-          }
+          const customerCode = customer.customer_code || getCustomerCodeFromLabel(customer.label);
+          const census = sumCensusForCodes(censusRecords, customerCode ? [customerCode] : [], date);
           
           const facilityMeta = {
             typeLabel: 'Facility',
             entityName: customer.label,
             monthLabel: date,
             parentDistrict: selectedLabel,
+            parentRegion: queryParams.districtRegion || '',
             plType: reportPlType,
             actualCensus: census.actual,
             budgetCensus: census.budget,
@@ -984,14 +1106,19 @@ function createApiRoutes(storageService, bigQueryService) {
         const regionData = await bigQueryService.getPLData({ ...queryParams, ytd: false });
         const regionYtdData = await bigQueryService.getPLData({ ...queryParams, ytd: true });
         
-        // Region summaries don't show census (only individual facilities do)
+        const regionCensus = sumCensusForCustomers(censusRecords, queryParams.customersInRegion, date);
+
+        // Region summaries include census rollup
         const regionMeta = {
           typeLabel: 'Region',
           entityName: selectedLabel,
           monthLabel: date,
           districtCount: 0, // Will be updated after processing
           facilityCount: 0, // Will be updated after processing
-          plType: reportPlType
+          plType: reportPlType,
+          actualCensus: regionCensus.actual,
+          budgetCensus: regionCensus.budget,
+          headcount: null
         };
         
         console.log('   Generating region summary P&L (header will be updated with actual counts)...');
@@ -1039,13 +1166,19 @@ function createApiRoutes(storageService, bigQueryService) {
           const districtData = accountService.filterDataByCustomers(allCustomersData, districtCustomerIds);
           const districtYtdData = accountService.filterDataByCustomers(allCustomersYtdData, districtCustomerIds);
           
+          const districtCensus = sumCensusForCustomers(censusRecords, districtGroup.customers, date);
+
           // Create district meta with placeholder facility count (will be corrected after processing)
           const districtMeta = {
             typeLabel: groupType,
             entityName: districtGroup.districtLabel,
             monthLabel: date,
             facilityCount: 0, // Will be updated with actual count
-            plType: reportPlType
+            plType: reportPlType,
+            parentRegion: districtGroup.districtRegion || selectedLabel,
+            actualCensus: districtCensus.actual,
+            budgetCensus: districtCensus.budget,
+            headcount: null
           };
           
           const districtResult = await pnlRenderService.generatePNLReport(
@@ -1069,21 +1202,15 @@ function createApiRoutes(storageService, bigQueryService) {
               const facilityData = accountService.filterDataByCustomers(allCustomersData, [customer.customer_internal_id]);
               const facilityYtdData = accountService.filterDataByCustomers(allCustomersYtdData, [customer.customer_internal_id]);
               
-              // Fetch census data for this facility
-              let census = { actual: null, budget: null };
-              if (censusService.isAvailable() && customer.customer_code) {
-                try {
-                  census = await censusService.getCensusForCustomer(customer.customer_code, date);
-                } catch (error) {
-                  console.warn(`   ⚠️  Could not fetch census for ${customer.customer_code}:`, error.message);
-                }
-              }
+              const customerCode = customer.customer_code || getCustomerCodeFromLabel(customer.label);
+              const census = sumCensusForCodes(censusRecords, customerCode ? [customerCode] : [], date);
               
               const facilityMeta = {
                 typeLabel: 'Facility',
                 entityName: customer.label,
                 monthLabel: date,
                 parentDistrict: districtGroup.districtLabel,
+                parentRegion: districtGroup.districtRegion || selectedLabel,
                 plType: reportPlType,
                 actualCensus: census.actual,
                 budgetCensus: census.budget,
@@ -1182,23 +1309,30 @@ function createApiRoutes(storageService, bigQueryService) {
         
         const subsidiaryId = queryParams.subsidiaryId;
         const regionGroups = queryParams.regionGroups;
+        const hasDistrictTagFilter = Boolean(queryParams.districtTagFilter);
         
         // Query 1 & 2: Subsidiary Summary (Month + YTD)
-        console.log('\n📊 Step 1/4: Querying BigQuery for subsidiary summary...');
-        const subsidiaryMonthData = await bigQueryService.getPLData({ 
-          hierarchy: 'subsidiary', 
-          subsidiaryId, 
-          date, 
-          accountConfig, 
-          ytd: false 
-        });
-        const subsidiaryYtdData = await bigQueryService.getPLData({ 
-          hierarchy: 'subsidiary', 
-          subsidiaryId, 
-          date, 
-          accountConfig, 
-          ytd: true 
-        });
+        let subsidiaryMonthData;
+        let subsidiaryYtdData;
+        if (!hasDistrictTagFilter) {
+          console.log('\n📊 Step 1/4: Querying BigQuery for subsidiary summary...');
+          subsidiaryMonthData = await bigQueryService.getPLData({ 
+            hierarchy: 'subsidiary', 
+            subsidiaryId, 
+            date, 
+            accountConfig, 
+            ytd: false 
+          });
+          subsidiaryYtdData = await bigQueryService.getPLData({ 
+            hierarchy: 'subsidiary', 
+            subsidiaryId, 
+            date, 
+            accountConfig, 
+            ytd: true 
+          });
+        } else {
+          console.log('\n📊 Step 1/4: District tag filter active - summary will use filtered customers');
+        }
         
         // Query 3 & 4: All customers in subsidiary (Month + YTD)
         console.log('\n📊 Step 2/4: Querying BigQuery for all customers in subsidiary...');
@@ -1225,6 +1359,11 @@ function createApiRoutes(storageService, bigQueryService) {
         });
         
         console.log('   ✅ Query complete - processing results in memory...');
+
+        if (hasDistrictTagFilter) {
+          subsidiaryMonthData = allCustomersMonthData;
+          subsidiaryYtdData = allCustomersYtdData;
+        }
         
         // Step 3/4: Generate subsidiary summary
         console.log('\n📝 Step 3/4: Generating subsidiary summary HTML...');
@@ -1232,7 +1371,9 @@ function createApiRoutes(storageService, bigQueryService) {
         let totalDistrictCount = 0;
         let totalFacilityCount = 0;
         
-        // Subsidiary summaries don't show census (only individual facilities do)
+        const subsidiaryCensus = sumCensusForCustomers(censusRecords, queryParams.customersInSubsidiary, date);
+
+        // Subsidiary summaries include census rollup
         const subsidiaryMeta = {
           typeLabel: queryParams.isTag ? 'Subsidiary Tag' : 'Subsidiary',
           entityName: selectedLabel,
@@ -1240,7 +1381,10 @@ function createApiRoutes(storageService, bigQueryService) {
           plType: reportPlType,
           regionCount: 0,  // Will be updated after processing
           districtCount: 0,
-          facilityCount: 0
+          facilityCount: 0,
+          actualCensus: subsidiaryCensus.actual,
+          budgetCensus: subsidiaryCensus.budget,
+          headcount: null
         };
         
         const subsidiaryResult = await pnlRenderService.generatePNLReport(
@@ -1279,34 +1423,48 @@ function createApiRoutes(storageService, bigQueryService) {
             d.customers.map(c => c.customer_internal_id)
           );
 
-          // Query BigQuery directly for region summary using region_internal_id AND subsidiary_internal_id
-          // This ensures the region total matches the sum of all transactions for this region within the subsidiary
-          console.log(`      Querying BigQuery for region summary (region_internal_id=${region.regionInternalId}, subsidiary_internal_id=${Array.isArray(subsidiaryId) ? subsidiaryId.join(',') : subsidiaryId})...`);
-          const regionMonthData = await bigQueryService.getPLData({
-            hierarchy: 'region',
-            regionId: region.regionInternalId,
-            subsidiaryId: subsidiaryId, // Supports both single ID and array (for subsidiary tags)
-            date,
-            accountConfig,
-            ytd: false
-          });
-          const regionYtdData = await bigQueryService.getPLData({
-            hierarchy: 'region',
-            regionId: region.regionInternalId,
-            subsidiaryId: subsidiaryId,
-            date,
-            accountConfig,
-            ytd: true
-          });
+          let regionMonthData;
+          let regionYtdData;
 
-          // Region summaries don't show census (only individual facilities do)
+          if (hasDistrictTagFilter) {
+            regionMonthData = accountService.filterDataByCustomers(allCustomersMonthData, regionCustomerIds);
+            regionYtdData = accountService.filterDataByCustomers(allCustomersYtdData, regionCustomerIds);
+          } else {
+            // Query BigQuery directly for region summary using region_internal_id AND subsidiary_internal_id
+            // This ensures the region total matches the sum of all transactions for this region within the subsidiary
+            console.log(`      Querying BigQuery for region summary (region_internal_id=${region.regionInternalId}, subsidiary_internal_id=${Array.isArray(subsidiaryId) ? subsidiaryId.join(',') : subsidiaryId})...`);
+            regionMonthData = await bigQueryService.getPLData({
+              hierarchy: 'region',
+              regionId: region.regionInternalId,
+              subsidiaryId: subsidiaryId, // Supports both single ID and array (for subsidiary tags)
+              date,
+              accountConfig,
+              ytd: false
+            });
+            regionYtdData = await bigQueryService.getPLData({
+              hierarchy: 'region',
+              regionId: region.regionInternalId,
+              subsidiaryId: subsidiaryId,
+              date,
+              accountConfig,
+              ytd: true
+            });
+          }
+
+          const regionCustomers = region.districts.flatMap(district => district.customers);
+          const regionCensus = sumCensusForCustomers(censusRecords, regionCustomers, date);
+
+          // Region summaries include census rollup
           const regionMeta = {
             typeLabel: 'Region',
             entityName: region.regionLabel,
             monthLabel: date,
             plType: reportPlType,
             districtCount: 0,  // Will be updated
-            facilityCount: 0
+            facilityCount: 0,
+            actualCensus: regionCensus.actual,
+            budgetCensus: regionCensus.budget,
+            headcount: null
           };
           
           const regionResult = await pnlRenderService.generatePNLReport(
@@ -1340,13 +1498,19 @@ function createApiRoutes(storageService, bigQueryService) {
             const districtMonthData = accountService.filterDataByCustomers(allCustomersMonthData, districtCustomerIds);
             const districtYtdData = accountService.filterDataByCustomers(allCustomersYtdData, districtCustomerIds);
             
+            const districtCensus = sumCensusForCustomers(censusRecords, district.customers, date);
+
             // Generate district summary
             const districtMeta = {
               typeLabel: 'District',
               entityName: district.districtLabel,
               monthLabel: date,
               plType: reportPlType,
-              facilityCount: 0  // Will be updated
+              facilityCount: 0,  // Will be updated
+              parentRegion: district.districtRegion || region.regionLabel,
+              actualCensus: districtCensus.actual,
+              budgetCensus: districtCensus.budget,
+              headcount: null
             };
             
             const districtResult = await pnlRenderService.generatePNLReport(
@@ -1374,15 +1538,8 @@ function createApiRoutes(storageService, bigQueryService) {
               const facilityMonthData = accountService.filterDataByCustomers(allCustomersMonthData, [customer.customer_internal_id]);
               const facilityYtdData = accountService.filterDataByCustomers(allCustomersYtdData, [customer.customer_internal_id]);
               
-              // Fetch census data for this facility
-              let census = { actual: null, budget: null };
-              if (censusService.isAvailable() && customer.customer_code) {
-                try {
-                  census = await censusService.getCensusForCustomer(customer.customer_code, date);
-                } catch (error) {
-                  console.warn(`   ⚠️  Could not fetch census for ${customer.customer_code}:`, error.message);
-                }
-              }
+              const customerCode = customer.customer_code || getCustomerCodeFromLabel(customer.label);
+              const census = sumCensusForCodes(censusRecords, customerCode ? [customerCode] : [], date);
               
               const facilityMeta = {
                 typeLabel: 'Facility',
@@ -1391,7 +1548,9 @@ function createApiRoutes(storageService, bigQueryService) {
                 plType: reportPlType,
                 actualCensus: census.actual,
                 budgetCensus: census.budget,
-                startDateEst: customer.start_date_est
+                startDateEst: customer.start_date_est,
+                parentDistrict: district.districtLabel,
+                parentRegion: district.districtRegion || region.regionLabel
               };
               
               const facilityResult = await pnlRenderService.generatePNLReport(
@@ -2052,4 +2211,3 @@ function createApiRoutes(storageService, bigQueryService) {
 }
 
 module.exports = createApiRoutes;
-

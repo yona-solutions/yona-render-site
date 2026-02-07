@@ -715,14 +715,40 @@
     }
 
     .pnl-subtitle {
-      font-weight: 600;
-      font-size: 13px;
+      font-weight: 700;
+      font-size: 14px;
       margin-bottom: 2px;
     }
 
     .pnl-meta {
       font-size: 11px;
       line-height: 1.4;
+    }
+
+    .pnl-header-row {
+      display: flex;
+      justify-content: center;
+      align-items: baseline;
+      gap: 6px;
+      font-size: 11px;
+      line-height: 1.4;
+    }
+
+    .pnl-header-row-secondary {
+      font-weight: 700;
+      font-size: 12px;
+    }
+
+    .pnl-header-item {
+      white-space: nowrap;
+    }
+
+    .pnl-sep {
+      margin: 0 6px;
+    }
+
+    .pnl-italic {
+      font-style: italic;
     }
 
     .pnl-divider {
@@ -871,6 +897,20 @@
               readonly
             />
             <div class="searchable-select-dropdown" id="subsidiaryFilterDropdown"></div>
+          </div>
+        </div>
+
+        <!-- District Tag Filter (only visible when Subsidiary tab is active) -->
+        <div class="control-group" id="districtTagFilterGroup" style="display: none;">
+          <label class="control-label">District Tag</label>
+          <div class="searchable-select" id="districtTagFilterWrapper">
+            <input 
+              type="text" 
+              id="districtTagFilterInput" 
+              placeholder="Optional: Filter by district tag..." 
+              readonly
+            />
+            <div class="searchable-select-dropdown" id="districtTagFilterDropdown"></div>
           </div>
         </div>
 
@@ -1054,7 +1094,7 @@
     // Initialize Page
     // ============================================
     
-    let monthSelect, districtSelect, subsidiaryFilterSelect;
+    let monthSelect, districtSelect, subsidiaryFilterSelect, districtTagFilterSelect;
     
     /**
      * Load available dates from BigQuery and populate the month dropdown
@@ -1190,6 +1230,36 @@
         subsidiaryFilterSelect.setOptions([], false);
       }
     }
+
+    /**
+     * Load district tags for the subsidiary filter dropdown
+     * Shows only tag items, no default selection
+     */
+    async function loadDistrictTagsForFilter() {
+      try {
+        console.log('📡 Fetching district tags for filter dropdown...');
+        const response = await authFetch('/api/storage/districts');
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch districts');
+        }
+
+        const items = await response.json();
+        const tagItems = items.filter(item => item.type === 'tag');
+
+        const options = tagItems.map(item => ({
+          value: item.id,
+          label: item.label,
+          type: item.type
+        }));
+
+        districtTagFilterSelect.setOptions(options, false);
+        console.log(`✅ Loaded ${options.length} district tags`);
+      } catch (error) {
+        console.error('Error loading district tags for filter:', error);
+        districtTagFilterSelect.setOptions([], false);
+      }
+    }
     
     // Initialize searchable selects and load data
     document.addEventListener('DOMContentLoaded', () => {
@@ -1197,6 +1267,7 @@
       monthSelect = new SearchableSelect('monthSelectWrapper');
       districtSelect = new SearchableSelect('districtSelectWrapper');
       subsidiaryFilterSelect = new SearchableSelect('subsidiaryFilterWrapper', [], false);
+      districtTagFilterSelect = new SearchableSelect('districtTagFilterWrapper', [], false);
       
       // Set up change handlers
       monthSelect.onChange = (value, label) => {
@@ -1263,14 +1334,28 @@
         // Show/hide subsidiary filter based on hierarchy type
         const subsidiaryFilterGroup = document.getElementById('subsidiaryFilterGroup');
         
+        const districtTagFilterGroup = document.getElementById('districtTagFilterGroup');
+
         if (hierarchyType === 'region') {
           subsidiaryFilterGroup.style.display = 'block';
+          districtTagFilterGroup.style.display = 'none';
           // Load subsidiaries for the filter dropdown
           loadSubsidiariesForFilter();
-        } else {
+          // Clear district tag filter selection
+          districtTagFilterSelect.selectOption(null, '');
+        } else if (hierarchyType === 'subsidiary') {
           subsidiaryFilterGroup.style.display = 'none';
+          districtTagFilterGroup.style.display = 'block';
+          // Load district tags for the filter dropdown
+          loadDistrictTagsForFilter();
           // Clear subsidiary filter selection
           subsidiaryFilterSelect.selectOption(null, '');
+        } else {
+          subsidiaryFilterGroup.style.display = 'none';
+          districtTagFilterGroup.style.display = 'none';
+          // Clear both filter selections
+          subsidiaryFilterSelect.selectOption(null, '');
+          districtTagFilterSelect.selectOption(null, '');
         }
         
         // Load the appropriate hierarchy data from API
@@ -1396,6 +1481,15 @@
           if (subsidiaryFilter && subsidiaryFilter !== 'all') {
             url += `&subsidiaryFilter=${encodeURIComponent(subsidiaryFilter)}`;
             console.log(`   📎 Applying subsidiary filter: ${subsidiaryFilterSelect.selectedLabel || subsidiaryFilter}`);
+          }
+        }
+
+        // Add district tag filter if Subsidiary hierarchy and a tag is selected
+        if (hierarchy === 'subsidiary' && districtTagFilterSelect && districtTagFilterSelect.selectedValue) {
+          const districtTagFilter = districtTagFilterSelect.selectedValue;
+          if (districtTagFilter && districtTagFilter !== 'all') {
+            url += `&districtTagFilter=${encodeURIComponent(districtTagFilter)}`;
+            console.log(`   📎 Applying district tag filter: ${districtTagFilterSelect.selectedLabel || districtTagFilter}`);
           }
         }
 
@@ -1706,8 +1800,8 @@
     }
 
     .pnl-report-header .pnl-subtitle {
-      font-weight: 600;
-      font-size: 10px;
+      font-weight: 700;
+      font-size: 11px;
       margin: 1px 0 0 0;
       line-height: 1.1;
     }
@@ -1717,6 +1811,33 @@
       font-size: 8px;
       line-height: 1.2;
       margin: 0;
+    }
+
+    .pnl-header-row {
+      display: flex;
+      justify-content: center;
+      align-items: baseline;
+      gap: 4px;
+      font-size: 8px;
+      line-height: 1.2;
+      margin: 0;
+    }
+
+    .pnl-header-row-secondary {
+      font-weight: 700;
+      font-size: 9px;
+    }
+
+    .pnl-header-item {
+      white-space: nowrap;
+    }
+
+    .pnl-sep {
+      margin: 0 4px;
+    }
+
+    .pnl-italic {
+      font-style: italic;
     }
 
     .pnl-divider {

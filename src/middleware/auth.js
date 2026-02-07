@@ -85,10 +85,11 @@ async function initializeUserRolesTable(pool) {
       )
     `);
 
-    // Ensure the initial admin exists
+    // Ensure the initial admins exist
     await pool.query(`
       INSERT INTO user_roles (email, role)
-      VALUES ('elan@flowsensesolutions.com', 'admin')
+      VALUES ('elan@flowsensesolutions.com', 'admin'),
+             ('daniel@flowsensesolutions.com', 'admin')
       ON CONFLICT (email) DO NOTHING
     `);
 

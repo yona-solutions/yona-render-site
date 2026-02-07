@@ -54,11 +54,11 @@ function formatMonthLabel(isoDate) {
     const dateStr = String(isoDate).substring(0, 10);
     const [year, month] = dateStr.split('-');
     
-    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
-                       'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
+                       'July', 'August', 'September', 'October', 'November', 'December'];
     const monthName = monthNames[parseInt(month) - 1];
     
-    return `${monthName} - ${year}`;
+    return `${monthName} ${year}`;
   } catch (e) {
     return isoDate;
   }
@@ -93,6 +93,31 @@ function formatStartDate(dateStr) {
 }
 
 /**
+ * Formats a number with 2 decimals for census/headcount display
+ * 
+ * @param {number} n - Number to format
+ * @returns {string} Formatted number string
+ */
+function formatDecimal(n) {
+  if (n == null || Number.isNaN(Number(n))) {
+    return '';
+  }
+  
+  return Number(n).toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+}
+
+function formatInteger(n) {
+  if (n == null || Number.isNaN(Number(n))) {
+    return '';
+  }
+  
+  return Math.round(Number(n)).toLocaleString();
+}
+
+/**
  * Generates the HTML header for a P&L report
  * Header varies based on entity type (Subsidiary, Region, District, Facility)
  * 
@@ -108,35 +133,64 @@ function generateHeader(meta) {
     regionCount,
     facilityCount,
     parentDistrict,
+    parentRegion,
     actualCensus,
     budgetCensus,
-    startDateEst
+    startDateEst,
+    headcount,
+    accountCount,
+    orgLabel,
+    reportTypeLabel
   } = meta;
   
   const formattedMonth = formatMonthLabel(monthLabel);
+  const organization = orgLabel || 'Yona Solutions';
+  const resolvedAccountCount = accountCount != null ? accountCount : facilityCount;
+  const resolvedReportType = reportTypeLabel || (() => {
+    if (typeLabel === 'Facility') return 'Account';
+    if (typeLabel === 'Region') return 'Region';
+    if (typeLabel === 'District' || typeLabel === 'District Tag') return 'District';
+    if (typeLabel === 'Subsidiary' || typeLabel === 'Subsidiary Tag') return 'Entity';
+    return typeLabel || 'Report';
+  })();
   
-  // Census data is only shown for individual facilities, not for rollups
-  let censusHtml = '';
-  if (typeLabel === 'Facility') {
-    if (actualCensus != null) {
-      censusHtml += `<div class="pnl-meta">Census Actual: ${Math.round(Number(actualCensus))}</div>`;
-    }
-    if (budgetCensus != null) {
-      censusHtml += `<div class="pnl-meta">Census Budget: ${Math.round(Number(budgetCensus))}</div>`;
-    }
+  function buildRow(items, { italic, className } = {}) {
+    const parts = items.filter(i => i && String(i).trim() !== '');
+    if (!parts.length) return '';
+    
+    const rowClass = [
+      'pnl-header-row',
+      italic ? 'pnl-italic' : null,
+      className || null
+    ].filter(Boolean).join(' ');
+    const htmlParts = parts.map((part, idx) => {
+      const sep = idx === 0 ? '' : '<span class="pnl-sep">|</span>';
+      return `${sep}<span class="pnl-header-item">${part}</span>`;
+    });
+    
+    return `<div class="${rowClass}">${htmlParts.join('')}</div>`;
   }
   
   if (typeLabel === 'Facility') {
-    let startDateHtml = startDateEst ? `<div class="pnl-meta">Start Date: ${formatStartDate(startDateEst)}</div>` : '';
+    const censusRow = buildRow(
+      [
+        `Census: ${actualCensus != null ? formatDecimal(actualCensus) : ''}`,
+        `Budget Census: ${budgetCensus != null ? formatDecimal(budgetCensus) : ''}`,
+        `Headcount: ${headcount != null ? formatInteger(headcount) : ''}`
+      ],
+      { italic: true }
+    );
     
     return `
       <div class="pnl-report-header">
         <div class="pnl-title">${entityName}</div>
-        <div class="pnl-meta">${formattedMonth}</div>
-        <div class="pnl-meta">Type: Facility</div>
-        <div class="pnl-meta">${parentDistrict || ''}</div>
-        ${censusHtml}
-        ${startDateHtml}
+        ${buildRow([organization, parentRegion, parentDistrict], { className: 'pnl-header-row-secondary' })}
+        ${buildRow([
+          formattedMonth,
+          startDateEst ? `Start Date: ${formatStartDate(startDateEst)}` : '',
+          `Report Type: ${resolvedReportType}`
+        ])}
+        ${censusRow}
       </div>
     `;
   } else if (typeLabel === 'Subsidiary') {
@@ -144,10 +198,21 @@ function generateHeader(meta) {
       <div class="pnl-report-header">
         <div class="pnl-title">${entityName}</div>
         <div class="pnl-subtitle">Actual vs Budget</div>
-        <div class="pnl-meta">${formattedMonth}</div>
-        <div class="pnl-meta">Regions: ${regionCount ?? '-'}</div>
-        <div class="pnl-meta">Districts: ${districtCount ?? '-'}</div>
-        <div class="pnl-meta">Facilities: ${facilityCount ?? '-'}</div>
+        ${buildRow([
+          formattedMonth,
+          regionCount != null ? `Regions: ${regionCount}` : '',
+          districtCount != null ? `Districts: ${districtCount}` : '',
+          resolvedAccountCount != null ? `Accounts: ${resolvedAccountCount}` : '',
+          `Report Type: ${resolvedReportType}`
+        ])}
+        ${buildRow(
+          [
+            `Census: ${actualCensus != null ? formatDecimal(actualCensus) : ''}`,
+            `Budget Census: ${budgetCensus != null ? formatDecimal(budgetCensus) : ''}`,
+            `Headcount: ${headcount != null ? formatInteger(headcount) : ''}`
+          ],
+          { italic: true }
+        )}
       </div>
     `;
   } else if (typeLabel === 'Subsidiary Tag') {
@@ -155,45 +220,86 @@ function generateHeader(meta) {
       <div class="pnl-report-header">
         <div class="pnl-title">${entityName}</div>
         <div class="pnl-subtitle">Actual vs Budget</div>
-        <div class="pnl-meta">${formattedMonth}</div>
-        <div class="pnl-meta">Regions: ${regionCount ?? '-'}</div>
-        <div class="pnl-meta">Districts: ${districtCount ?? '-'}</div>
-        <div class="pnl-meta">Facilities: ${facilityCount ?? '-'}</div>
-        <div class="pnl-meta">Type: Subsidiary Tag</div>
+        ${buildRow([
+          formattedMonth,
+          regionCount != null ? `Regions: ${regionCount}` : '',
+          districtCount != null ? `Districts: ${districtCount}` : '',
+          resolvedAccountCount != null ? `Accounts: ${resolvedAccountCount}` : '',
+          `Report Type: ${resolvedReportType}`
+        ])}
+        ${buildRow(
+          [
+            `Census: ${actualCensus != null ? formatDecimal(actualCensus) : ''}`,
+            `Budget Census: ${budgetCensus != null ? formatDecimal(budgetCensus) : ''}`,
+            `Headcount: ${headcount != null ? formatInteger(headcount) : ''}`
+          ],
+          { italic: true }
+        )}
       </div>
     `;
   } else if (typeLabel === 'Region') {
     return `
       <div class="pnl-report-header">
         <div class="pnl-title">${entityName}</div>
-        <div class="pnl-subtitle">Yona Solutions</div>
-        <div class="pnl-meta">${formattedMonth}</div>
-        <div class="pnl-meta">Districts: ${districtCount ?? '-'}</div>
-        <div class="pnl-meta">Facilities: ${facilityCount ?? '-'}</div>
+        <div class="pnl-subtitle">${organization}</div>
+        ${buildRow([
+          formattedMonth,
+          districtCount != null ? `Districts: ${districtCount}` : '',
+          resolvedAccountCount != null ? `Accounts: ${resolvedAccountCount}` : '',
+          `Report Type: ${resolvedReportType}`
+        ])}
+        ${buildRow(
+          [
+            `Census: ${actualCensus != null ? formatDecimal(actualCensus) : ''}`,
+            `Budget Census: ${budgetCensus != null ? formatDecimal(budgetCensus) : ''}`,
+            `Headcount: ${headcount != null ? formatInteger(headcount) : ''}`
+          ],
+          { italic: true }
+        )}
       </div>
     `;
   } else if (typeLabel === 'District') {
     return `
       <div class="pnl-report-header">
         <div class="pnl-title">${entityName}</div>
-        <div class="pnl-subtitle">Yona Solutions</div>
-        <div class="pnl-meta">${formattedMonth}</div>
-        <div class="pnl-meta">Facilities: ${facilityCount ?? '-'}</div>
-        <div class="pnl-meta">Type: District</div>
+        ${buildRow([organization, parentRegion], { className: 'pnl-header-row-secondary' })}
+        ${buildRow([
+          formattedMonth,
+          resolvedAccountCount != null ? `Accounts: ${resolvedAccountCount}` : '',
+          `Report Type: ${resolvedReportType}`
+        ])}
+        ${buildRow(
+          [
+            `Census: ${actualCensus != null ? formatDecimal(actualCensus) : ''}`,
+            `Budget Census: ${budgetCensus != null ? formatDecimal(budgetCensus) : ''}`,
+            `Headcount: ${headcount != null ? formatInteger(headcount) : ''}`
+          ],
+          { italic: true }
+        )}
       </div>
     `;
   } else if (typeLabel === 'District Tag') {
     return `
       <div class="pnl-report-header">
         <div class="pnl-title">${entityName}</div>
-        <div class="pnl-subtitle">Yona Solutions</div>
-        <div class="pnl-meta">${formattedMonth}</div>
-        <div class="pnl-meta">Facilities: ${facilityCount ?? '-'}</div>
-        <div class="pnl-meta">Type: District Tag</div>
+        ${buildRow([organization, parentRegion], { className: 'pnl-header-row-secondary' })}
+        ${buildRow([
+          formattedMonth,
+          resolvedAccountCount != null ? `Accounts: ${resolvedAccountCount}` : '',
+          `Report Type: ${resolvedReportType}`
+        ])}
+        ${buildRow(
+          [
+            `Census: ${actualCensus != null ? formatDecimal(actualCensus) : ''}`,
+            `Budget Census: ${budgetCensus != null ? formatDecimal(budgetCensus) : ''}`,
+            `Headcount: ${headcount != null ? formatInteger(headcount) : ''}`
+          ],
+          { italic: true }
+        )}
       </div>
     `;
   }
-  
+
   return '';
 }
 
@@ -426,4 +532,3 @@ module.exports = {
   formatPercent,
   formatMonthLabel
 };
-

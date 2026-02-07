@@ -418,6 +418,7 @@ class StorageService {
     const customers = [];
     const seenIds = new Set(); // Avoid duplicates
     let districtDisplayName = districtId; // Default to ID if not found
+    let districtRegionLabel = null;
     
     // Check if this is a tag selection (IDs starting with "tag_" are tags)
     const isTag = districtId.startsWith('tag_');
@@ -445,8 +446,11 @@ class StorageService {
       
       // Get the district's display name (label)
       const districtConfig = configData[districtId];
-      if (districtConfig && districtConfig.label) {
-        districtDisplayName = districtConfig.label;
+      if (districtConfig) {
+        if (districtConfig.label) {
+          districtDisplayName = districtConfig.label;
+        }
+        districtRegionLabel = districtConfig.districtRegion || districtConfig.region_label || null;
       }
     }
     
@@ -479,6 +483,7 @@ class StorageService {
     return {
       customers,
       districtName: districtDisplayName,
+      districtRegion: districtRegionLabel,
       isTag
     };
   }
@@ -653,7 +658,8 @@ class StorageService {
           isTag: false,
           districtIds: [districtId],
           customers: [],
-          configOrderIndex: config.configOrderIndex
+          configOrderIndex: config.configOrderIndex,
+          districtRegion: config.districtRegion || config.region_label || null
         });
       }
     }
@@ -830,16 +836,17 @@ class StorageService {
       // These should respect districtReportingExcluded
       for (const [districtId, config] of Object.entries(districtConfigs)) {
         if (!districtsInTags.has(districtId) && !config.districtReportingExcluded) {
-          groups.push({
-            districtId: districtId,
-            districtLabel: config.label,
-            isTag: false,
-            districtIds: [districtId], // Single district
-            customers: [],
-            order: orderIndex++
-          });
-        }
+        groups.push({
+          districtId: districtId,
+          districtLabel: config.label,
+          isTag: false,
+          districtIds: [districtId], // Single district
+          customers: [],
+          order: orderIndex++,
+          districtRegion: config.districtRegion || config.region_label || null
+        });
       }
+    }
 
       // Assign customers to groups
       for (const customer of regionData.customers) {
@@ -908,4 +915,3 @@ class StorageService {
 }
 
 module.exports = StorageService;
-
