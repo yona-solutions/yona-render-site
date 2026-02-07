@@ -753,24 +753,49 @@ class EmailSchedulerService {
     }
     .pnl-report-header {
       text-align: center;
-      margin-bottom: 8px;
+      margin-bottom: 6px;
       padding: 0;
+      line-height: 1.2;
     }
-    .pnl-title {
-      font-size: 14px;
+    .pnl-report-header .pnl-title {
       font-weight: 700;
-      margin: 0 0 2px 0;
+      font-size: 13px;
+      margin: 0;
+      line-height: 1.1;
     }
-    .pnl-subtitle {
+    .pnl-report-header .pnl-subtitle {
+      font-weight: 700;
       font-size: 11px;
-      font-weight: 600;
-      color: #444;
-      margin: 0 0 4px 0;
+      margin: 1px 0 0 0;
+      line-height: 1.1;
     }
-    .pnl-meta {
+    .pnl-report-header .pnl-meta,
+    .pnl-report-header .meta {
+      font-size: 8px;
+      line-height: 1.2;
+      margin: 0;
+    }
+    .pnl-header-row {
+      display: flex;
+      justify-content: center;
+      align-items: baseline;
+      gap: 4px;
+      font-size: 8px;
+      line-height: 1.2;
+      margin: 0;
+    }
+    .pnl-header-row-secondary {
+      font-weight: 700;
       font-size: 9px;
-      color: #666;
-      margin: 1px 0;
+    }
+    .pnl-header-item {
+      white-space: nowrap;
+    }
+    .pnl-sep {
+      margin: 0 4px;
+    }
+    .pnl-italic {
+      font-style: italic;
     }
     .pnl-divider {
       border: none;

@@ -164,8 +164,8 @@ function generateHeader(meta) {
       className || null
     ].filter(Boolean).join(' ');
     const inlineStyle = [
-      'display:flex; justify-content:center; align-items:baseline; gap:6px; font-size:11px; line-height:1.4',
-      bold ? '; font-weight:700; font-size:12px' : '; font-weight:400',
+      'display:flex; justify-content:center; align-items:baseline; gap:6px; line-height:1.4',
+      bold ? '; font-weight:700' : '; font-weight:400',
       italic ? '; font-style:italic' : ''
     ].join('');
     const htmlParts = parts.map((part, idx) => {
@@ -188,7 +188,7 @@ function generateHeader(meta) {
     
     return `
       <div class="pnl-report-header" style="text-align:center; margin-bottom:10px">
-        <div class="pnl-title" style="font-weight:700; font-size:15px">${entityName}</div>
+        <div class="pnl-title" style="font-weight:700">${entityName}</div>
         ${buildRow([organization, parentRegion, parentDistrict], { bold: true, className: 'pnl-header-row-secondary' })}
         ${buildRow([
           formattedMonth,
@@ -201,8 +201,8 @@ function generateHeader(meta) {
   } else if (typeLabel === 'Subsidiary') {
     return `
       <div class="pnl-report-header" style="text-align:center; margin-bottom:10px">
-        <div class="pnl-title" style="font-weight:700; font-size:15px">${entityName}</div>
-        <div class="pnl-subtitle" style="font-weight:700; font-size:14px">Actual vs Budget</div>
+        <div class="pnl-title" style="font-weight:700">${entityName}</div>
+        <div class="pnl-subtitle" style="font-weight:700">Actual vs Budget</div>
         ${buildRow([
           formattedMonth,
           regionCount != null ? `Regions: ${regionCount}` : '',
@@ -223,8 +223,8 @@ function generateHeader(meta) {
   } else if (typeLabel === 'Subsidiary Tag') {
     return `
       <div class="pnl-report-header" style="text-align:center; margin-bottom:10px">
-        <div class="pnl-title" style="font-weight:700; font-size:15px">${entityName}</div>
-        <div class="pnl-subtitle" style="font-weight:700; font-size:14px">Actual vs Budget</div>
+        <div class="pnl-title" style="font-weight:700">${entityName}</div>
+        <div class="pnl-subtitle" style="font-weight:700">Actual vs Budget</div>
         ${buildRow([
           formattedMonth,
           regionCount != null ? `Regions: ${regionCount}` : '',
@@ -245,8 +245,8 @@ function generateHeader(meta) {
   } else if (typeLabel === 'Region') {
     return `
       <div class="pnl-report-header" style="text-align:center; margin-bottom:10px">
-        <div class="pnl-title" style="font-weight:700; font-size:15px">${entityName}</div>
-        <div class="pnl-subtitle" style="font-weight:700; font-size:14px">${organization}</div>
+        <div class="pnl-title" style="font-weight:700">${entityName}</div>
+        <div class="pnl-subtitle" style="font-weight:700">${organization}</div>
         ${buildRow([
           formattedMonth,
           districtCount != null ? `Districts: ${districtCount}` : '',
@@ -266,7 +266,7 @@ function generateHeader(meta) {
   } else if (typeLabel === 'District') {
     return `
       <div class="pnl-report-header" style="text-align:center; margin-bottom:10px">
-        <div class="pnl-title" style="font-weight:700; font-size:15px">${entityName}</div>
+        <div class="pnl-title" style="font-weight:700">${entityName}</div>
         ${buildRow([organization, parentRegion], { bold: true, className: 'pnl-header-row-secondary' })}
         ${buildRow([
           formattedMonth,
@@ -286,7 +286,7 @@ function generateHeader(meta) {
   } else if (typeLabel === 'District Tag') {
     return `
       <div class="pnl-report-header" style="text-align:center; margin-bottom:10px">
-        <div class="pnl-title" style="font-weight:700; font-size:15px">${entityName}</div>
+        <div class="pnl-title" style="font-weight:700">${entityName}</div>
         ${buildRow([organization, parentRegion], { bold: true, className: 'pnl-header-row-secondary' })}
         ${buildRow([
           formattedMonth,
