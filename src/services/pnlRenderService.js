@@ -154,21 +154,26 @@ function generateHeader(meta) {
     return typeLabel || 'Report';
   })();
   
-  function buildRow(items, { italic, className } = {}) {
+  function buildRow(items, { italic, bold, className } = {}) {
     const parts = items.filter(i => i && String(i).trim() !== '');
     if (!parts.length) return '';
-    
+
     const rowClass = [
       'pnl-header-row',
       italic ? 'pnl-italic' : null,
       className || null
     ].filter(Boolean).join(' ');
+    const inlineStyle = [
+      'display:flex; justify-content:center; align-items:baseline; gap:6px; font-size:11px; line-height:1.4',
+      bold ? '; font-weight:700; font-size:12px' : '; font-weight:400',
+      italic ? '; font-style:italic' : ''
+    ].join('');
     const htmlParts = parts.map((part, idx) => {
-      const sep = idx === 0 ? '' : '<span class="pnl-sep">|</span>';
-      return `${sep}<span class="pnl-header-item">${part}</span>`;
+      const sep = idx === 0 ? '' : '<span class="pnl-sep" style="margin:0 2px; color:#888">|</span>';
+      return `${sep}<span class="pnl-header-item" style="white-space:nowrap">${part}</span>`;
     });
-    
-    return `<div class="${rowClass}">${htmlParts.join('')}</div>`;
+
+    return `<div class="${rowClass}" style="${inlineStyle}">${htmlParts.join('')}</div>`;
   }
   
   if (typeLabel === 'Facility') {
@@ -182,9 +187,9 @@ function generateHeader(meta) {
     );
     
     return `
-      <div class="pnl-report-header">
-        <div class="pnl-title">${entityName}</div>
-        ${buildRow([organization, parentRegion, parentDistrict], { className: 'pnl-header-row-secondary' })}
+      <div class="pnl-report-header" style="text-align:center; margin-bottom:10px">
+        <div class="pnl-title" style="font-weight:700; font-size:15px">${entityName}</div>
+        ${buildRow([organization, parentRegion, parentDistrict], { bold: true, className: 'pnl-header-row-secondary' })}
         ${buildRow([
           formattedMonth,
           startDateEst ? `Start Date: ${formatStartDate(startDateEst)}` : '',
@@ -195,9 +200,9 @@ function generateHeader(meta) {
     `;
   } else if (typeLabel === 'Subsidiary') {
     return `
-      <div class="pnl-report-header">
-        <div class="pnl-title">${entityName}</div>
-        <div class="pnl-subtitle">Actual vs Budget</div>
+      <div class="pnl-report-header" style="text-align:center; margin-bottom:10px">
+        <div class="pnl-title" style="font-weight:700; font-size:15px">${entityName}</div>
+        <div class="pnl-subtitle" style="font-weight:700; font-size:14px">Actual vs Budget</div>
         ${buildRow([
           formattedMonth,
           regionCount != null ? `Regions: ${regionCount}` : '',
@@ -217,9 +222,9 @@ function generateHeader(meta) {
     `;
   } else if (typeLabel === 'Subsidiary Tag') {
     return `
-      <div class="pnl-report-header">
-        <div class="pnl-title">${entityName}</div>
-        <div class="pnl-subtitle">Actual vs Budget</div>
+      <div class="pnl-report-header" style="text-align:center; margin-bottom:10px">
+        <div class="pnl-title" style="font-weight:700; font-size:15px">${entityName}</div>
+        <div class="pnl-subtitle" style="font-weight:700; font-size:14px">Actual vs Budget</div>
         ${buildRow([
           formattedMonth,
           regionCount != null ? `Regions: ${regionCount}` : '',
@@ -239,9 +244,9 @@ function generateHeader(meta) {
     `;
   } else if (typeLabel === 'Region') {
     return `
-      <div class="pnl-report-header">
-        <div class="pnl-title">${entityName}</div>
-        <div class="pnl-subtitle">${organization}</div>
+      <div class="pnl-report-header" style="text-align:center; margin-bottom:10px">
+        <div class="pnl-title" style="font-weight:700; font-size:15px">${entityName}</div>
+        <div class="pnl-subtitle" style="font-weight:700; font-size:14px">${organization}</div>
         ${buildRow([
           formattedMonth,
           districtCount != null ? `Districts: ${districtCount}` : '',
@@ -260,9 +265,9 @@ function generateHeader(meta) {
     `;
   } else if (typeLabel === 'District') {
     return `
-      <div class="pnl-report-header">
-        <div class="pnl-title">${entityName}</div>
-        ${buildRow([organization, parentRegion], { className: 'pnl-header-row-secondary' })}
+      <div class="pnl-report-header" style="text-align:center; margin-bottom:10px">
+        <div class="pnl-title" style="font-weight:700; font-size:15px">${entityName}</div>
+        ${buildRow([organization, parentRegion], { bold: true, className: 'pnl-header-row-secondary' })}
         ${buildRow([
           formattedMonth,
           resolvedAccountCount != null ? `Accounts: ${resolvedAccountCount}` : '',
@@ -280,9 +285,9 @@ function generateHeader(meta) {
     `;
   } else if (typeLabel === 'District Tag') {
     return `
-      <div class="pnl-report-header">
-        <div class="pnl-title">${entityName}</div>
-        ${buildRow([organization, parentRegion], { className: 'pnl-header-row-secondary' })}
+      <div class="pnl-report-header" style="text-align:center; margin-bottom:10px">
+        <div class="pnl-title" style="font-weight:700; font-size:15px">${entityName}</div>
+        ${buildRow([organization, parentRegion], { bold: true, className: 'pnl-header-row-secondary' })}
         ${buildRow([
           formattedMonth,
           resolvedAccountCount != null ? `Accounts: ${resolvedAccountCount}` : '',
