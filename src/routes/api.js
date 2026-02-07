@@ -39,14 +39,16 @@ function collectCustomerCodes(customers) {
 function sumCensusForCodes(censusRecords, customerCodes, date) {
   const month = normalizeCensusMonth(date);
   if (!month || !censusRecords || censusRecords.length === 0 || !customerCodes || customerCodes.length === 0) {
-    return { actual: null, budget: null };
+    return { actual: null, budget: null, headcount: null };
   }
 
   const codeSet = new Set(customerCodes.filter(Boolean));
   let actualTotal = 0;
   let budgetTotal = 0;
+  let headcountTotal = 0;
   let actualFound = false;
   let budgetFound = false;
+  let headcountFound = false;
 
   for (const record of censusRecords) {
     if (!record || record.month !== month) continue;
@@ -57,12 +59,16 @@ function sumCensusForCodes(censusRecords, customerCodes, date) {
     } else if (record.type === 'Budget') {
       budgetTotal += Number(record.value) || 0;
       budgetFound = true;
+    } else if (record.type === 'Headcount') {
+      headcountTotal += Number(record.value) || 0;
+      headcountFound = true;
     }
   }
 
   return {
     actual: actualFound ? actualTotal : null,
-    budget: budgetFound ? budgetTotal : null
+    budget: budgetFound ? budgetTotal : null,
+    headcount: headcountFound ? headcountTotal : null
   };
 }
 
@@ -465,7 +471,7 @@ function createApiRoutes(storageService, bigQueryService) {
         facilityCount: 0,
         actualCensus: subsidiaryCensus.actual,
         budgetCensus: subsidiaryCensus.budget,
-        headcount: null
+        headcount: subsidiaryCensus.headcount
       };
 
       const subsidiaryResultReport = await pnlRenderService.generatePNLReport(
@@ -538,7 +544,7 @@ function createApiRoutes(storageService, bigQueryService) {
           facilityCount: 0,
           actualCensus: regionCensus.actual,
           budgetCensus: regionCensus.budget,
-          headcount: null
+          headcount: regionCensus.headcount
         };
 
         const regionResult = await pnlRenderService.generatePNLReport(
@@ -576,7 +582,7 @@ function createApiRoutes(storageService, bigQueryService) {
           parentRegion: district.districtRegion || region.regionLabel,
           actualCensus: districtCensus.actual,
           budgetCensus: districtCensus.budget,
-          headcount: null
+          headcount: districtCensus.headcount
         };
 
           const districtResult = await pnlRenderService.generatePNLReport(
@@ -611,6 +617,7 @@ function createApiRoutes(storageService, bigQueryService) {
               plType: reportPlType,
               actualCensus: census.actual,
               budgetCensus: census.budget,
+              headcount: census.headcount,
               startDateEst: customer.start_date_est,
               parentDistrict: district.districtLabel,
               parentRegion: district.districtRegion || region.regionLabel
@@ -995,7 +1002,7 @@ function createApiRoutes(storageService, bigQueryService) {
           parentRegion: queryParams.districtRegion || '',
           actualCensus: districtCensus.actual,
           budgetCensus: districtCensus.budget,
-          headcount: null
+          headcount: districtCensus.headcount
         };
         
         console.log('   Generating district summary P&L (header will be updated with actual counts)...');
@@ -1049,6 +1056,7 @@ function createApiRoutes(storageService, bigQueryService) {
             plType: reportPlType,
             actualCensus: census.actual,
             budgetCensus: census.budget,
+            headcount: census.headcount,
             startDateEst: customer.start_date_est
           };
           
@@ -1118,7 +1126,7 @@ function createApiRoutes(storageService, bigQueryService) {
           plType: reportPlType,
           actualCensus: regionCensus.actual,
           budgetCensus: regionCensus.budget,
-          headcount: null
+          headcount: regionCensus.headcount
         };
         
         console.log('   Generating region summary P&L (header will be updated with actual counts)...');
@@ -1178,7 +1186,7 @@ function createApiRoutes(storageService, bigQueryService) {
             parentRegion: districtGroup.districtRegion || selectedLabel,
             actualCensus: districtCensus.actual,
             budgetCensus: districtCensus.budget,
-            headcount: null
+            headcount: districtCensus.headcount
           };
           
           const districtResult = await pnlRenderService.generatePNLReport(
@@ -1214,6 +1222,7 @@ function createApiRoutes(storageService, bigQueryService) {
                 plType: reportPlType,
                 actualCensus: census.actual,
                 budgetCensus: census.budget,
+                headcount: census.headcount,
                 startDateEst: customer.start_date_est
               };
               
@@ -1384,7 +1393,7 @@ function createApiRoutes(storageService, bigQueryService) {
           facilityCount: 0,
           actualCensus: subsidiaryCensus.actual,
           budgetCensus: subsidiaryCensus.budget,
-          headcount: null
+          headcount: subsidiaryCensus.headcount
         };
         
         const subsidiaryResult = await pnlRenderService.generatePNLReport(
@@ -1464,7 +1473,7 @@ function createApiRoutes(storageService, bigQueryService) {
             facilityCount: 0,
             actualCensus: regionCensus.actual,
             budgetCensus: regionCensus.budget,
-            headcount: null
+            headcount: regionCensus.headcount
           };
           
           const regionResult = await pnlRenderService.generatePNLReport(
@@ -1510,7 +1519,7 @@ function createApiRoutes(storageService, bigQueryService) {
               parentRegion: district.districtRegion || region.regionLabel,
               actualCensus: districtCensus.actual,
               budgetCensus: districtCensus.budget,
-              headcount: null
+              headcount: districtCensus.headcount
             };
             
             const districtResult = await pnlRenderService.generatePNLReport(
@@ -1548,6 +1557,7 @@ function createApiRoutes(storageService, bigQueryService) {
                 plType: reportPlType,
                 actualCensus: census.actual,
                 budgetCensus: census.budget,
+                headcount: census.headcount,
                 startDateEst: customer.start_date_est,
                 parentDistrict: district.districtLabel,
                 parentRegion: district.districtRegion || region.regionLabel
