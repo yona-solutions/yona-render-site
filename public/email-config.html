@@ -2020,9 +2020,16 @@
         // Get entity display based on type - show region+subsidiary when applicable
         let entityDisplay = '—';
         let entityTooltip = '';
-        if (schedule.template_type === 'district' && schedule.district_name) {
-          entityDisplay = schedule.district_name;
-          entityTooltip = `District: ${schedule.district_name}`;
+        if (schedule.template_type === 'district') {
+          const parts = [];
+          if (schedule.district_name) parts.push(schedule.district_name);
+          if (schedule.subsidiary_name) parts.push(schedule.subsidiary_name);
+          if (parts.length > 0) {
+            entityDisplay = parts.join(' / ');
+            entityTooltip = parts.length === 2
+              ? `District: ${schedule.district_name}, Subsidiary: ${schedule.subsidiary_name}`
+              : (schedule.district_name ? `District: ${schedule.district_name}` : `Subsidiary: ${schedule.subsidiary_name}`);
+          }
         } else if (schedule.template_type === 'region') {
           const parts = [];
           if (schedule.region_name) parts.push(schedule.region_name);
@@ -2571,10 +2578,10 @@
       regionGroup.style.opacity = isRegion ? '1' : '0.5';
       if (!isRegion) regionSelect.value = '';
 
-      // Subsidiary: enabled for region or subsidiary type
-      subsidiarySelect.disabled = !(isRegion || isSubsidiary);
-      subsidiaryGroup.style.opacity = (isRegion || isSubsidiary) ? '1' : '0.5';
-      if (!(isRegion || isSubsidiary)) subsidiarySelect.value = '';
+      // Subsidiary: enabled for district, region, or subsidiary type
+      subsidiarySelect.disabled = !(isDistrict || isRegion || isSubsidiary);
+      subsidiaryGroup.style.opacity = (isDistrict || isRegion || isSubsidiary) ? '1' : '0.5';
+      if (!(isDistrict || isRegion || isSubsidiary)) subsidiarySelect.value = '';
     }
 
     function onEditEntityChange(entityType) {
@@ -2655,12 +2662,18 @@
       let subsidiaryId = null, subsidiaryName = null;
 
       if (templateType === 'district') {
-        // District type: only district field is editable
+        // District type: district and subsidiary fields are editable
         const select = document.getElementById('editDistrictId');
         districtId = select.value || null;
         if (districtId) {
           const opt = districtOptions.find(d => d.id === districtId);
           districtName = opt ? opt.label : null;
+        }
+        const subsidiarySelect = document.getElementById('editSubsidiaryId');
+        subsidiaryId = subsidiarySelect.value || null;
+        if (subsidiaryId) {
+          const opt = subsidiaryOptions.find(s => s.id === subsidiaryId);
+          subsidiaryName = opt ? opt.label : null;
         }
       } else if (templateType === 'region') {
         // Region type: region and subsidiary fields are editable
@@ -3344,7 +3357,10 @@
         console.log('   Date:', latestDate);
         
         // Fetch P&L data
-        const dataUrl = `/api/pl/data?hierarchy=${schedule.template_type}&selectedId=${encodeURIComponent(entityId)}&date=${latestDate}`;
+        let dataUrl = `/api/pl/data?hierarchy=${schedule.template_type}&selectedId=${encodeURIComponent(entityId)}&date=${latestDate}`;
+        if ((schedule.template_type === 'region' || schedule.template_type === 'district') && schedule.subsidiary_id) {
+          dataUrl += `&subsidiaryFilter=${encodeURIComponent(schedule.subsidiary_id)}`;
+        }
         console.log('   URL:', dataUrl);
         const dataResponse = await authFetch(dataUrl);
         

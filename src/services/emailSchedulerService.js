@@ -626,7 +626,10 @@ class EmailSchedulerService {
       const latestDate = dates[0].time || dates[0].formatted;
 
       // Fetch P&L data
-      const dataUrl = `${baseUrl}/api/pl/data?hierarchy=${schedule.template_type}&selectedId=${encodeURIComponent(entityId)}&date=${latestDate}&plType=${schedule.process}`;
+      let dataUrl = `${baseUrl}/api/pl/data?hierarchy=${schedule.template_type}&selectedId=${encodeURIComponent(entityId)}&date=${latestDate}&plType=${schedule.process}`;
+      if ((schedule.template_type === 'region' || schedule.template_type === 'district') && schedule.subsidiary_id) {
+        dataUrl += `&subsidiaryFilter=${encodeURIComponent(schedule.subsidiary_id)}`;
+      }
       const dataResponse = await fetch(dataUrl, { headers: internalHeaders });
       
       if (!dataResponse.ok) {
@@ -691,9 +694,9 @@ class EmailSchedulerService {
   }
 
   /**
-   * Check if a report container has non-zero income
+   * Check if a report container has non-zero net income
    * Checks BOTH Actuals (cells[1]) and Budget (cells[2])
-   * Returns true if EITHER has non-zero income
+   * Returns true if EITHER has non-zero net income
    */
   hasNonZeroIncome(container) {
     const table = container.querySelector("table");
@@ -702,7 +705,7 @@ class EmailSchedulerService {
     const rows = Array.from(table.querySelectorAll("tr"));
     for (const row of rows) {
       const cells = Array.from(row.querySelectorAll("td"));
-      if (cells.length > 0 && cells[0].textContent.trim() === "Income") {
+      if (cells.length > 0 && cells[0].textContent.trim() === "Net Income") {
         const actualsValue = cells.length > 1 ? this.parseAccountingToNumber(cells[1].textContent.trim()) : 0;
         const budgetValue = cells.length > 2 ? this.parseAccountingToNumber(cells[2].textContent.trim()) : 0;
         // Keep if EITHER Actuals OR Budget is non-zero

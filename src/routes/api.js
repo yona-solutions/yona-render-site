@@ -404,17 +404,23 @@ function createApiRoutes(storageService, bigQueryService) {
 
       // Group customers by region and district
       const regionGroups = await storageService.groupCustomersByRegionAndDistrict(customersInSubsidiary);
-
-      const subsidiaryCensus = sumCensusForCustomers(censusRecords, customersInSubsidiary, date);
-
-      // Step 2: Fetch all customer data
-      sendProgress('customer-data', 'Fetching customer data...');
-
-      const allCustomerIds = regionGroups.flatMap(region =>
+      const allowedCustomerIds = regionGroups.flatMap(region =>
         region.districts.flatMap(district =>
           district.customers.map(c => c.customer_internal_id)
         )
       );
+      const exclusionsApplied = allowedCustomerIds.length !== customersInSubsidiary.length;
+
+      const subsidiaryCensus = sumCensusForCustomers(
+        censusRecords,
+        regionGroups.flatMap(r => r.districts.flatMap(d => d.customers)),
+        date
+      );
+
+      // Step 2: Fetch all customer data
+      sendProgress('customer-data', 'Fetching customer data...');
+
+      const allCustomerIds = allowedCustomerIds;
 
       const allCustomersMonthData = await bigQueryService.getPLData({
         hierarchy: 'district',
@@ -434,7 +440,7 @@ function createApiRoutes(storageService, bigQueryService) {
       // Query subsidiary summary (skip if district tag filter is active)
       let subsidiaryMonthData;
       let subsidiaryYtdData;
-      if (!hasDistrictTagFilter) {
+      if (!hasDistrictTagFilter && !exclusionsApplied) {
         subsidiaryMonthData = await bigQueryService.getPLData({
           hierarchy: 'subsidiary',
           subsidiaryId,
@@ -449,7 +455,9 @@ function createApiRoutes(storageService, bigQueryService) {
           accountConfig,
           ytd: true
         });
-      } else {
+      }
+
+      if (hasDistrictTagFilter || exclusionsApplied) {
         subsidiaryMonthData = allCustomersMonthData;
         subsidiaryYtdData = allCustomersYtdData;
       }
@@ -510,7 +518,7 @@ function createApiRoutes(storageService, bigQueryService) {
 
         let regionMonthData;
         let regionYtdData;
-        if (hasDistrictTagFilter) {
+        if (hasDistrictTagFilter || exclusionsApplied) {
           regionMonthData = accountService.filterDataByCustomers(allCustomersMonthData, regionCustomerIds);
           regionYtdData = accountService.filterDataByCustomers(allCustomersYtdData, regionCustomerIds);
         } else {
@@ -593,13 +601,16 @@ function createApiRoutes(storageService, bigQueryService) {
             childrenMap,
             sectionConfig
           );
-
+          
           if (districtResult.noRevenue) {
             continue;
           }
-
-          totalDistrictCount++;
-          regionDistrictCount++;
+          
+          if (!district.districtSummaryExcluded) {
+            totalDistrictCount++;
+            regionDistrictCount++;
+          }
+          
           const facilityReports = [];
           let districtFacilityCount = 0;
 
@@ -642,17 +653,19 @@ function createApiRoutes(storageService, bigQueryService) {
             totalFacilityCount++;
           }
 
-          // Update district header with facility count
-          districtMeta.facilityCount = districtFacilityCount;
-          const updatedDistrictHeaderHtml = await pnlRenderService.generateHeader(districtMeta);
+          if (!district.districtSummaryExcluded) {
+            // Update district header with facility count
+            districtMeta.facilityCount = districtFacilityCount;
+            const updatedDistrictHeaderHtml = await pnlRenderService.generateHeader(districtMeta);
 
-          const districtParts = districtResult.html.split('<hr class="pnl-divider">');
-          const districtContentHtml = districtParts[1];
-          const completeDistrictHtml = `    <div class="pnl-report-container page-break">
+            const districtParts = districtResult.html.split('<hr class="pnl-divider">');
+            const districtContentHtml = districtParts[1];
+            const completeDistrictHtml = `    <div class="pnl-report-container page-break">
       ${updatedDistrictHeaderHtml}
       <hr class="pnl-divider">${districtContentHtml}`;
 
-          districtReports.push(completeDistrictHtml);
+            districtReports.push(completeDistrictHtml);
+          }
           districtReports.push(...facilityReports);
         }
 
@@ -804,18 +817,59 @@ function createApiRoutes(storageService, bigQueryService) {
         // Get full customer details for this district or district tag
         // Tags are treated as districts - they just aggregate multiple districts' customers
         const districtResult = await storageService.getCustomersForDistrict(actualId);
-        const { customers, districtName, isTag, districtRegion } = districtResult;
-        
+        let { customers, districtName, isTag, districtRegion } = districtResult;
+
         if (customers.length === 0) {
-          return res.status(404).json({ 
+          return res.status(404).json({
             error: 'No customers found for selected district',
             code: 'NO_CUSTOMERS_FOUND'
           });
         }
-        
+
+        // Check for optional subsidiary filter
+        const subsidiaryFilter = req.query.subsidiaryFilter;
+
+        if (subsidiaryFilter && subsidiaryFilter !== 'all') {
+          const subsidiaryResult = await storageService.getSubsidiaryInternalId(subsidiaryFilter);
+
+          if (!subsidiaryResult) {
+            return res.status(404).json({
+              error: 'Subsidiary not found',
+              code: 'SUBSIDIARY_NOT_FOUND'
+            });
+          }
+
+          const subsidiaryIds = subsidiaryResult.subsidiaryIds;
+          console.log(`   Using subsidiary filter: subsidiary_internal_id=${JSON.stringify(subsidiaryIds)}`);
+
+          // Query dim_customers to find which of these customers belong to the filtered subsidiary
+          const customerInternalIds = customers.map(c => c.customer_internal_id);
+          const [rows] = await bigQueryService.bigquery.query({
+            query: `
+              SELECT customer_id
+              FROM \`yona-solutions-poc.dbt_production.dim_customers\`
+              WHERE customer_id IN UNNEST(@customerIds)
+                AND subsidiary_internal_id IN UNNEST(@subsidiaryIds)
+            `,
+            location: 'US',
+            params: { customerIds: customerInternalIds, subsidiaryIds: subsidiaryIds }
+          });
+
+          const validCustomerIds = new Set(rows.map(r => r.customer_id));
+          customers = customers.filter(c => validCustomerIds.has(c.customer_internal_id));
+          console.log(`   Filtered to ${customers.length} customers after subsidiary filter`);
+
+          if (customers.length === 0) {
+            return res.status(404).json({
+              error: 'No customers found for selected district/subsidiary combination',
+              code: 'NO_CUSTOMERS_FOUND'
+            });
+          }
+        }
+
         // Update selectedLabel to use the district display name
         selectedLabel = districtName;
-        
+
         const customerIds = customers.map(c => c.customer_internal_id);
         queryParams.customerIds = customerIds;
         queryParams.customers = customers; // Store full customer details for facility P&Ls
@@ -850,8 +904,10 @@ function createApiRoutes(storageService, bigQueryService) {
             });
           }
           
-          subsidiaryId = subsidiaryResult.subsidiaryId;
-          console.log(`   Using subsidiary filter: subsidiary_internal_id=${subsidiaryId}`);
+          subsidiaryId = subsidiaryResult.subsidiaryIds.length === 1
+            ? subsidiaryResult.subsidiaryIds[0]
+            : subsidiaryResult.subsidiaryIds;
+          console.log(`   Using subsidiary filter: subsidiary_internal_id=${JSON.stringify(subsidiaryId)}`);
         }
         
         // Get customers in this region from dim_customers (optionally filtered by subsidiary)
@@ -866,17 +922,26 @@ function createApiRoutes(storageService, bigQueryService) {
         
         // Group customers by their parent district
         const districtGroups = await storageService.groupCustomersByDistrict(customersInRegion);
+        const allowedCustomerIds = districtGroups.flatMap(group =>
+          group.customers.map(c => c.customer_internal_id)
+        );
+        const exclusionsApplied = allowedCustomerIds.length !== customersInRegion.length;
         
         queryParams.regionId = regionId;
         queryParams.subsidiaryId = subsidiaryId; // Will be null if not filtered
         queryParams.customersInRegion = customersInRegion;
         queryParams.districtGroups = districtGroups;
+        queryParams.allowedCustomerIds = allowedCustomerIds;
+        queryParams.exclusionsApplied = exclusionsApplied;
         
         const filterDesc = subsidiaryId 
           ? `region_internal_id=${regionId} AND subsidiary_internal_id=${subsidiaryId}`
           : `region_internal_id=${regionId}`;
         console.log(`   Using filters: ${filterDesc}`);
         console.log(`   Found ${customersInRegion.length} customers in ${districtGroups.length} districts`);
+        if (exclusionsApplied) {
+          console.log(`   ⚠️  District reporting exclusions applied: ${allowedCustomerIds.length} customers included`);
+        }
       } else if (hierarchy === 'subsidiary') {
         // Get subsidiary internal ID(s) and name
         // Handles both single subsidiaries and subsidiary tags (multiple subsidiaries)
@@ -936,6 +1001,12 @@ function createApiRoutes(storageService, bigQueryService) {
         
         // Group customers by region, then by district
         const regionGroups = await storageService.groupCustomersByRegionAndDistrict(customersInSubsidiary);
+        const allowedCustomerIds = regionGroups.flatMap(region =>
+          region.districts.flatMap(district =>
+            district.customers.map(c => c.customer_internal_id)
+          )
+        );
+        const exclusionsApplied = allowedCustomerIds.length !== customersInSubsidiary.length;
         
         // For BigQuery queries, pass the array of subsidiary IDs
         // Single subsidiaries will have array length of 1, tags will have multiple
@@ -943,6 +1014,8 @@ function createApiRoutes(storageService, bigQueryService) {
         queryParams.regionGroups = regionGroups;
         queryParams.isTag = isTag; // Store whether this is a tag for header generation
         queryParams.customersInSubsidiary = customersInSubsidiary;
+        queryParams.allowedCustomerIds = allowedCustomerIds;
+        queryParams.exclusionsApplied = exclusionsApplied;
         
         const filterDesc = regionId 
           ? `subsidiary_internal_id IN [${subsidiaryIds.join(', ')}] AND region_internal_id=${regionId}`
@@ -1109,12 +1182,32 @@ function createApiRoutes(storageService, bigQueryService) {
         // Multi-level region rendering: Region Summary -> District Summaries -> Facility P&Ls
         // OPTIMIZED: Only 4 BigQuery queries total (Region Month/YTD + All Customers Month/YTD)
         
-        // 1. Generate region summary P&L (filtered by region_internal_id)
+        // 1. Generate region summary P&L (filtered by region_internal_id unless exclusions applied)
         console.log('   Querying BigQuery for region summary (Month + YTD)...');
-        const regionData = await bigQueryService.getPLData({ ...queryParams, ytd: false });
-        const regionYtdData = await bigQueryService.getPLData({ ...queryParams, ytd: true });
+        let regionData;
+        let regionYtdData;
+        if (queryParams.exclusionsApplied) {
+          regionData = await bigQueryService.getPLData({ 
+            hierarchy: 'district',
+            customerIds: queryParams.allowedCustomerIds,
+            date,
+            accountConfig,
+            ytd: false
+          });
+          regionYtdData = await bigQueryService.getPLData({ 
+            hierarchy: 'district',
+            customerIds: queryParams.allowedCustomerIds,
+            date,
+            accountConfig,
+            ytd: true
+          });
+        } else {
+          regionData = await bigQueryService.getPLData({ ...queryParams, ytd: false });
+          regionYtdData = await bigQueryService.getPLData({ ...queryParams, ytd: true });
+        }
         
-        const regionCensus = sumCensusForCustomers(censusRecords, queryParams.customersInRegion, date);
+        const regionCustomersForCensus = queryParams.districtGroups.flatMap(group => group.customers);
+        const regionCensus = sumCensusForCustomers(censusRecords, regionCustomersForCensus, date);
 
         // Region summaries include census rollup
         const regionMeta = {
@@ -1146,8 +1239,8 @@ function createApiRoutes(storageService, bigQueryService) {
         
         // 2. Query ALL customer data ONCE (all customers in region, all their transactions)
         // This includes transactions outside the region - customers' full P&L
-        console.log(`   Querying BigQuery for all ${queryParams.customersInRegion.length} customers (Month + YTD)...`);
-        const allCustomerIds = queryParams.customersInRegion.map(c => c.customer_internal_id);
+        console.log(`   Querying BigQuery for all ${queryParams.allowedCustomerIds.length} customers (Month + YTD)...`);
+        const allCustomerIds = queryParams.allowedCustomerIds;
         const allCustomersQueryParams = {
           hierarchy: 'district',
           customerIds: allCustomerIds,
@@ -1200,9 +1293,12 @@ function createApiRoutes(storageService, bigQueryService) {
           
           // Only include district if it has revenue
           if (!districtResult.noRevenue) {
-            const districtHtmlIndex = htmlParts.length; // Remember position for later update
-            htmlParts.push(districtResult.html); // Temporary placeholder
-            totalDistrictCount++; // Count this district (has revenue)
+            let districtHtmlIndex = null;
+            if (!districtGroup.districtSummaryExcluded) {
+              districtHtmlIndex = htmlParts.length; // Remember position for later update
+              htmlParts.push(districtResult.html); // Temporary placeholder
+              totalDistrictCount++; // Count this district (has revenue)
+            }
             
             // 3b. Generate facility P&Ls for customers in this district (filter in memory)
             let districtFacilityCount = 0;
@@ -1245,19 +1341,21 @@ function createApiRoutes(storageService, bigQueryService) {
             console.log(`     ✓ Generated district summary + ${districtFacilityCount} facility P&Ls`);
             totalFacilityCount += districtFacilityCount;
             
-            // Regenerate district header with actual facility count
-            districtMeta.facilityCount = districtFacilityCount;
-            const correctedDistrictResult = await pnlRenderService.generatePNLReport(
-              districtData,
-              districtYtdData,
-              districtMeta,
-              accountConfig,
-              childrenMap,
-              sectionConfig
-            );
-            
-            // Replace district HTML with corrected version
-            htmlParts[districtHtmlIndex] = correctedDistrictResult.html;
+            if (districtHtmlIndex !== null) {
+              // Regenerate district header with actual facility count
+              districtMeta.facilityCount = districtFacilityCount;
+              const correctedDistrictResult = await pnlRenderService.generatePNLReport(
+                districtData,
+                districtYtdData,
+                districtMeta,
+                accountConfig,
+                childrenMap,
+                sectionConfig
+              );
+              
+              // Replace district HTML with corrected version
+              htmlParts[districtHtmlIndex] = correctedDistrictResult.html;
+            }
           } else {
             console.log(`     ⊘ District has no revenue, skipping`);
           }
@@ -1319,11 +1417,12 @@ function createApiRoutes(storageService, bigQueryService) {
         const subsidiaryId = queryParams.subsidiaryId;
         const regionGroups = queryParams.regionGroups;
         const hasDistrictTagFilter = Boolean(queryParams.districtTagFilter);
+        const hasReportingExclusions = Boolean(queryParams.exclusionsApplied);
         
         // Query 1 & 2: Subsidiary Summary (Month + YTD)
         let subsidiaryMonthData;
         let subsidiaryYtdData;
-        if (!hasDistrictTagFilter) {
+        if (!hasDistrictTagFilter && !hasReportingExclusions) {
           console.log('\n📊 Step 1/4: Querying BigQuery for subsidiary summary...');
           subsidiaryMonthData = await bigQueryService.getPLData({ 
             hierarchy: 'subsidiary', 
@@ -1345,11 +1444,7 @@ function createApiRoutes(storageService, bigQueryService) {
         
         // Query 3 & 4: All customers in subsidiary (Month + YTD)
         console.log('\n📊 Step 2/4: Querying BigQuery for all customers in subsidiary...');
-        const allCustomerIds = regionGroups.flatMap(region => 
-          region.districts.flatMap(district => 
-            district.customers.map(c => c.customer_internal_id)
-          )
-        );
+        const allCustomerIds = queryParams.allowedCustomerIds;
         
         console.log(`   Querying for ${allCustomerIds.length} customers...`);
         const allCustomersMonthData = await bigQueryService.getPLData({ 
@@ -1369,7 +1464,7 @@ function createApiRoutes(storageService, bigQueryService) {
         
         console.log('   ✅ Query complete - processing results in memory...');
 
-        if (hasDistrictTagFilter) {
+        if (hasDistrictTagFilter || hasReportingExclusions) {
           subsidiaryMonthData = allCustomersMonthData;
           subsidiaryYtdData = allCustomersYtdData;
         }
@@ -1380,7 +1475,10 @@ function createApiRoutes(storageService, bigQueryService) {
         let totalDistrictCount = 0;
         let totalFacilityCount = 0;
         
-        const subsidiaryCensus = sumCensusForCustomers(censusRecords, queryParams.customersInSubsidiary, date);
+        const subsidiaryCustomersForCensus = regionGroups.flatMap(region =>
+          region.districts.flatMap(district => district.customers)
+        );
+        const subsidiaryCensus = sumCensusForCustomers(censusRecords, subsidiaryCustomersForCensus, date);
 
         // Subsidiary summaries include census rollup
         const subsidiaryMeta = {
@@ -1435,7 +1533,7 @@ function createApiRoutes(storageService, bigQueryService) {
           let regionMonthData;
           let regionYtdData;
 
-          if (hasDistrictTagFilter) {
+          if (hasDistrictTagFilter || hasReportingExclusions) {
             regionMonthData = accountService.filterDataByCustomers(allCustomersMonthData, regionCustomerIds);
             regionYtdData = accountService.filterDataByCustomers(allCustomersYtdData, regionCustomerIds);
           } else {
@@ -1522,25 +1620,27 @@ function createApiRoutes(storageService, bigQueryService) {
               headcount: districtCensus.headcount
             };
             
-            const districtResult = await pnlRenderService.generatePNLReport(
-              districtMonthData,
-              districtYtdData,
-              districtMeta,
-              accountConfig,
-              childrenMap,
-              sectionConfig
-            );
-            
-            if (districtResult.noRevenue) {
-              console.log(`         ⚠️  District "${district.districtLabel}" has no revenue - skipping`);
-              continue;
-            }
-            
+          const districtResult = await pnlRenderService.generatePNLReport(
+            districtMonthData,
+            districtYtdData,
+            districtMeta,
+            accountConfig,
+            childrenMap,
+            sectionConfig
+          );
+          
+          if (districtResult.noRevenue) {
+            console.log(`         ⚠️  District "${district.districtLabel}" has no revenue - skipping`);
+            continue;
+          }
+          
+          if (!district.districtSummaryExcluded) {
             totalDistrictCount++;
             regionDistrictCount++;
-            let districtHeaderHtml = districtResult.html.split('<div class="pnl-content">')[0];
-            const facilityReports = [];
-            let districtFacilityCount = 0;
+          }
+          let districtHeaderHtml = districtResult.html.split('<div class="pnl-content">')[0];
+          const facilityReports = [];
+          let districtFacilityCount = 0;
             
             // Generate facility reports for this district
             for (const customer of district.customers) {
@@ -1582,18 +1682,20 @@ function createApiRoutes(storageService, bigQueryService) {
               totalFacilityCount++;
             }
             
-            // Update district header with facility count
-            districtMeta.facilityCount = districtFacilityCount;
-            const updatedDistrictHeaderHtml = await pnlRenderService.generateHeader(districtMeta);
-            
-            // Reconstruct district HTML with updated header
-            const districtParts = districtResult.html.split('<hr class="pnl-divider">');
-            const districtContentHtml = districtParts[1];
-            const completeDistrictHtml = `    <div class="pnl-report-container page-break">
+            if (!district.districtSummaryExcluded) {
+              // Update district header with facility count
+              districtMeta.facilityCount = districtFacilityCount;
+              const updatedDistrictHeaderHtml = await pnlRenderService.generateHeader(districtMeta);
+              
+              // Reconstruct district HTML with updated header
+              const districtParts = districtResult.html.split('<hr class="pnl-divider">');
+              const districtContentHtml = districtParts[1];
+              const completeDistrictHtml = `    <div class="pnl-report-container page-break">
       ${updatedDistrictHeaderHtml}
       <hr class="pnl-divider">${districtContentHtml}`;
-            
-            districtReports.push(completeDistrictHtml);
+              
+              districtReports.push(completeDistrictHtml);
+            }
             districtReports.push(...facilityReports);
             
             console.log(`         ✅ District complete: ${districtFacilityCount} facilities with revenue`);

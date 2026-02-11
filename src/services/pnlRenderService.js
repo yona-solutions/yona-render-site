@@ -456,9 +456,10 @@ async function generatePNLReport(monthData, ytdData, meta, accountConfig, childr
     ytdBud: valYtdBud['Income'] || 0
   };
   
-  // Check for no revenue (facilities only)
+  // Check for no revenue (facilities only) using Net Income
   if (meta.typeLabel === 'Facility') {
-    if (Math.abs(incomeTotals.act) < 0.0001) {
+    const netIncome = valMonthAct['Net Income'] || 0;
+    if (Math.abs(netIncome) < 0.0001) {
       return { noRevenue: true, html: '' };
     }
   }

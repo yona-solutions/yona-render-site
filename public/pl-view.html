@@ -1336,7 +1336,7 @@
         
         const districtTagFilterGroup = document.getElementById('districtTagFilterGroup');
 
-        if (hierarchyType === 'region') {
+        if (hierarchyType === 'region' || hierarchyType === 'district') {
           subsidiaryFilterGroup.style.display = 'block';
           districtTagFilterGroup.style.display = 'none';
           // Load subsidiaries for the filter dropdown
@@ -1474,8 +1474,8 @@
         // Build API URL
         let url = `/api/pl/data?hierarchy=${hierarchy}&selectedId=${encodeURIComponent(selectedId)}&date=${selectedDate}&plType=${plType}`;
 
-        // Add subsidiary filter if Region hierarchy and a subsidiary is selected
-        if (hierarchy === 'region' && subsidiaryFilterSelect && subsidiaryFilterSelect.selectedValue) {
+        // Add subsidiary filter if Region or District hierarchy and a subsidiary is selected
+        if ((hierarchy === 'region' || hierarchy === 'district') && subsidiaryFilterSelect && subsidiaryFilterSelect.selectedValue) {
           const subsidiaryFilter = subsidiaryFilterSelect.selectedValue;
           // Only add filter parameter if a subsidiary is actually selected (not empty)
           if (subsidiaryFilter && subsidiaryFilter !== 'all') {
@@ -1684,9 +1684,9 @@
     }
 
     /**
-     * Decide if a single report page has a valid, non-zero "Income" row
+     * Decide if a single report page has a valid, non-zero "Net Income" row
      * @param {Element} containerEl - Report container element
-     * @returns {boolean} True if has non-zero income
+     * @returns {boolean} True if has non-zero net income
      */
     function hasNonZeroIncome(containerEl) {
       const table = containerEl.querySelector(".pnl-report-table");
@@ -1698,14 +1698,14 @@
 
         // first column text
         const label = (cells[0].textContent || "").trim();
-        if (label === "Income") {
+        if (label === "Net Income") {
           // Current Month is column #2 in your header layout (index 1)
           const currentMonthCell = cells[1];
           const value = parseAccountingToNumber(currentMonthCell?.textContent || "");
           return Math.abs(value) > 0.0001;
         }
       }
-      // No "Income" row found
+      // No "Net Income" row found
       return false;
     }
 
@@ -1741,7 +1741,7 @@
         // Remove any explicit page-break divs; we'll rely on .pnl-report-container breaks only
         root.querySelectorAll(".page-break").forEach(el => el.remove());
 
-        // Collect only report pages with non-zero Income
+        // Collect only report pages with non-zero Net Income
         const kept = [];
         root.querySelectorAll(".pnl-report-container").forEach(container => {
           if (hasNonZeroIncome(container)) {
@@ -1753,7 +1753,7 @@
         const filteredHtmlContent = kept.length ? kept.join("\n") : 
           (root.querySelector(".pnl-report-container")?.outerHTML || htmlContent);
 
-        console.log(`📊 Filtered to ${kept.length} reports with non-zero income`);
+        console.log(`📊 Filtered to ${kept.length} reports with non-zero net income`);
 
         // 3) Build the complete printable HTML with styles
         const fullHTML = `<!DOCTYPE html>

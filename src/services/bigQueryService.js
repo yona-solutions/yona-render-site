@@ -286,8 +286,14 @@ class BigQueryService {
     const params = { regionInternalId: regionInternalId };
     
     if (subsidiaryInternalId) {
-      whereClause += ' AND subsidiary_internal_id = @subsidiaryInternalId';
-      params.subsidiaryInternalId = subsidiaryInternalId;
+      const subsidiaryIds = Array.isArray(subsidiaryInternalId) ? subsidiaryInternalId : [subsidiaryInternalId];
+      if (subsidiaryIds.length === 1) {
+        whereClause += ' AND subsidiary_internal_id = @subsidiaryInternalId';
+        params.subsidiaryInternalId = subsidiaryIds[0];
+      } else {
+        whereClause += ' AND subsidiary_internal_id IN UNNEST(@subsidiaryInternalIds)';
+        params.subsidiaryInternalIds = subsidiaryIds;
+      }
     }
 
     const query = `
@@ -303,8 +309,8 @@ class BigQueryService {
       ORDER BY customer_id
     `;
 
-    const filterDesc = subsidiaryInternalId 
-      ? `region_internal_id=${regionInternalId} AND subsidiary_internal_id=${subsidiaryInternalId}`
+    const filterDesc = subsidiaryInternalId
+      ? `region_internal_id=${regionInternalId} AND subsidiary_internal_id=${JSON.stringify(subsidiaryInternalId)}`
       : `region_internal_id=${regionInternalId}`;
     console.log(`\n🔍 Querying dim_customers for ${filterDesc}`);
 

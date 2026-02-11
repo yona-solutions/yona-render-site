@@ -750,7 +750,10 @@ router.post('/report-schedules/:id/send-email', async (req, res) => {
     const baseUrl = process.env.NODE_ENV === 'production'
       ? (process.env.RENDER_EXTERNAL_URL || 'https://yona-render-site.onrender.com')
       : `http://127.0.0.1:${process.env.PORT || 3000}`;
-    const dataUrl = `${baseUrl}/api/pl/data?hierarchy=${schedule.template_type}&selectedId=${encodeURIComponent(entityId)}&date=${latestDate}&plType=${schedule.process}`;
+    let dataUrl = `${baseUrl}/api/pl/data?hierarchy=${schedule.template_type}&selectedId=${encodeURIComponent(entityId)}&date=${latestDate}&plType=${schedule.process}`;
+    if ((schedule.template_type === 'region' || schedule.template_type === 'district') && schedule.subsidiary_id) {
+      dataUrl += `&subsidiaryFilter=${encodeURIComponent(schedule.subsidiary_id)}`;
+    }
     console.log(`   Fetching data from: ${dataUrl}`);
 
     const controller2 = new AbortController();
@@ -1011,7 +1014,11 @@ router.post('/report-schedules/:id/send-to-groups', async (req, res) => {
 
     // Fetch P&L data
     console.log(`   Fetching P&L data for ${schedule.template_type} ${entityId}...`);
-    const plResponse = await fetch(`http://localhost:${process.env.PORT || 3000}/api/pl/data?hierarchy=${schedule.template_type}&selectedId=${encodeURIComponent(entityId)}&date=${latestDate}&plType=${plType}`, {
+    let sendGroupDataUrl = `http://localhost:${process.env.PORT || 3000}/api/pl/data?hierarchy=${schedule.template_type}&selectedId=${encodeURIComponent(entityId)}&date=${latestDate}&plType=${plType}`;
+    if ((schedule.template_type === 'region' || schedule.template_type === 'district') && schedule.subsidiary_id) {
+      sendGroupDataUrl += `&subsidiaryFilter=${encodeURIComponent(schedule.subsidiary_id)}`;
+    }
+    const plResponse = await fetch(sendGroupDataUrl, {
       headers: {
         'X-API-Key': process.env.SCHEDULER_API_KEY
       }
@@ -1133,7 +1140,7 @@ router.post('/report-schedules/:id/send-to-groups', async (req, res) => {
 });
 
 /**
- * Filter P&L report HTML to only include reports with non-zero income
+ * Filter P&L report HTML to only include reports with non-zero net income
  * Uses regex instead of JSDOM to avoid memory issues
  * Checks BOTH Actuals and Budget - excludes only if both are zero
  */
@@ -1158,14 +1165,14 @@ function filterReportsWithIncome(htmlContent) {
     return isNaN(num) ? 0 : num;
   }
 
-  // Filter to only containers with non-zero income (Actuals OR Budget)
+  // Filter to only containers with non-zero net income (Actuals OR Budget)
   const kept = containers.filter(container => {
-    // Look for the Income row and capture Actuals and Budget values
-    // Pattern: <td...>Income</td><td...>ACTUALS</td><td...>BUDGET</td>
-    const incomeMatch = container.match(/<td[^>]*>\s*Income\s*<\/td>\s*<td[^>]*>([^<]*)<\/td>\s*<td[^>]*>([^<]*)<\/td>/i);
+    // Look for the Net Income row and capture Actuals and Budget values
+    // Pattern: <td...>Net Income</td><td...>ACTUALS</td><td...>BUDGET</td>
+    const incomeMatch = container.match(/<td[^>]*>\s*Net Income\s*<\/td>\s*<td[^>]*>([^<]*)<\/td>\s*<td[^>]*>([^<]*)<\/td>/i);
 
     if (!incomeMatch) {
-      // No income row found, keep the report
+      // No net income row found, keep the report
       return true;
     }
 
@@ -1176,7 +1183,7 @@ function filterReportsWithIncome(htmlContent) {
     return actualsValue !== 0 || budgetValue !== 0;
   });
 
-  console.log(`   Filtered: ${kept.length} of ${containers.length} reports have non-zero income (Actuals or Budget)`);
+  console.log(`   Filtered: ${kept.length} of ${containers.length} reports have non-zero net income (Actuals or Budget)`);
 
   if (kept.length === 0) {
     // If all filtered out, keep at least the first one
@@ -1551,7 +1558,7 @@ router.post('/report-schedules/:id/process', requireApiKey, async (req, res) => 
     const doc = new parser().parseFromString(`<div id="root">${htmlContent}</div>`, "text/html");
     const root = doc.getElementById("root");
 
-    // Helper function to check if a report has non-zero income
+    // Helper function to check if a report has non-zero net income
     function hasNonZeroIncome(container) {
       const table = container.querySelector("table");
       if (!table) return false;
@@ -1559,7 +1566,7 @@ router.post('/report-schedules/:id/process', requireApiKey, async (req, res) => 
       const rows = Array.from(table.querySelectorAll("tr"));
       for (const row of rows) {
         const cells = Array.from(row.querySelectorAll("td"));
-        if (cells.length > 0 && cells[0].textContent.trim() === "Income") {
+        if (cells.length > 0 && cells[0].textContent.trim() === "Net Income") {
           if (cells.length > 1) {
             const valueText = cells[1].textContent.trim();
             const numValue = parseAccountingToNumber(valueText);
@@ -1591,7 +1598,7 @@ router.post('/report-schedules/:id/process', requireApiKey, async (req, res) => 
     const filteredHtmlContent = kept.length ? kept.join("\n") :
       (root.querySelector(".pnl-report-container")?.outerHTML || htmlContent);
 
-    console.log(`   Filtered to ${kept.length} reports with non-zero income`);
+    console.log(`   Filtered to ${kept.length} reports with non-zero net income`);
 
     // Build complete PDF HTML
     const fullHTML = buildPDFHTML(filteredHtmlContent);
@@ -1989,4 +1996,3 @@ module.exports = {
   router,
   initializeEmailConfigRoutes
 };
-
