@@ -199,19 +199,10 @@ class BigQueryService {
       });
 
       console.log(`✅ Retrieved ${rows.length} rows from BigQuery for ${hierarchy} (${ytd ? 'YTD' : 'Month'})`);
-      
+
       // Transform to array format with account labels
       const result = this.transformToArrayFormat(rows, accountConfig);
-      
-      console.log(`✅ Transformed to array format (${ytd ? 'YTD' : 'Month'}): ${result.Account.length} entries`);
-      if (result.Account.length > 0) {
-        console.log('Sample entry:', {
-          Account: result.Account[0],
-          Scenario: result.Scenario[0],
-          Value: result.Value[0]
-        });
-      }
-      
+
       return result;
     } catch (error) {
       console.error('Error fetching P&L data:', error);

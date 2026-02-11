@@ -381,6 +381,28 @@ function createApiRoutes(storageService, bigQueryService) {
       const sectionConfig = accountService.getSectionConfig();
       const censusRecords = censusService.isAvailable() ? await censusService.fetchCensusData() : [];
 
+      // ============================================================================
+      // SUBSIDIARY P&L QUERY HIERARCHY
+      // ============================================================================
+      // Each level queries BigQuery directly using its own dimension filter.
+      // DO NOT substitute customer-level data for subsidiary or region summaries.
+      //
+      //   Subsidiary  →  WHERE subsidiary_internal_id = @subsidiaryId
+      //   Region      →  WHERE region_internal_id = @regionId AND subsidiary_internal_id = @subsidiaryId
+      //   District    →  WHERE customer_internal_id IN UNNEST(@customerIds)  (customers in district)
+      //   Facility    →  WHERE customer_internal_id IN UNNEST(@customerIds)  (single customer)
+      //
+      // WHY: Formula accounts (Gross Profit, Net Income, etc.) exist in
+      // fct_transactions_summary at both the subsidiary level and the customer
+      // level. The per-customer formula values do NOT sum to the subsidiary-level
+      // value. If we aggregate customer rows for the subsidiary summary, formula
+      // accounts will be incorrect. The same applies to region summaries.
+      //
+      // The customer-level bulk query (allCustomersMonthData / allCustomersYtdData)
+      // is ONLY used to derive district and facility breakdowns via client-side
+      // filtering with filterDataByCustomers().
+      // ============================================================================
+
       // Step 1: Get subsidiary internal ID(s)
       sendProgress('subsidiary-summary', 'Fetching subsidiary summary...');
 
@@ -425,7 +447,16 @@ function createApiRoutes(storageService, bigQueryService) {
           )
         )
       ));
-      const exclusionsApplied = allowedCustomerIds.length !== customersInSubsidiary.length;
+
+      // Log subsidiary structure: regions and their customers
+      console.log(`\n📋 Subsidiary structure: ${selectedLabel}`);
+      const structureSummary = regionGroups.map(r => ({
+        region: r.regionLabel,
+        customers: r.districts.flatMap(d => d.customers.map(c => c.customer_internal_id))
+      }));
+      for (const r of structureSummary) {
+        console.log(`   Region ${r.region}: ${r.customers.length} customers [${r.customers.join(', ')}]`);
+      }
 
       const subsidiaryCensus = sumCensusForCustomers(
         censusRecords,
@@ -433,7 +464,26 @@ function createApiRoutes(storageService, bigQueryService) {
         date
       );
 
-      // Step 2: Fetch all customer data
+      // Step 2: Fetch subsidiary summary (always query by subsidiary_internal_id)
+      sendProgress('subsidiary-summary', 'Fetching subsidiary summary...');
+
+      const subsidiaryMonthData = await bigQueryService.getPLData({
+        hierarchy: 'subsidiary',
+        subsidiaryId,
+        date,
+        accountConfig,
+        ytd: false
+      });
+      const subsidiaryYtdData = await bigQueryService.getPLData({
+        hierarchy: 'subsidiary',
+        subsidiaryId,
+        date,
+        accountConfig,
+        ytd: true
+      });
+
+      // Fetch all customer data — ONLY used for district and facility breakdowns.
+      // Do NOT use this data for subsidiary or region summaries (see header comment).
       sendProgress('customer-data', 'Fetching customer data...');
 
       const allCustomerIds = allowedCustomerIds;
@@ -452,31 +502,6 @@ function createApiRoutes(storageService, bigQueryService) {
         accountConfig,
         ytd: true
       });
-
-      // Query subsidiary summary (skip if district tag filter is active)
-      let subsidiaryMonthData;
-      let subsidiaryYtdData;
-      if (!hasDistrictTagFilter && !exclusionsApplied) {
-        subsidiaryMonthData = await bigQueryService.getPLData({
-          hierarchy: 'subsidiary',
-          subsidiaryId,
-          date,
-          accountConfig,
-          ytd: false
-        });
-        subsidiaryYtdData = await bigQueryService.getPLData({
-          hierarchy: 'subsidiary',
-          subsidiaryId,
-          date,
-          accountConfig,
-          ytd: true
-        });
-      }
-
-      if (hasDistrictTagFilter || exclusionsApplied) {
-        subsidiaryMonthData = allCustomersMonthData;
-        subsidiaryYtdData = allCustomersYtdData;
-      }
 
       // Step 3: Generate subsidiary report
       sendProgress('generating-subsidiary', 'Generating subsidiary report...');
@@ -533,29 +558,23 @@ function createApiRoutes(storageService, bigQueryService) {
           district.customers.map(c => c.customer_internal_id)
         );
 
-        let regionMonthData;
-        let regionYtdData;
-        if (hasDistrictTagFilter || exclusionsApplied) {
-          regionMonthData = accountService.filterDataByCustomers(allCustomersMonthData, regionCustomerIds);
-          regionYtdData = accountService.filterDataByCustomers(allCustomersYtdData, regionCustomerIds);
-        } else {
-          regionMonthData = await bigQueryService.getPLData({
-            hierarchy: 'region',
-            regionId: region.regionInternalId,
-            subsidiaryId: subsidiaryId,
-            date,
-            accountConfig,
-            ytd: false
-          });
-          regionYtdData = await bigQueryService.getPLData({
-            hierarchy: 'region',
-            regionId: region.regionInternalId,
-            subsidiaryId: subsidiaryId,
-            date,
-            accountConfig,
-            ytd: true
-          });
-        }
+        // Query region summary directly — do NOT substitute customer-level data (see header comment)
+        const regionMonthData = await bigQueryService.getPLData({
+          hierarchy: 'region',
+          regionId: region.regionInternalId,
+          subsidiaryId: subsidiaryId,
+          date,
+          accountConfig,
+          ytd: false
+        });
+        const regionYtdData = await bigQueryService.getPLData({
+          hierarchy: 'region',
+          regionId: region.regionInternalId,
+          subsidiaryId: subsidiaryId,
+          date,
+          accountConfig,
+          ytd: true
+        });
 
         const regionCustomers = uniqueCustomersById(
           region.districts.flatMap(district => district.customers)
@@ -1210,31 +1229,33 @@ function createApiRoutes(storageService, bigQueryService) {
         });
       } else if (hierarchy === 'region') {
         // Multi-level region rendering: Region Summary -> District Summaries -> Facility P&Ls
-        // OPTIMIZED: Only 4 BigQuery queries total (Region Month/YTD + All Customers Month/YTD)
-        
-        // 1. Generate region summary P&L (filtered by region_internal_id unless exclusions applied)
+        //
+        // QUERY HIERARCHY (same principle as subsidiary tab — see header comment above):
+        //   Region   →  WHERE region_internal_id = @regionId [AND subsidiary_internal_id = @subsidiaryId]
+        //   District →  WHERE customer_internal_id IN UNNEST(@customerIds)
+        //   Facility →  WHERE customer_internal_id IN UNNEST(@customerIds)
+        //
+        // Always query region summary directly by region_internal_id. Do NOT
+        // substitute customer-level data — formula accounts will be incorrect.
+
+        // 1. Generate region summary P&L (always filtered by region_internal_id)
         console.log('   Querying BigQuery for region summary (Month + YTD)...');
-        let regionData;
-        let regionYtdData;
-        if (queryParams.exclusionsApplied) {
-          regionData = await bigQueryService.getPLData({ 
-            hierarchy: 'district',
-            customerIds: queryParams.allowedCustomerIds,
-            date,
-            accountConfig,
-            ytd: false
-          });
-          regionYtdData = await bigQueryService.getPLData({ 
-            hierarchy: 'district',
-            customerIds: queryParams.allowedCustomerIds,
-            date,
-            accountConfig,
-            ytd: true
-          });
-        } else {
-          regionData = await bigQueryService.getPLData({ ...queryParams, ytd: false });
-          regionYtdData = await bigQueryService.getPLData({ ...queryParams, ytd: true });
-        }
+        const regionData = await bigQueryService.getPLData({
+          hierarchy: 'region',
+          regionId: queryParams.regionId,
+          subsidiaryId: queryParams.subsidiaryId,
+          date,
+          accountConfig,
+          ytd: false
+        });
+        const regionYtdData = await bigQueryService.getPLData({
+          hierarchy: 'region',
+          regionId: queryParams.regionId,
+          subsidiaryId: queryParams.subsidiaryId,
+          date,
+          accountConfig,
+          ytd: true
+        });
         
         const regionCustomersForCensus = uniqueCustomersById(
           queryParams.districtGroups.flatMap(group => group.customers)
@@ -1430,10 +1451,27 @@ function createApiRoutes(storageService, bigQueryService) {
           meta: regionMeta
         });
       } else if (hierarchy === 'subsidiary') {
-        // ============================================
+        // ============================================================================
         // Multi-Level Subsidiary P&L Rendering
-        // ============================================
-        // 
+        // ============================================================================
+        //
+        // QUERY HIERARCHY — each level queries BigQuery by its own dimension filter.
+        // DO NOT substitute customer-level data for subsidiary or region summaries.
+        //
+        //   Subsidiary →  WHERE subsidiary_internal_id = @subsidiaryId
+        //   Region     →  WHERE region_internal_id = @regionId AND subsidiary_internal_id = @subsidiaryId
+        //   District   →  WHERE customer_internal_id IN UNNEST(@customerIds)
+        //   Facility   →  WHERE customer_internal_id IN UNNEST(@customerIds)
+        //
+        // WHY: Formula accounts (Gross Profit, Net Income, etc.) exist in
+        // fct_transactions_summary at both the subsidiary level and the customer
+        // level. The per-customer formula values do NOT sum to the subsidiary-level
+        // value. The same applies to region summaries.
+        //
+        // The customer-level bulk query (allCustomersMonthData / allCustomersYtdData)
+        // is ONLY used to derive district and facility breakdowns.
+        // ============================================================================
+        //
         // Structure: Subsidiary -> Regions -> Districts -> Facilities
         // 
         // Process:
@@ -1457,27 +1495,24 @@ function createApiRoutes(storageService, bigQueryService) {
         const hasReportingExclusions = Boolean(queryParams.exclusionsApplied);
         
         // Query 1 & 2: Subsidiary Summary (Month + YTD)
-        let subsidiaryMonthData;
-        let subsidiaryYtdData;
-        if (!hasDistrictTagFilter && !hasReportingExclusions) {
-          console.log('\n📊 Step 1/4: Querying BigQuery for subsidiary summary...');
-          subsidiaryMonthData = await bigQueryService.getPLData({ 
-            hierarchy: 'subsidiary', 
-            subsidiaryId, 
-            date, 
-            accountConfig, 
-            ytd: false 
-          });
-          subsidiaryYtdData = await bigQueryService.getPLData({ 
-            hierarchy: 'subsidiary', 
-            subsidiaryId, 
-            date, 
-            accountConfig, 
-            ytd: true 
-          });
-        } else {
-          console.log('\n📊 Step 1/4: District tag filter active - summary will use filtered customers');
-        }
+        // Always query by subsidiary_internal_id — do NOT use customer-level data.
+        // Formula accounts (Gross Profit, Net Income, etc.) have different values
+        // at the subsidiary vs customer level in fct_transactions_summary.
+        console.log('\n📊 Step 1/4: Querying BigQuery for subsidiary summary...');
+        const subsidiaryMonthData = await bigQueryService.getPLData({
+          hierarchy: 'subsidiary',
+          subsidiaryId,
+          date,
+          accountConfig,
+          ytd: false
+        });
+        const subsidiaryYtdData = await bigQueryService.getPLData({
+          hierarchy: 'subsidiary',
+          subsidiaryId,
+          date,
+          accountConfig,
+          ytd: true
+        });
         
         // Query 3 & 4: All customers in subsidiary (Month + YTD)
         console.log('\n📊 Step 2/4: Querying BigQuery for all customers in subsidiary...');
@@ -1500,11 +1535,6 @@ function createApiRoutes(storageService, bigQueryService) {
         });
         
         console.log('   ✅ Query complete - processing results in memory...');
-
-        if (hasDistrictTagFilter || hasReportingExclusions) {
-          subsidiaryMonthData = allCustomersMonthData;
-          subsidiaryYtdData = allCustomersYtdData;
-        }
         
         // Step 3/4: Generate subsidiary summary
         console.log('\n📝 Step 3/4: Generating subsidiary summary HTML...');
@@ -1569,33 +1599,25 @@ function createApiRoutes(storageService, bigQueryService) {
             d.customers.map(c => c.customer_internal_id)
           );
 
-          let regionMonthData;
-          let regionYtdData;
-
-          if (hasDistrictTagFilter || hasReportingExclusions) {
-            regionMonthData = accountService.filterDataByCustomers(allCustomersMonthData, regionCustomerIds);
-            regionYtdData = accountService.filterDataByCustomers(allCustomersYtdData, regionCustomerIds);
-          } else {
-            // Query BigQuery directly for region summary using region_internal_id AND subsidiary_internal_id
-            // This ensures the region total matches the sum of all transactions for this region within the subsidiary
-            console.log(`      Querying BigQuery for region summary (region_internal_id=${region.regionInternalId}, subsidiary_internal_id=${Array.isArray(subsidiaryId) ? subsidiaryId.join(',') : subsidiaryId})...`);
-            regionMonthData = await bigQueryService.getPLData({
-              hierarchy: 'region',
-              regionId: region.regionInternalId,
-              subsidiaryId: subsidiaryId, // Supports both single ID and array (for subsidiary tags)
-              date,
-              accountConfig,
-              ytd: false
-            });
-            regionYtdData = await bigQueryService.getPLData({
-              hierarchy: 'region',
-              regionId: region.regionInternalId,
-              subsidiaryId: subsidiaryId,
-              date,
-              accountConfig,
-              ytd: true
-            });
-          }
+          // Query region summary directly — do NOT substitute customer-level data.
+          // Formula accounts have different values at region vs customer level.
+          console.log(`      Querying BigQuery for region summary (region_internal_id=${region.regionInternalId}, subsidiary_internal_id=${Array.isArray(subsidiaryId) ? subsidiaryId.join(',') : subsidiaryId})...`);
+          const regionMonthData = await bigQueryService.getPLData({
+            hierarchy: 'region',
+            regionId: region.regionInternalId,
+            subsidiaryId: subsidiaryId,
+            date,
+            accountConfig,
+            ytd: false
+          });
+          const regionYtdData = await bigQueryService.getPLData({
+            hierarchy: 'region',
+            regionId: region.regionInternalId,
+            subsidiaryId: subsidiaryId,
+            date,
+            accountConfig,
+            ytd: true
+          });
 
           const regionCustomers = uniqueCustomersById(
             region.districts.flatMap(district => district.customers)

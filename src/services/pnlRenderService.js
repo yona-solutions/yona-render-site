@@ -441,7 +441,7 @@ async function generatePNLReport(monthData, ytdData, meta, accountConfig, childr
   const monthBudget = accountService.buildAccountTotals(monthData, 'Budget');
   const ytdActuals = ytdData ? accountService.buildAccountTotals(ytdData, 'Actuals') : {};
   const ytdBudget = ytdData ? accountService.buildAccountTotals(ytdData, 'Budget') : {};
-  
+
   // Compute rollups (parent accounts aggregate children)
   const valMonthAct = accountService.computeRollups(monthActuals, accountConfig, childrenMap, isOperational);
   const valMonthBud = accountService.computeRollups(monthBudget, accountConfig, childrenMap, isOperational);
