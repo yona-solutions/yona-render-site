@@ -140,7 +140,8 @@ function generateHeader(meta) {
     headcount,
     accountCount,
     orgLabel,
-    reportTypeLabel
+    reportTypeLabel,
+    regionStructure
   } = meta;
   
   const formattedMonth = formatMonthLabel(monthLabel);

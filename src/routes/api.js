@@ -28,12 +28,12 @@ function getCustomerCodeFromLabel(label) {
 
 function collectCustomerCodes(customers) {
   if (!Array.isArray(customers)) return [];
-  const codes = [];
+  const codeSet = new Set();
   for (const customer of customers) {
     const code = customer?.customer_code || getCustomerCodeFromLabel(customer?.label);
-    if (code) codes.push(code);
+    if (code) codeSet.add(code);
   }
-  return codes;
+  return Array.from(codeSet);
 }
 
 function uniqueCustomersById(customers) {
@@ -465,7 +465,7 @@ function createApiRoutes(storageService, bigQueryService) {
       );
 
       // Step 2: Fetch subsidiary summary (always query by subsidiary_internal_id)
-      sendProgress('subsidiary-summary', 'Fetching subsidiary summary...');
+      sendProgress('subsidiary-summary', 'Fetching subsidiary data...');
 
       const subsidiaryMonthData = await bigQueryService.getPLData({
         hierarchy: 'subsidiary',
@@ -484,7 +484,7 @@ function createApiRoutes(storageService, bigQueryService) {
 
       // Fetch all customer data — ONLY used for district and facility breakdowns.
       // Do NOT use this data for subsidiary or region summaries (see header comment).
-      sendProgress('customer-data', 'Fetching customer data...');
+      sendProgress('customer-data', 'Fetching facility data...');
 
       const allCustomerIds = allowedCustomerIds;
 
@@ -504,12 +504,18 @@ function createApiRoutes(storageService, bigQueryService) {
       });
 
       // Step 3: Generate subsidiary report
-      sendProgress('generating-subsidiary', 'Generating subsidiary report...');
+      sendProgress('generating-subsidiary', 'Generating reports...');
 
       let totalRegionCount = 0;
       let totalDistrictCount = 0;
       let totalFacilityCount = 0;
       const totalFacilitySeen = new Set();
+
+      // Build region → customers structure for header metadata
+      const regionStructure = regionGroups.map(r => ({
+        region: r.regionLabel,
+        customers: r.districts.flatMap(d => d.customers.map(c => c.label || c.customer_internal_id))
+      }));
 
       const subsidiaryMeta = {
         typeLabel: isTag ? 'Subsidiary Tag' : 'Subsidiary',
@@ -521,7 +527,8 @@ function createApiRoutes(storageService, bigQueryService) {
         facilityCount: 0,
         actualCensus: subsidiaryCensus.actual,
         budgetCensus: subsidiaryCensus.budget,
-        headcount: subsidiaryCensus.headcount
+        headcount: subsidiaryCensus.headcount,
+        regionStructure
       };
 
       const subsidiaryResultReport = await pnlRenderService.generatePNLReport(

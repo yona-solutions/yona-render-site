@@ -1622,13 +1622,27 @@
       metaInfoHtml += `<strong>Type:</strong> ${meta.typeLabel}<br>`;
       metaInfoHtml += `<strong>Entity:</strong> ${selectedLabel}<br>`;
       metaInfoHtml += `<strong>Period:</strong> ${date}<br>`;
-      
+
       if (meta.facilityCount) {
         metaInfoHtml += `<strong>Facilities:</strong> ${meta.facilityCount}<br>`;
       }
-      
+
       metaInfoHtml += `<strong>P&L Type:</strong> ${meta.plType || 'Standard'}`;
-      
+
+      // Show region → customer structure for subsidiary views
+      if (meta.regionStructure && meta.regionStructure.length > 0) {
+        metaInfoHtml += '<br><br><strong>Regions:</strong>';
+        for (const r of meta.regionStructure) {
+          const regionId = r.region.replace(/[^a-zA-Z0-9]/g, '_');
+          const customerList = r.customers.map(c => `<div style="padding:2px 0 2px 16px; font-size:0.9em">${c}</div>`).join('');
+          metaInfoHtml += `
+            <details style="margin-top:4px">
+              <summary style="cursor:pointer"><strong>${r.region}</strong> (${r.customers.length} customers)</summary>
+              <div style="margin-left:8px">${customerList}</div>
+            </details>`;
+        }
+      }
+
       queryInfo.innerHTML = metaInfoHtml;
       
       // Display P&L HTML or no revenue message
@@ -1741,6 +1755,20 @@
         // Remove any explicit page-break divs; we'll rely on .pnl-report-container breaks only
         root.querySelectorAll(".page-break").forEach(el => el.remove());
 
+        // Mark long tables as compact so they fit a single PDF page
+        const compactRowThreshold = 30;
+        root.querySelectorAll(".pnl-report-container").forEach(container => {
+          const table = container.querySelector(".pnl-report-table");
+          if (!table) return;
+          const bodyRows = table.querySelectorAll("tbody tr");
+          const allRows = table.querySelectorAll("tr");
+          const headerRows = table.querySelectorAll("thead tr");
+          const rowCount = bodyRows.length > 0 ? bodyRows.length : Math.max(0, allRows.length - headerRows.length);
+          if (rowCount > compactRowThreshold) {
+            container.classList.add("pnl-compact");
+          }
+        });
+
         // Collect only report pages with non-zero Net Income
         const kept = [];
         root.querySelectorAll(".pnl-report-container").forEach(container => {
@@ -1765,6 +1793,11 @@
       box-sizing: border-box;
     }
 
+    @page {
+      size: letter portrait;
+      margin: 0;
+    }
+
     body {
       margin: 0;
       padding: 0;
@@ -1776,7 +1809,7 @@
       color: #000000;
       width: 100%;
       margin: 0 auto;
-      padding: 8px 24px 12px 24px;
+      padding: 8px 18px 10px 18px;
       page-break-after: always;
     }
 
@@ -1864,6 +1897,72 @@
       height: 12px;
       line-height: 1.2;
       vertical-align: middle;
+    }
+
+    .pnl-compact {
+      padding: 4px 12px 6px 12px;
+      transform: scale(0.9);
+      transform-origin: top center;
+      width: 111%;
+      margin-left: -5.5%;
+      page-break-inside: avoid;
+    }
+
+    .pnl-compact .pnl-report-header .pnl-title {
+      font-size: 11px;
+    }
+
+    .pnl-compact .pnl-report-header .pnl-subtitle {
+      font-size: 9px;
+    }
+
+    .pnl-compact .pnl-header-row {
+      font-size: 7px;
+    }
+
+    .pnl-compact .pnl-header-row-secondary {
+      font-size: 8px;
+    }
+
+    .pnl-compact .pnl-divider {
+      margin: 3px 0 4px 0;
+    }
+
+    .pnl-compact .pnl-report-table {
+      font-size: 5.5px;
+    }
+
+    .pnl-compact .pnl-report-table th,
+    .pnl-compact .pnl-report-table td {
+      padding: 0.5px 1px;
+      height: 8px;
+      line-height: 1.0;
+    }
+
+    .pnl-compact .pnl-report-table th {
+      font-size: 5.5px;
+    }
+
+    .pnl-compact .pnl-report-table td:first-child,
+    .pnl-compact .pnl-report-table th:first-child {
+      font-size: 5.5px;
+      max-width: 140px;
+      white-space: nowrap;
+    }
+
+    .pnl-compact .pnl-report-table .section-header-row td {
+      padding-top: 4px;
+      padding-bottom: 2px;
+    }
+
+    .pnl-compact .pnl-report-table .header-group-row th {
+      font-size: 6px;
+      padding: 2px 1px;
+    }
+
+    .pnl-compact .pnl-report-table .header-label-row th {
+      font-size: 5px;
+      padding: 1px 1px;
     }
 
     .pnl-report-table th {
