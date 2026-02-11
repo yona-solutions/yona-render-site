@@ -511,12 +511,6 @@ function createApiRoutes(storageService, bigQueryService) {
       let totalFacilityCount = 0;
       const totalFacilitySeen = new Set();
 
-      // Build region → customers structure for header metadata
-      const regionStructure = regionGroups.map(r => ({
-        region: r.regionLabel,
-        customers: r.districts.flatMap(d => d.customers.map(c => c.label || c.customer_internal_id))
-      }));
-
       const subsidiaryMeta = {
         typeLabel: isTag ? 'Subsidiary Tag' : 'Subsidiary',
         entityName: selectedLabel,
@@ -527,8 +521,7 @@ function createApiRoutes(storageService, bigQueryService) {
         facilityCount: 0,
         actualCensus: subsidiaryCensus.actual,
         budgetCensus: subsidiaryCensus.budget,
-        headcount: subsidiaryCensus.headcount,
-        regionStructure
+        headcount: subsidiaryCensus.headcount
       };
 
       const subsidiaryResultReport = await pnlRenderService.generatePNLReport(
@@ -738,6 +731,22 @@ function createApiRoutes(storageService, bigQueryService) {
 
       // Step 5: Finalize
       sendProgress('finalizing', 'Finalizing reports...');
+
+      // Build region → customers structure filtered to only revenue-bearing facilities
+      subsidiaryMeta.regionStructure = regionGroups.map(r => {
+        const seen = new Set();
+        const customers = [];
+        for (const d of r.districts) {
+          for (const c of d.customers) {
+            const id = c.customer_internal_id;
+            if (id != null && !seen.has(id) && totalFacilitySeen.has(id)) {
+              seen.add(id);
+              customers.push(c.label || id);
+            }
+          }
+        }
+        return { region: r.regionLabel, customers };
+      }).filter(r => r.customers.length > 0);
 
       // Update subsidiary header
       subsidiaryMeta.regionCount = totalRegionCount;

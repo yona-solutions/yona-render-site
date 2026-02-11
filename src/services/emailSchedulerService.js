@@ -648,6 +648,20 @@ class EmailSchedulerService {
       const doc = new parser().parseFromString(`<div id="root">${htmlContent}</div>`, "text/html");
       const root = doc.getElementById("root");
       
+      // Mark long tables as compact so they fit a single PDF page
+      const compactRowThreshold = 30;
+      root.querySelectorAll(".pnl-report-container").forEach(container => {
+        const table = container.querySelector(".pnl-report-table");
+        if (!table) return;
+        const bodyRows = table.querySelectorAll("tbody tr");
+        const allRows = table.querySelectorAll("tr");
+        const headerRows = table.querySelectorAll("thead tr");
+        const rowCount = bodyRows.length > 0 ? bodyRows.length : Math.max(0, allRows.length - headerRows.length);
+        if (rowCount > compactRowThreshold) {
+          container.classList.add("pnl-compact");
+        }
+      });
+      
       const kept = [];
       root.querySelectorAll(".pnl-report-container").forEach(container => {
         if (this.hasNonZeroIncome(container)) {
@@ -739,6 +753,7 @@ class EmailSchedulerService {
   <meta charset="UTF-8">
   <style>
     * { box-sizing: border-box; }
+    @page { size: letter portrait; margin: 0; }
     body {
       font-family: Arial, sans-serif;
       margin: 0;
@@ -748,7 +763,7 @@ class EmailSchedulerService {
     .pnl-report-container {
       background: #ffffff;
       width: 100%;
-      padding: 12px 20px;
+      padding: 8px 18px 10px 18px;
       page-break-after: always;
     }
     .pnl-report-container:last-child {
@@ -813,10 +828,76 @@ class EmailSchedulerService {
     }
     .pnl-report-table th,
     .pnl-report-table td {
-      padding: 3px 4px;
+      padding: 2px 2px;
       border: none;
       white-space: nowrap;
       vertical-align: middle;
+    }
+
+    .pnl-compact {
+      padding: 4px 12px 6px 12px;
+      transform: scale(0.9);
+      transform-origin: top center;
+      width: 111%;
+      margin-left: -5.5%;
+      page-break-inside: avoid;
+    }
+
+    .pnl-compact .pnl-report-header .pnl-title {
+      font-size: 11px;
+    }
+
+    .pnl-compact .pnl-report-header .pnl-subtitle {
+      font-size: 9px;
+    }
+
+    .pnl-compact .pnl-header-row {
+      font-size: 7px;
+    }
+
+    .pnl-compact .pnl-header-row-secondary {
+      font-size: 8px;
+    }
+
+    .pnl-compact .pnl-divider {
+      margin: 3px 0 4px 0;
+    }
+
+    .pnl-compact .pnl-report-table {
+      font-size: 5.5px;
+    }
+
+    .pnl-compact .pnl-report-table th,
+    .pnl-compact .pnl-report-table td {
+      padding: 0.5px 1px;
+      height: 8px;
+      line-height: 1.0;
+    }
+
+    .pnl-compact .pnl-report-table th {
+      font-size: 5.5px;
+    }
+
+    .pnl-compact .pnl-report-table td:first-child,
+    .pnl-compact .pnl-report-table th:first-child {
+      font-size: 5.5px;
+      max-width: 120px;
+      white-space: nowrap;
+    }
+
+    .pnl-compact .pnl-report-table .section-header-row td {
+      padding-top: 4px;
+      padding-bottom: 2px;
+    }
+
+    .pnl-compact .pnl-report-table .header-group-row th {
+      font-size: 6px;
+      padding: 2px 1px;
+    }
+
+    .pnl-compact .pnl-report-table .header-label-row th {
+      font-size: 5px;
+      padding: 1px 1px;
     }
     .pnl-report-table th {
       font-weight: 600;

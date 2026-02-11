@@ -1204,6 +1204,11 @@ function buildPDFHTML(content) {
       box-sizing: border-box;
     }
 
+    @page {
+      size: letter portrait;
+      margin: 0;
+    }
+
     body {
       margin: 0;
       padding: 0;
@@ -1215,7 +1220,7 @@ function buildPDFHTML(content) {
       color: #000000;
       width: 100%;
       margin: 0 auto;
-      padding: 8px 24px 12px 24px;
+      padding: 8px 18px 10px 18px;
       page-break-after: always;
     }
 
@@ -1303,6 +1308,72 @@ function buildPDFHTML(content) {
       height: 12px;
       line-height: 1.2;
       vertical-align: middle;
+    }
+
+    .pnl-compact {
+      padding: 4px 12px 6px 12px;
+      transform: scale(0.9);
+      transform-origin: top center;
+      width: 111%;
+      margin-left: -5.5%;
+      page-break-inside: avoid;
+    }
+
+    .pnl-compact .pnl-report-header .pnl-title {
+      font-size: 11px;
+    }
+
+    .pnl-compact .pnl-report-header .pnl-subtitle {
+      font-size: 9px;
+    }
+
+    .pnl-compact .pnl-header-row {
+      font-size: 7px;
+    }
+
+    .pnl-compact .pnl-header-row-secondary {
+      font-size: 8px;
+    }
+
+    .pnl-compact .pnl-divider {
+      margin: 3px 0 4px 0;
+    }
+
+    .pnl-compact .pnl-report-table {
+      font-size: 5.5px;
+    }
+
+    .pnl-compact .pnl-report-table th,
+    .pnl-compact .pnl-report-table td {
+      padding: 0.5px 1px;
+      height: 8px;
+      line-height: 1.0;
+    }
+
+    .pnl-compact .pnl-report-table th {
+      font-size: 5.5px;
+    }
+
+    .pnl-compact .pnl-report-table td:first-child,
+    .pnl-compact .pnl-report-table th:first-child {
+      font-size: 5.5px;
+      max-width: 140px;
+      white-space: nowrap;
+    }
+
+    .pnl-compact .pnl-report-table .section-header-row td {
+      padding-top: 4px;
+      padding-bottom: 2px;
+    }
+
+    .pnl-compact .pnl-report-table .header-group-row th {
+      font-size: 6px;
+      padding: 2px 1px;
+    }
+
+    .pnl-compact .pnl-report-table .header-label-row th {
+      font-size: 5px;
+      padding: 1px 1px;
     }
 
     .pnl-report-table th {
@@ -1557,6 +1628,20 @@ router.post('/report-schedules/:id/process', requireApiKey, async (req, res) => 
     const parser = new (require('jsdom').JSDOM)(htmlContent).window.DOMParser;
     const doc = new parser().parseFromString(`<div id="root">${htmlContent}</div>`, "text/html");
     const root = doc.getElementById("root");
+
+    // Mark long tables as compact so they fit a single PDF page
+    const compactRowThreshold = 30;
+    root.querySelectorAll(".pnl-report-container").forEach(container => {
+      const table = container.querySelector(".pnl-report-table");
+      if (!table) return;
+      const bodyRows = table.querySelectorAll("tbody tr");
+      const allRows = table.querySelectorAll("tr");
+      const headerRows = table.querySelectorAll("thead tr");
+      const rowCount = bodyRows.length > 0 ? bodyRows.length : Math.max(0, allRows.length - headerRows.length);
+      if (rowCount > compactRowThreshold) {
+        container.classList.add("pnl-compact");
+      }
+    });
 
     // Helper function to check if a report has non-zero net income
     function hasNonZeroIncome(container) {

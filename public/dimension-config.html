@@ -2172,8 +2172,8 @@
           
           if (dateValue) {
             const dateBadge = document.createElement('span');
-            const date = new Date(dateValue);
-            dateBadge.textContent = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            const date = new Date(`${dateValue}T00:00:00Z`);
+            dateBadge.textContent = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
             dateBadge.style.display = 'inline-block';
             dateBadge.style.padding = '4px 10px';
             dateBadge.style.background = '#e8f5e9';
