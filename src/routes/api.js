@@ -36,6 +36,20 @@ function collectCustomerCodes(customers) {
   return codes;
 }
 
+function uniqueCustomersById(customers) {
+  if (!Array.isArray(customers)) return [];
+  const seen = new Set();
+  const unique = [];
+  for (const customer of customers) {
+    const id = customer?.customer_internal_id;
+    if (id == null) continue;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    unique.push(customer);
+  }
+  return unique;
+}
+
 function sumCensusForCodes(censusRecords, customerCodes, date) {
   const month = normalizeCensusMonth(date);
   if (!month || !censusRecords || censusRecords.length === 0 || !customerCodes || customerCodes.length === 0) {
@@ -404,16 +418,18 @@ function createApiRoutes(storageService, bigQueryService) {
 
       // Group customers by region and district
       const regionGroups = await storageService.groupCustomersByRegionAndDistrict(customersInSubsidiary);
-      const allowedCustomerIds = regionGroups.flatMap(region =>
-        region.districts.flatMap(district =>
-          district.customers.map(c => c.customer_internal_id)
+      const allowedCustomerIds = Array.from(new Set(
+        regionGroups.flatMap(region =>
+          region.districts.flatMap(district =>
+            district.customers.map(c => c.customer_internal_id)
+          )
         )
-      );
+      ));
       const exclusionsApplied = allowedCustomerIds.length !== customersInSubsidiary.length;
 
       const subsidiaryCensus = sumCensusForCustomers(
         censusRecords,
-        regionGroups.flatMap(r => r.districts.flatMap(d => d.customers)),
+        uniqueCustomersById(regionGroups.flatMap(r => r.districts.flatMap(d => d.customers))),
         date
       );
 
@@ -468,6 +484,7 @@ function createApiRoutes(storageService, bigQueryService) {
       let totalRegionCount = 0;
       let totalDistrictCount = 0;
       let totalFacilityCount = 0;
+      const totalFacilitySeen = new Set();
 
       const subsidiaryMeta = {
         typeLabel: isTag ? 'Subsidiary Tag' : 'Subsidiary',
@@ -540,7 +557,9 @@ function createApiRoutes(storageService, bigQueryService) {
           });
         }
 
-        const regionCustomers = region.districts.flatMap(district => district.customers);
+        const regionCustomers = uniqueCustomersById(
+          region.districts.flatMap(district => district.customers)
+        );
         const regionCensus = sumCensusForCustomers(censusRecords, regionCustomers, date);
 
         const regionMeta = {
@@ -571,6 +590,7 @@ function createApiRoutes(storageService, bigQueryService) {
         totalRegionCount++;
         let regionDistrictCount = 0;
         let regionFacilityCount = 0;
+        const regionFacilitySeen = new Set();
 
         const districtReports = [];
 
@@ -649,8 +669,14 @@ function createApiRoutes(storageService, bigQueryService) {
 
             facilityReports.push(facilityResult.html);
             districtFacilityCount++;
-            regionFacilityCount++;
-            totalFacilityCount++;
+            if (!regionFacilitySeen.has(customer.customer_internal_id)) {
+              regionFacilitySeen.add(customer.customer_internal_id);
+              regionFacilityCount++;
+            }
+            if (!totalFacilitySeen.has(customer.customer_internal_id)) {
+              totalFacilitySeen.add(customer.customer_internal_id);
+              totalFacilityCount++;
+            }
           }
 
           if (!district.districtSummaryExcluded) {
@@ -922,9 +948,11 @@ function createApiRoutes(storageService, bigQueryService) {
         
         // Group customers by their parent district
         const districtGroups = await storageService.groupCustomersByDistrict(customersInRegion);
-        const allowedCustomerIds = districtGroups.flatMap(group =>
-          group.customers.map(c => c.customer_internal_id)
-        );
+        const allowedCustomerIds = Array.from(new Set(
+          districtGroups.flatMap(group =>
+            group.customers.map(c => c.customer_internal_id)
+          )
+        ));
         const exclusionsApplied = allowedCustomerIds.length !== customersInRegion.length;
         
         queryParams.regionId = regionId;
@@ -1001,11 +1029,13 @@ function createApiRoutes(storageService, bigQueryService) {
         
         // Group customers by region, then by district
         const regionGroups = await storageService.groupCustomersByRegionAndDistrict(customersInSubsidiary);
-        const allowedCustomerIds = regionGroups.flatMap(region =>
-          region.districts.flatMap(district =>
-            district.customers.map(c => c.customer_internal_id)
+        const allowedCustomerIds = Array.from(new Set(
+          regionGroups.flatMap(region =>
+            region.districts.flatMap(district =>
+              district.customers.map(c => c.customer_internal_id)
+            )
           )
-        );
+        ));
         const exclusionsApplied = allowedCustomerIds.length !== customersInSubsidiary.length;
         
         // For BigQuery queries, pass the array of subsidiary IDs
@@ -1206,7 +1236,9 @@ function createApiRoutes(storageService, bigQueryService) {
           regionYtdData = await bigQueryService.getPLData({ ...queryParams, ytd: true });
         }
         
-        const regionCustomersForCensus = queryParams.districtGroups.flatMap(group => group.customers);
+        const regionCustomersForCensus = uniqueCustomersById(
+          queryParams.districtGroups.flatMap(group => group.customers)
+        );
         const regionCensus = sumCensusForCustomers(censusRecords, regionCustomersForCensus, date);
 
         // Region summaries include census rollup
@@ -1256,6 +1288,7 @@ function createApiRoutes(storageService, bigQueryService) {
         // 3. Generate district summaries and facility P&Ls by filtering the data in memory
         console.log(`   Generating P&Ls for ${queryParams.districtGroups.length} groups (tags + districts)...`);
         let totalFacilityCount = 0;
+        const totalFacilitySeen = new Set();
         let totalDistrictCount = 0; // Track districts/tags with revenue
         
         for (const districtGroup of queryParams.districtGroups) {
@@ -1335,11 +1368,15 @@ function createApiRoutes(storageService, bigQueryService) {
               if (!facilityResult.noRevenue) {
                 htmlParts.push(facilityResult.html);
                 districtFacilityCount++;
+                if (!totalFacilitySeen.has(customer.customer_internal_id)) {
+                  totalFacilitySeen.add(customer.customer_internal_id);
+                  totalFacilityCount++;
+                }
               }
             }
             
             console.log(`     ✓ Generated district summary + ${districtFacilityCount} facility P&Ls`);
-            totalFacilityCount += districtFacilityCount;
+            // totalFacilityCount updated via unique facility tracking
             
             if (districtHtmlIndex !== null) {
               // Regenerate district header with actual facility count
@@ -1475,8 +1512,10 @@ function createApiRoutes(storageService, bigQueryService) {
         let totalDistrictCount = 0;
         let totalFacilityCount = 0;
         
-        const subsidiaryCustomersForCensus = regionGroups.flatMap(region =>
-          region.districts.flatMap(district => district.customers)
+        const subsidiaryCustomersForCensus = uniqueCustomersById(
+          regionGroups.flatMap(region =>
+            region.districts.flatMap(district => district.customers)
+          )
         );
         const subsidiaryCensus = sumCensusForCustomers(censusRecords, subsidiaryCustomersForCensus, date);
 
@@ -1558,7 +1597,9 @@ function createApiRoutes(storageService, bigQueryService) {
             });
           }
 
-          const regionCustomers = region.districts.flatMap(district => district.customers);
+          const regionCustomers = uniqueCustomersById(
+            region.districts.flatMap(district => district.customers)
+          );
           const regionCensus = sumCensusForCustomers(censusRecords, regionCustomers, date);
 
           // Region summaries include census rollup
@@ -1591,6 +1632,7 @@ function createApiRoutes(storageService, bigQueryService) {
           totalRegionCount++;
           let regionDistrictCount = 0;
           let regionFacilityCount = 0;
+          const regionFacilitySeen = new Set();
           
           let regionHeaderHtml = regionResult.html.split('<div class="pnl-content">')[0];
           const districtReports = [];
@@ -1678,8 +1720,14 @@ function createApiRoutes(storageService, bigQueryService) {
               
               facilityReports.push(facilityResult.html);
               districtFacilityCount++;
-              regionFacilityCount++;
-              totalFacilityCount++;
+              if (!regionFacilitySeen.has(customer.customer_internal_id)) {
+                regionFacilitySeen.add(customer.customer_internal_id);
+                regionFacilityCount++;
+              }
+              if (!totalFacilitySeen.has(customer.customer_internal_id)) {
+                totalFacilitySeen.add(customer.customer_internal_id);
+                totalFacilityCount++;
+              }
             }
             
             if (!district.districtSummaryExcluded) {
