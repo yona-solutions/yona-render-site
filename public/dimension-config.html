@@ -3655,6 +3655,7 @@
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
         let accounts = await response.json();
+        const allAccounts = accounts.slice();
         AppState.accountRollupMap = {};
         accounts.forEach(account => {
           const normalizedRollup = normalizeRollupType(account.rollup_type || '');
@@ -3662,11 +3663,9 @@
         });
 
         // Filter accounts by classification based on tree ancestry
-        const currentData = AppState.dimensions[AppState.currentDimension];
-        const classificationAncestor = getClassificationAncestor(node.id, currentData);
-        if (classificationAncestor) {
-          accounts = accounts.filter(a => a.account_classification === classificationAncestor);
-        }
+        // NOTE: Showing all accounts for now (no classification filter).
+
+        const currentData = AppState.dimensions[AppState.currentDimension] || {};
 
         // Clear loading state
       dropdown.innerHTML = '';
@@ -3688,6 +3687,21 @@
           if (String(itemId) !== String(node.id) && itemData.account_internal_id) {
             mappedAccountIds.add(parseInt(itemData.account_internal_id));
           }
+        }
+
+        if (!accounts.length) {
+          dropdown.innerHTML = '';
+          const emptyOption = document.createElement('div');
+          emptyOption.className = 'custom-select-no-results';
+          emptyOption.textContent = 'No accounts returned from /api/accounts';
+          dropdown.appendChild(emptyOption);
+          input.value = '';
+          input.dataset.selectedValue = '';
+          input.dataset.selectedRollupType = '';
+          hint.textContent = 'No accounts returned from /api/accounts';
+          hint.style.display = 'block';
+          input.setAttribute('readonly', 'readonly');
+          return;
         }
 
         // Add all account options

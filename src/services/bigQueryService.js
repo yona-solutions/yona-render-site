@@ -418,7 +418,9 @@ class BigQueryService {
       SELECT
         account_id,
         display_name,
-        display_name_with_id
+        display_name_with_id,
+        account_classification,
+        rollup_type
       FROM \`${this.dataset}.dim_accounts\`
       ORDER BY display_name
     `;
@@ -428,11 +430,13 @@ class BigQueryService {
         query: query,
         location: 'US'
       });
-      
+
       return rows.map(row => ({
         account_id: row.account_id,
         display_name: row.display_name,
-        display_name_with_id: row.display_name_with_id
+        display_name_with_id: row.display_name_with_id,
+        account_classification: row.account_classification,
+        rollup_type: row.rollup_type
       }));
     } catch (error) {
       console.error('Error fetching accounts from BigQuery:', error);
@@ -643,4 +647,3 @@ class BigQueryService {
 }
 
 module.exports = BigQueryService;
-
