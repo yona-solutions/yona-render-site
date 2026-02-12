@@ -226,15 +226,58 @@
       padding: 0;
     }
 
+    .tree-content {
+      --rollup-width: 160px;
+      --rollup-right-pad: 120px;
+      --actions-pad: 96px;
+    }
+
     .node-item {
       display: flex;
       align-items: center;
       padding: 4px 6px;
+      padding-right: var(--actions-pad);
       border-bottom: 1px solid #f0f0f0;
       background-color: white;
       transition: background-color 0.1s ease;
       min-height: 30px;
       position: relative;
+    }
+
+    .tree-header {
+      display: flex;
+      align-items: center;
+      padding: 6px 8px;
+      padding-right: var(--actions-pad);
+      font-size: 12px;
+      font-weight: 600;
+      color: #455A64;
+      background: #f8fafc;
+      border-bottom: 1px solid #e5e7eb;
+      position: sticky;
+      top: 0;
+      z-index: 2;
+    }
+
+    .tree-header-rollup {
+      width: var(--rollup-width);
+      text-align: right;
+      letter-spacing: 0.2px;
+      margin-right: var(--rollup-right-pad);
+    }
+
+    .tree-header-name {
+      flex: 1;
+    }
+
+    .node-rollup {
+      margin-left: auto;
+      width: var(--rollup-width);
+      text-align: right;
+      font-size: 12px;
+      color: #546e7a;
+      margin-right: var(--rollup-right-pad);
+      white-space: nowrap;
     }
 
     .node-item:hover {
@@ -996,6 +1039,10 @@
 
     <!-- Tree Content -->
     <div class="tree-content">
+      <div id="treeHeader" class="tree-header" style="display: none;">
+        <span class="tree-header-name">Name</span>
+        <span class="tree-header-rollup">Time Rollup</span>
+      </div>
       <div id="loadingState" class="loading-state">Loading dimensions...</div>
       <div id="errorState" class="error-state" style="display: none;"></div>
       <ul id="treeRoot" class="tree-node" style="display: none;"></ul>
@@ -1036,6 +1083,16 @@
       </div>
       <div id="accountMappingHint" class="field-hint" style="display: none;"></div>
     </div>
+
+    <div id="accountRollupSection" class="field-group" style="display: none;">
+        <label class="field-label">Rollup Type</label>
+        <select id="editAccountRollupType" class="field-input">
+          <option value="">(Use default)</option>
+          <option value="Sum">SUM</option>
+          <option value="Ending Balance">ENDING BALANCE</option>
+        </select>
+        <div class="field-hint">Defaults from mapped account, but you can override.</div>
+      </div>
 
       <div id="accountCheckboxesSection" class="field-group checkbox-group" style="display: none;">
         <label>
@@ -1368,7 +1425,8 @@
       expandedNodes: new Set(),
       searchQuery: '',
       trees: {},
-      editingNode: null
+      editingNode: null,
+      accountRollupMap: {}
     };
 
     // API Functions
@@ -1633,6 +1691,16 @@
       }
       
       div.appendChild(label);
+
+      if (AppState.currentDimension === 'account') {
+        const rollupSpan = document.createElement('span');
+        rollupSpan.className = 'node-rollup';
+        const rollupValue =
+          node.rollup_type ||
+          (node.account_internal_id && AppState.accountRollupMap[node.account_internal_id]);
+        rollupSpan.textContent = normalizeRollupType(rollupValue) || '';
+        div.appendChild(rollupSpan);
+      }
       
       // Add action buttons (drag handle + edit button)
       const actionsDiv = document.createElement('div');
@@ -1685,8 +1753,10 @@
         actionsDiv.appendChild(addBtn);
       }
       
+      const isClassificationRoot = node.label === 'Income Statement' || node.label === 'Balance Sheet';
+
       // Add edit and delete buttons (not for region and vendor tabs)
-      if (AppState.currentDimension !== 'region' && AppState.currentDimension !== 'vendor') {
+      if (!isClassificationRoot && AppState.currentDimension !== 'region' && AppState.currentDimension !== 'vendor') {
         const editBtn = document.createElement('button');
         editBtn.className = 'btn-edit';
         editBtn.innerHTML = '✏️';
@@ -1922,6 +1992,8 @@
       document.getElementById('loadingState').style.display = 'block';
       document.getElementById('errorState').style.display = 'none';
       document.getElementById('treeRoot').style.display = 'none';
+      const treeHeader = document.getElementById('treeHeader');
+      if (treeHeader) treeHeader.style.display = 'none';
     }
 
     function hideLoadingState() {
@@ -1934,6 +2006,8 @@
       errorState.style.display = 'block';
       document.getElementById('loadingState').style.display = 'none';
       document.getElementById('treeRoot').style.display = 'none';
+      const treeHeader = document.getElementById('treeHeader');
+      if (treeHeader) treeHeader.style.display = 'none';
     }
 
     // Load and render unmapped accounts
@@ -2254,6 +2328,10 @@
     }
 
     function renderCurrentDimension() {
+      const treeHeader = document.getElementById('treeHeader');
+      if (treeHeader) {
+        treeHeader.style.display = AppState.currentDimension === 'account' ? 'flex' : 'none';
+      }
       if (AppState.currentDimension === 'unmapped-accounts' || AppState.currentDimension === 'unmapped-customers') {
         if (AppState.unmapped && AppState.unmapped.type) {
           renderUnmappedList(
@@ -2560,6 +2638,7 @@
       const isDepartmentTab = AppState.currentDimension === 'department';
 
       document.getElementById('accountMappingSection').style.display = isAccountTab ? 'block' : 'none';
+      document.getElementById('accountRollupSection').style.display = isAccountTab ? 'block' : 'none';
       document.getElementById('accountCheckboxesSection').style.display = isAccountTab ? 'block' : 'none';
 
       document.getElementById('customerMappingSection').style.display = isCustomerTab ? 'block' : 'none';
@@ -2578,11 +2657,25 @@
       // Hide parent section for department tab (subsidiaries are managed in BigQuery)
       document.getElementById('parentSection').style.display = isDepartmentTab ? 'none' : 'block';
 
+      const isClassificationRoot = node.label === 'Income Statement' || node.label === 'Balance Sheet';
+      if (isClassificationRoot) {
+        closeEditSidebar();
+        return;
+      }
+
       // Populate synchronous fields immediately
       if (isAccountTab) {
         document.getElementById('editDisplayExcluded').checked = node.displayExcluded || false;
         document.getElementById('editDoubleLines').checked = node.doubleLines || false;
         document.getElementById('editOperationalExcluded').checked = node.operationalExcluded || false;
+        const rollupInput = document.getElementById('editAccountRollupType');
+        const defaultRollup = normalizeRollupType(
+          node.rollup_type ||
+          (node.account_internal_id && AppState.accountRollupMap[node.account_internal_id]) ||
+          ''
+        );
+        rollupInput.value = defaultRollup;
+        rollupInput.disabled = !!node.account_internal_id;
       }
 
       if (isCustomerTab) {
@@ -2695,10 +2788,29 @@
         // Get account mapping value
         const accountMappingInput = document.getElementById('editAccountMapping');
         const accountMappingValue = accountMappingInput.dataset.selectedValue;
+        const rollupInput = document.getElementById('editAccountRollupType');
         if (accountMappingValue) {
           configData[nodeId].account_internal_id = accountMappingValue;
+          const selectedRollupType =
+            accountMappingInput.dataset.selectedRollupType ||
+            AppState.accountRollupMap[accountMappingValue];
+          const normalizedSelectedRollup = normalizeRollupType(selectedRollupType);
+          if (normalizedSelectedRollup) {
+            configData[nodeId].rollup_type = normalizedSelectedRollup;
+          } else {
+            delete configData[nodeId].rollup_type;
+          }
         } else {
           delete configData[nodeId].account_internal_id;
+        }
+
+        const rollupValue = rollupInput.value.trim();
+        if (!accountMappingValue) {
+          if (rollupValue) {
+            configData[nodeId].rollup_type = rollupValue;
+          } else {
+            delete configData[nodeId].rollup_type;
+          }
         }
 
         // Get checkbox values
@@ -3480,40 +3592,93 @@
       }
     }
 
+    // Walk up the tree to find if this node is a descendant of
+    // "Income Statement" or "Balance Sheet" (or is one of those nodes itself)
+    function normalizeClassification(text) {
+      if (!text) return null;
+      const t = String(text).toLowerCase();
+      if (t.includes('income statement')) return 'Income Statement';
+      if (t.includes('balance sheet')) return 'Balance Sheet';
+      return null;
+    }
+
+    function normalizeRollupType(value) {
+      if (!value) return '';
+      const t = String(value).toLowerCase();
+      if (t.includes('ending')) return 'Ending Balance';
+      if (t.includes('sum')) return 'Sum';
+      return String(value);
+    }
+
+    function getClassificationAncestor(nodeId, flatData) {
+      let currentId = nodeId;
+      while (currentId) {
+        const nodeData = flatData[currentId];
+        if (!nodeData) break;
+
+        const explicitClass =
+          nodeData.account_classification ||
+          nodeData.classification;
+        const normalizedExplicit = normalizeClassification(explicitClass);
+        if (normalizedExplicit) {
+          return normalizedExplicit;
+        }
+
+        const normalizedLabel = normalizeClassification(nodeData.label);
+        if (normalizedLabel) {
+          return normalizedLabel;
+        }
+
+        currentId = nodeData.parent;
+      }
+      return null;
+    }
+
     async function populateAccountMappingDropdown(node) {
       const input = document.getElementById('editAccountMapping');
       const dropdown = document.getElementById('editAccountMappingDropdown');
       const hint = document.getElementById('accountMappingHint');
-      
+
       // Clear existing options
       dropdown.innerHTML = '';
-      
+
       // Show loading state
       const loadingOption = document.createElement('div');
       loadingOption.className = 'custom-select-no-results';
       loadingOption.textContent = 'Loading accounts...';
       dropdown.appendChild(loadingOption);
-      
+
       try {
         // Fetch accounts from API
         const response = await authFetch('/api/accounts');
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
-        const accounts = await response.json();
-        
+        let accounts = await response.json();
+        AppState.accountRollupMap = {};
+        accounts.forEach(account => {
+          const normalizedRollup = normalizeRollupType(account.rollup_type || '');
+          AppState.accountRollupMap[account.account_id] = normalizedRollup;
+        });
+
+        // Filter accounts by classification based on tree ancestry
+        const currentData = AppState.dimensions[AppState.currentDimension];
+        const classificationAncestor = getClassificationAncestor(node.id, currentData);
+        if (classificationAncestor) {
+          accounts = accounts.filter(a => a.account_classification === classificationAncestor);
+        }
+
         // Clear loading state
       dropdown.innerHTML = '';
-      
+
       // Create "No account mapped" option
       const noMapOption = document.createElement('div');
       noMapOption.className = 'custom-select-option';
       noMapOption.textContent = '(No account mapped)';
       noMapOption.dataset.value = '';
       dropdown.appendChild(noMapOption);
-      
+
         // Get all already-mapped account IDs (excluding current node)
-        const currentData = AppState.dimensions[AppState.currentDimension];
         const mappedAccountIds = new Set();
         // Store the current node's original mapping so we never disable it
         const nodeOriginalAccountId = node.account_internal_id;
@@ -3528,6 +3693,7 @@
         // Add all account options
         let selectedText = '';
         let selectedDisplayName = '';
+        console.log('[DEBUG] Adding', accounts.length, 'options to dropdown. Dropdown element:', dropdown, 'In DOM:', document.contains(dropdown));
         accounts.forEach(account => {
         const option = document.createElement('div');
           option.className = 'custom-select-option';
@@ -3535,6 +3701,8 @@
           option.textContent = baseText;
           option.dataset.value = account.account_id;
           option.dataset.displayName = account.display_name;
+          const normalizedRollup = normalizeRollupType(account.rollup_type || '');
+          option.dataset.rollupType = normalizedRollup;
 
           // Check if this is the currently selected account
           const isCurrentSelection = node.account_internal_id && parseInt(node.account_internal_id) === parseInt(account.account_id);
@@ -3564,11 +3732,16 @@
         if (node.account_internal_id && selectedText) {
           input.value = selectedText;
           input.dataset.selectedValue = node.account_internal_id;
+          const rollupType = normalizeRollupType(
+            node.rollup_type || AppState.accountRollupMap[node.account_internal_id] || ''
+          );
+          input.dataset.selectedRollupType = rollupType;
           hint.textContent = `Mapped to account ID: ${node.account_internal_id}`;
         hint.style.display = 'block';
       } else {
         input.value = '';
           input.dataset.selectedValue = '';
+        input.dataset.selectedRollupType = '';
         noMapOption.classList.add('selected');
         hint.style.display = 'none';
       }
@@ -3579,6 +3752,14 @@
       setupCustomDropdown(input, dropdown, (value, text, displayName) => {
         input.value = text;
           input.dataset.selectedValue = value;
+        const selectedOption = dropdown.querySelector(`.custom-select-option.selected`);
+        const rollupType = selectedOption ? selectedOption.dataset.rollupType : '';
+        const rollupInput = document.getElementById('editAccountRollupType');
+        if (rollupInput) {
+          const fallbackRollup = value ? (AppState.accountRollupMap[value] || '') : '';
+          rollupInput.value = rollupType || fallbackRollup || '';
+          rollupInput.disabled = !!value;
+        }
         if (value) {
             hint.textContent = `Mapped to account ID: ${value}`;
           hint.style.display = 'block';
@@ -3588,6 +3769,8 @@
           hint.style.display = 'none';
         }
       });
+      const finalDropdown = document.getElementById('editAccountMappingDropdown');
+      console.log('[DEBUG] After setupCustomDropdown, options in DOM dropdown:', finalDropdown.querySelectorAll('.custom-select-option').length);
       } catch (error) {
         console.error('Error loading accounts:', error);
         dropdown.innerHTML = '';
@@ -3758,6 +3941,7 @@
           const text = e.target.textContent;
           const displayName = e.target.dataset.displayName || '';
           const startDateEst = e.target.dataset.startDateEst || '';
+          const rollupType = e.target.dataset.rollupType || '';
           
           // Update selected state
           dropdown.querySelectorAll('.custom-select-option').forEach(opt => {
@@ -3771,12 +3955,17 @@
           if (displayName) {
             input.dataset.selectedDisplayName = displayName;
           }
+          if (rollupType) {
+            input.dataset.selectedRollupType = rollupType;
+          } else {
+            input.dataset.selectedRollupType = '';
+          }
           originalValue = text;
           input.setAttribute('readonly', 'readonly');
           
           // Call onChange callback if provided
           if (onChange) {
-            onChange(value, text, displayName, startDateEst);
+            onChange(value, text, displayName, startDateEst, rollupType);
           }
           
           // Close dropdown
