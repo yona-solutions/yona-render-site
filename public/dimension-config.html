@@ -1589,10 +1589,10 @@
       const labelText = document.createTextNode(node.label || node.id);
       label.appendChild(labelText);
       
-      // Add mapping indicator (support both customer field names)
-      if (node.account_internal_id || node.customer_internal_id || node.customer_id || 
-          node.region_internal_id || node.subsidiary_internal_id || 
-          node.vendor_internal_id) {
+      // Add mapping indicator (support both customer field names; use != null to treat 0 as mapped)
+      if (node.account_internal_id != null || node.customer_internal_id != null || node.customer_id != null ||
+          node.region_internal_id != null || node.subsidiary_internal_id != null ||
+          node.vendor_internal_id != null) {
         const mappedIcon = document.createElement('span');
         mappedIcon.className = 'inline-icon';
         mappedIcon.innerHTML = 'Ⓜ️';
