@@ -511,13 +511,13 @@ async function generatePNLReport(monthData, ytdData, meta, accountConfig, childr
         <thead>
           <tr>
             <th></th>
-            <th>Actual</th>
+            <th>Current Month</th>
             <th>%</th>
             <th>Budget</th>
             <th>%</th>
             <th>Act v Bud</th>
             <th></th>
-            <th>Actual</th>
+            <th>YTD</th>
             <th>%</th>
             <th>Budget</th>
             <th>%</th>

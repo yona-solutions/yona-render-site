@@ -107,7 +107,7 @@ async function getAuthToken() {
 function applyRoleToNav(role) {
   if (role !== 'viewer') return;
 
-  const adminPages = ['Dimension Config', 'Email Config', 'Run Log', 'Fivetran Sync', 'Storage Browser'];
+  const adminPages = ['Dimension Config', 'Email Config', 'Run Log', 'Fivetran Sync', 'Storage Browser', 'GCS Import'];
   document.querySelectorAll('.nav-item').forEach(item => {
     const text = item.textContent.trim();
     if (adminPages.includes(text)) {

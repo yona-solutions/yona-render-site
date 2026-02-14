@@ -2405,6 +2405,139 @@ function createApiRoutes(storageService, bigQueryService) {
     }
   });
 
+  // ==================== GCS Import ====================
+
+  const GCS_FUNCTION_URL = 'https://gcs-to-bigquery-abdw3vfmia-uc.a.run.app';
+
+  // In-memory state for tracking the import job
+  let gcsImportState = {
+    running: false,
+    stage: 'idle',       // idle | loading | cleanup | transform | done | failed
+    startedAt: null,
+    completedAt: null,
+    result: null,
+    error: null,
+  };
+
+  async function fetchCloudRunImportStatus() {
+    const { GoogleAuth } = require('google-auth-library');
+    const gcpKey = JSON.parse(process.env.GCP_SERVICE_ACCOUNT_KEY);
+
+    const auth = new GoogleAuth({ credentials: gcpKey });
+    const client = await auth.getIdTokenClient(GCS_FUNCTION_URL);
+    const response = await client.request({
+      url: `${GCS_FUNCTION_URL}?status=1`,
+      method: 'GET',
+      timeout: 10000, // 10 seconds for status check
+    });
+    return response.data;
+  }
+
+  /**
+   * Get GCS import status
+   *
+   * GET /api/gcs-import/status
+   */
+  router.get('/gcs-import/status', async (req, res) => {
+    const diagnostics = {
+      source: 'local',
+      cloudStatusFetched: false,
+      cloudStatusError: null,
+    };
+
+    // Always check Cloud Run for the latest persisted status
+    // (even while running — the cloud function writes stage updates to GCS)
+    try {
+      const cloudStatus = await fetchCloudRunImportStatus();
+      if (cloudStatus && typeof cloudStatus === 'object') {
+        diagnostics.source = 'cloud';
+        diagnostics.cloudStatusFetched = true;
+
+        if (gcsImportState.running) {
+          // While running, update stage and result from cloud so UI sees progress
+          if (cloudStatus.stage) {
+            gcsImportState.stage = cloudStatus.stage;
+          }
+          if (cloudStatus.result) {
+            gcsImportState.result = cloudStatus.result;
+          }
+        } else {
+          // Not running locally — adopt full cloud state
+          gcsImportState = {
+            ...gcsImportState,
+            ...cloudStatus,
+          };
+        }
+      }
+    } catch (error) {
+      // If Cloud Run is unreachable, fall back to local state
+      diagnostics.cloudStatusError = error.message;
+      console.warn('Failed to fetch Cloud Run status:', error.message);
+    }
+
+    res.json({ ...gcsImportState, diagnostics });
+  });
+
+  /**
+   * Trigger GCS-to-BigQuery import (non-blocking)
+   *
+   * POST /api/gcs-import/run
+   */
+  router.post('/gcs-import/run', async (req, res) => {
+    if (gcsImportState.running) {
+      return res.status(409).json({
+        success: false,
+        error: 'Import is already running',
+        stage: gcsImportState.stage,
+      });
+    }
+
+    // Reset and mark as running
+    gcsImportState = {
+      running: true,
+      stage: 'loading',
+      startedAt: new Date().toISOString(),
+      completedAt: null,
+      result: null,
+      error: null,
+    };
+
+    // Return immediately — run the function in the background
+    res.json({ success: true, message: 'Import started' });
+
+    // Background execution
+    try {
+      const { GoogleAuth } = require('google-auth-library');
+      const gcpKey = JSON.parse(process.env.GCP_SERVICE_ACCOUNT_KEY);
+
+      const auth = new GoogleAuth({ credentials: gcpKey });
+      const client = await auth.getIdTokenClient(GCS_FUNCTION_URL);
+      const response = await client.request({
+        url: GCS_FUNCTION_URL,
+        method: 'GET',
+        timeout: 3600000, // 60 minutes — match cloud function timeout
+      });
+
+      const data = response.data;
+
+      if (data.success) {
+        gcsImportState.stage = 'done';
+        gcsImportState.result = data;
+      } else {
+        gcsImportState.stage = 'failed';
+        gcsImportState.error = data.error || 'Unknown error';
+        gcsImportState.result = data;
+      }
+    } catch (error) {
+      console.error('GCS import error:', error);
+      gcsImportState.stage = 'failed';
+      gcsImportState.error = error.message;
+    } finally {
+      gcsImportState.running = false;
+      gcsImportState.completedAt = new Date().toISOString();
+    }
+  });
+
   return router;
 }
 

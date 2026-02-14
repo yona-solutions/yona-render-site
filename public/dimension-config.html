@@ -998,6 +998,7 @@
       <div class="nav-item" onclick="window.location.href='/email-config'">Email Config</div>
       <div class="nav-item" onclick="window.location.href='/run-log'">Run Log</div>
       <div class="nav-item" onclick="window.location.href='/fivetran-sync'">Fivetran Sync</div>
+      <div class="nav-item" onclick="window.location.href='/gcs-import'">GCS Import</div>
     </nav>
   </div>
 
@@ -1007,7 +1008,7 @@
     <div class="header-tabs">
       <button class="tab active" data-dimension="account">Accounts</button>
       <button class="tab" data-dimension="customer">Customers</button>
-      <button class="tab" data-dimension="department">Departments</button>
+      <button class="tab" data-dimension="department">Subsidiary</button>
       <button class="tab" data-dimension="region">Regions</button>
       <button class="tab" data-dimension="vendor">Vendors</button>
       <button class="tab unmapped-tab" data-dimension="unmapped-accounts">⚠️ Unmapped Accounts</button>
@@ -1706,8 +1707,8 @@
       const actionsDiv = document.createElement('div');
       actionsDiv.className = 'node-actions';
       
-      // Add drag handle (for accounts and customers tabs)
-      if (AppState.currentDimension === 'account' || AppState.currentDimension === 'customer') {
+      // Add drag handle (for accounts, customers, and subsidiaries tabs)
+      if (AppState.currentDimension === 'account' || AppState.currentDimension === 'customer' || AppState.currentDimension === 'department') {
         const dragHandle = document.createElement('button');
         dragHandle.className = 'btn-drag-handle';
         dragHandle.innerHTML = '⋮⋮';
@@ -1782,8 +1783,8 @@
       
       li.appendChild(div);
       
-      // Add drop handlers for reordering (for accounts and customers tabs)
-      if (AppState.currentDimension === 'account' || AppState.currentDimension === 'customer') {
+      // Add drop handlers for reordering (for accounts, customers, and subsidiaries tabs)
+      if (AppState.currentDimension === 'account' || AppState.currentDimension === 'customer' || AppState.currentDimension === 'department') {
         li.dataset.nodeId = node.id;
         li.dataset.parentId = node.parent || 'root';
         
@@ -2615,10 +2616,21 @@
       openEditSidebar(newNode);
     }
 
-    // Auto-fill the Name field when a mapping is selected
+    // Auto-fill the Name field when a real mapping is selected
     // Always fills with the mapped entity's display name (user can still edit)
-    function autoFillNameFromMapping(displayName) {
+    function autoFillNameFromMapping(displayName, mappingValue, mappingText) {
+      if (!mappingValue) return;
       if (!displayName) return;
+
+      const normalizedDisplayName = String(displayName).trim().toLowerCase();
+      const normalizedText = String(mappingText || '').trim().toLowerCase();
+      if (
+        normalizedDisplayName === 'none' ||
+        normalizedDisplayName.startsWith('(no ') ||
+        normalizedText.startsWith('(no ')
+      ) {
+        return;
+      }
 
       const nameInput = document.getElementById('editName');
       nameInput.value = displayName;
@@ -3364,7 +3376,7 @@
             hint.textContent = `Mapped to customer ID: ${value}`;
             hint.style.display = 'block';
             // Auto-fill name field
-            autoFillNameFromMapping(displayName);
+            autoFillNameFromMapping(displayName, value, text);
             // Auto-fill start date from customer data
             if (startDateEst) {
               document.getElementById('editStartDate').value = startDateEst;
@@ -3577,7 +3589,7 @@
             hint.textContent = `Mapped to subsidiary ID: ${value}`;
             hint.style.display = 'block';
             // Auto-fill name field if empty or default
-            autoFillNameFromMapping(displayName);
+            autoFillNameFromMapping(displayName, value, text);
           } else {
             hint.style.display = 'none';
           }
@@ -3778,7 +3790,7 @@
             hint.textContent = `Mapped to account ID: ${value}`;
           hint.style.display = 'block';
           // Auto-fill name field if empty or default
-          autoFillNameFromMapping(displayName);
+          autoFillNameFromMapping(displayName, value, text);
         } else {
           hint.style.display = 'none';
         }

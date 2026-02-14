@@ -73,6 +73,15 @@ function createViewRoutes() {
     res.sendFile(path.join(publicPath, 'fivetran-sync.html'));
   });
 
+  /**
+   * GCS Import page
+   *
+   * GET /gcs-import
+   */
+  router.get('/gcs-import', (req, res) => {
+    res.sendFile(path.join(publicPath, 'gcs-import.html'));
+  });
+
   // Future routes can be added here:
   // router.get('/reports', ...) 
   // router.get('/settings', ...)
