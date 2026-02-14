@@ -56,21 +56,30 @@ function createViewRoutes() {
   });
 
   /**
+   * Customer Explorer page
+   *
+   * GET /customer-explorer
+   */
+  router.get('/customer-explorer', (req, res) => {
+    res.sendFile(path.join(publicPath, 'customer-explorer.html'));
+  });
+
+  /**
+   * P&L Logic Overview page
+   *
+   * GET /pl-logic
+   */
+  router.get('/pl-logic', (req, res) => {
+    res.sendFile(path.join(publicPath, 'pl-logic.html'));
+  });
+
+  /**
    * Run Log page
    *
    * GET /run-log
    */
   router.get('/run-log', (req, res) => {
     res.sendFile(path.join(publicPath, 'run-log.html'));
-  });
-
-  /**
-   * Fivetran Sync page
-   *
-   * GET /fivetran-sync
-   */
-  router.get('/fivetran-sync', (req, res) => {
-    res.sendFile(path.join(publicPath, 'fivetran-sync.html'));
   });
 
   /**
@@ -90,4 +99,3 @@ function createViewRoutes() {
 }
 
 module.exports = createViewRoutes;
-

@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SPHERE - P&L Logic</title>
+  <style>
+    :root {
+      --bg: #f8f9fa;
+      --panel: #ffffff;
+      --ink: #1a202c;
+      --muted: #4a5568;
+      --line: #e2e8f0;
+      --accent: #2d4a68;
+      --accent-soft: #e6f0f8;
+      --shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+      display: flex;
+      min-height: 100vh;
+      background: var(--bg);
+    }
+
+    /* Sidebar */
+    .sidebar {
+      width: 195px;
+      background: #ffffff;
+      border-right: 1px solid #dfe3e8;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 1px 0 0 rgba(0,0,0,0.02);
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 100vh;
+      overflow-y: auto;
+      z-index: 100;
+    }
+
+    .logo {
+      padding: 18px 20px;
+      border-bottom: 1px solid #dfe3e8;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 19px;
+      font-weight: 600;
+      color: #1a202c;
+      letter-spacing: -0.3px;
+    }
+
+    .logo-icon {
+      width: 28px;
+      height: 28px;
+      background: linear-gradient(135deg, #3b5998 0%, #2d4373 100%);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 14px;
+      font-weight: bold;
+    }
+
+    .nav-menu {
+      flex: 1;
+      padding: 8px 0;
+    }
+
+    .nav-item {
+      padding: 11px 20px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      color: #4a5568;
+      font-size: 13.5px;
+      font-weight: 400;
+      border-left: 3px solid transparent;
+    }
+
+    .nav-item:hover:not(.disabled) {
+      background: #f7fafc;
+      color: #2d3748;
+    }
+
+    .nav-item.active {
+      background: #e6f0f8;
+      color: #2d4a68;
+      font-weight: 500;
+      border-left-color: #4a7c9e;
+    }
+
+    .nav-item.disabled {
+      color: #cbd5e0;
+      cursor: not-allowed;
+    }
+
+    /* Main Content */
+    .main-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: var(--bg);
+      margin-left: 195px;
+    }
+
+    /* Header */
+    .header {
+      background: white;
+      padding: 24px 35px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .header-left h1 {
+      font-size: 24px;
+      color: var(--ink);
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+
+    .header-left p {
+      color: #718096;
+      font-size: 14px;
+    }
+
+    .header-meta {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .meta-pill {
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    /* Content Area */
+    .content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 25px 35px 40px;
+    }
+
+    .content-grid {
+      display: grid;
+      grid-template-columns: 240px 1fr;
+      gap: 18px;
+      align-items: start;
+    }
+
+    .toc {
+      position: sticky;
+      top: 20px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      box-shadow: var(--shadow);
+      padding: 14px 14px 8px;
+    }
+
+    .toc h4 {
+      font-size: 12px;
+      color: #718096;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      margin-bottom: 10px;
+    }
+
+    .toc a {
+      display: block;
+      text-decoration: none;
+      color: var(--muted);
+      font-size: 13px;
+      padding: 6px 4px;
+      border-left: 2px solid transparent;
+    }
+
+    .toc a:hover {
+      color: var(--accent);
+      border-left-color: #4a7c9e;
+      background: #f7fafc;
+    }
+
+    .section-card {
+      background: var(--panel);
+      border-radius: 10px;
+      box-shadow: var(--shadow);
+      border: 1px solid var(--line);
+      margin-bottom: 18px;
+      padding: 22px 24px;
+    }
+
+    .section-title {
+      font-size: 18px;
+      color: #2d3748;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .section-subtitle {
+      font-size: 13px;
+      color: #718096;
+      margin-bottom: 16px;
+    }
+
+    .list {
+      display: grid;
+      gap: 10px;
+      color: #2d3748;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .step {
+      display: grid;
+      grid-template-columns: 36px 1fr;
+      gap: 10px;
+      align-items: start;
+      padding: 10px 12px;
+      background: #f8fafc;
+      border: 1px solid #edf2f7;
+      border-radius: 8px;
+    }
+
+    .step-num {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+    }
+
+    .grid {
+      display: grid;
+      gap: 14px;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    }
+
+    .grid-item {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px 16px;
+      background: #ffffff;
+    }
+
+    .grid-item h4 {
+      font-size: 14px;
+      color: #2d3748;
+      margin-bottom: 6px;
+    }
+
+    .grid-item p {
+      font-size: 13px;
+      color: #4a5568;
+      line-height: 1.45;
+    }
+
+    .callout {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-left: 4px solid #4a7c9e;
+      border-radius: 8px;
+      padding: 12px 14px;
+      font-size: 13px;
+      color: #4a5568;
+    }
+
+    .flow-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 10px;
+    }
+
+    .flow-card {
+      border: 1px dashed #cbd5e0;
+      border-radius: 10px;
+      padding: 12px 14px;
+      background: #fff;
+      font-size: 13px;
+      color: #4a5568;
+    }
+
+    .kicker {
+      font-size: 12px;
+      color: #718096;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      margin-bottom: 8px;
+    }
+
+    @media (max-width: 1024px) {
+      .content-grid {
+        grid-template-columns: 1fr;
+      }
+      .toc {
+        position: relative;
+        top: 0;
+      }
+    }
+
+    @media (max-width: 720px) {
+      .header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="logo">
+      <div class="logo-icon">S</div>
+      <span>SPHERE</span>
+    </div>
+
+    <nav class="nav-menu">
+      <div class="nav-item" onclick="window.location.href='/'">P&L View</div>
+      <div class="nav-item" onclick="window.location.href='/customer-explorer'">Customer Explorer</div>
+      <div class="nav-item active">P&L Logic</div>
+      <div class="nav-item" onclick="window.location.href='/dimension-config'">Dimension Config</div>
+      <div class="nav-item" onclick="window.location.href='/email-config'">Email Config</div>
+      <div class="nav-item" onclick="window.location.href='/run-log'">Run Log</div>
+      <div class="nav-item" onclick="window.location.href='/gcs-import'">NetSuite Sync</div>
+    </nav>
+  </div>
+
+  <div class="main-content">
+    <div class="header">
+      <div class="header-left">
+        <h1>📘 P&L Logic Overview</h1>
+        <p>Clear, accurate explanation of how each report level is built, filtered, and counted.</p>
+      </div>
+      <div class="header-meta">
+        <span class="meta-pill">Summary + Detail Flow</span>
+        <span class="meta-pill">Filters + Counts</span>
+        <span class="meta-pill">Customer-Driven</span>
+      </div>
+    </div>
+
+    <div class="content">
+      <div class="content-grid">
+        <aside class="toc">
+          <h4>On This Page</h4>
+          <a href="#flow">Overall Flow</a>
+          <a href="#tabs">Tab Logic</a>
+          <a href="#filters">Filters</a>
+          <a href="#counts">Counts</a>
+          <a href="#census">Census & Headcount</a>
+          <a href="#accuracy">Why Rollups Work</a>
+        </aside>
+
+        <div>
+          <section id="flow" class="section-card">
+            <div class="section-title">Overall flow (how the system actually runs)</div>
+            <div class="section-subtitle">This is the same sequence used in production, presented in plain language.</div>
+            <div class="list">
+              <div class="step">
+                <div class="step-num">1</div>
+                <div>Run the summary P&amp;L at the selected level using that level’s native ID filter. This keeps formula accounts (Gross Profit, Net Income) accurate.</div>
+              </div>
+              <div class="step">
+                <div class="step-num">2</div>
+                <div>Pull the full customer list from <strong>dim_customers</strong> that matches the selection and any optional filters.</div>
+              </div>
+              <div class="step">
+                <div class="step-num">3</div>
+                <div>Fetch customer‑level transactions once for those customers and reuse that data to build District and Facility detail.</div>
+              </div>
+              <div class="step">
+                <div class="step-num">4</div>
+                <div>Generate headers (counts, census, headcount) and refresh counts after detail is built so totals match what you see.</div>
+              </div>
+              <div class="step">
+                <div class="step-num">5</div>
+                <div>Exclude facilities where Net Income is zero in both Current Month and YTD, so output focuses on active locations.</div>
+              </div>
+            </div>
+            <div class="callout" style="margin-top: 12px;">
+              Performance note: Summary is queried at its native level; customer‑level data is used only for detail, not for rebuilding summaries.
+            </div>
+          </section>
+
+          <section id="tabs" class="section-card">
+            <div class="section-title">What each tab does</div>
+            <div class="section-subtitle">A concise version of the real logic for each tab.</div>
+            <div class="grid">
+              <div class="grid-item">
+                <h4>Subsidiary tab</h4>
+                <p>1) Run subsidiary summary using <strong>subsidiary_internal_id</strong> (Month + YTD). 2) Pull all customers in that subsidiary from <strong>dim_customers</strong> (optional region or district‑tag filter applies here). 3) Group customers into Regions and Districts. 4) For each Region, run a region summary using <strong>region_internal_id + subsidiary_internal_id</strong>. 5) Build District and Facility detail from the shared customer transaction set.</p>
+              </div>
+              <div class="grid-item">
+                <h4>Region tab</h4>
+                <p>1) Run region summary using <strong>region_internal_id</strong> (optional subsidiary filter). 2) Pull all customers in that region from <strong>dim_customers</strong>. 3) Group customers into Districts. 4) Build District summaries and Facility detail from the same customer‑level transactions.</p>
+              </div>
+              <div class="grid-item">
+                <h4>District tab</h4>
+                <p>1) Pull all customers for the selected district (or district tag) from <strong>dim_customers</strong>. 2) Run district summary using those customers (Month + YTD). 3) Build Facility P&amp;Ls by filtering the shared customer transaction set.</p>
+              </div>
+              <div class="grid-item">
+                <h4>Facility detail</h4>
+                <p>Facility rows are built from customer‑level transactions only. If Net Income is zero for both Current Month and YTD, that facility is excluded from the output and counts.</p>
+              </div>
+            </div>
+          </section>
+
+          <section class="section-card">
+            <div class="kicker">At a glance</div>
+            <div class="flow-row">
+              <div class="flow-card">Subsidiary summary by subsidiary ID → Region summaries by region + subsidiary → District + Facility detail from customer transactions</div>
+              <div class="flow-card">Region summary by region ID → District + Facility detail from customer transactions</div>
+              <div class="flow-card">District summary by customer list → Facility detail from customer transactions</div>
+            </div>
+          </section>
+
+          <section id="filters" class="section-card">
+            <div class="section-title">How filters are applied</div>
+            <div class="list">
+              <div><strong>Subsidiary filter:</strong> Applies <strong>subsidiary_internal_id</strong> to summaries and to the customer list pulled from <strong>dim_customers</strong>.</div>
+              <div><strong>Region filter:</strong> Applies <strong>region_internal_id</strong> to summaries and to the customer list pulled from <strong>dim_customers</strong>.</div>
+              <div><strong>District tags:</strong> In the Subsidiary tab, a district tag limits the customer list to districts with that tag.</div>
+              <div><strong>Process (Standard vs Operational):</strong> Controls which account rules are included in the P&amp;L.</div>
+            </div>
+            <div class="callout" style="margin-top: 12px;">
+              Example: Region = R870 + Subsidiary = Yona Ozark means the Region summary uses both IDs, and only customers that match both appear in District/Facility detail.
+            </div>
+          </section>
+
+          <section id="counts" class="section-card">
+            <div class="section-title">How counts are calculated</div>
+            <div class="list">
+              <div><strong>Region count (Subsidiary tab):</strong> Regions included after filtering, and only if the Region summary has revenue.</div>
+              <div><strong>District count (Subsidiary/Region tabs):</strong> Districts included only if the District summary has revenue, and only if that district is not marked “summary excluded.”</div>
+              <div><strong>Facility count (all tabs):</strong> Facilities included only if Net Income is non‑zero (Current Month OR YTD).</div>
+            </div>
+            <div class="callout" style="margin-top: 12px;">
+              Counts are refreshed after detail is built, so headers reflect what you actually see in the output.
+            </div>
+          </section>
+
+          <section id="census" class="section-card">
+            <div class="section-title">Census &amp; headcount</div>
+            <div class="list">
+              <div><strong>Census:</strong> Rolled up from customer census records for the selected hierarchy.</div>
+              <div><strong>Budget Census:</strong> Budget census is shown alongside actuals for comparison.</div>
+              <div><strong>Headcount:</strong> Summed from census data for the selected customers.</div>
+            </div>
+          </section>
+
+          <section id="accuracy" class="section-card">
+            <div class="section-title">Why rollups are accurate</div>
+            <div class="list">
+              <div>Summary levels are queried directly by their native dimension filters, so formula accounts remain correct.</div>
+              <div>Customer‑level data is used only for District and Facility detail, never to rebuild Subsidiary or Region summaries.</div>
+              <div>This avoids the common issue where summing facility formulas would distort higher‑level totals.</div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="/auth.js"></script>
+</body>
+</html>

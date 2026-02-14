@@ -644,6 +644,60 @@ class BigQueryService {
       throw new Error(`Failed to fetch all customers: ${error.message}`);
     }
   }
+
+  /**
+   * Get customers with region/subsidiary mapping for explorer view.
+   *
+   * @returns {Promise<Array>} Array of customer records with hierarchy info
+   * @throws {Error} If BigQuery is not initialized or query fails
+   */
+  async getCustomerExplorerData() {
+    if (!this.isAvailable()) {
+      throw new Error('BigQuery not initialized');
+    }
+
+    const query = `
+      SELECT
+        customer_id,
+        customer_code,
+        display_name,
+        display_name_with_id,
+        start_date_est,
+        region_internal_id,
+        region_name,
+        region_hierarchy,
+        subsidiary_internal_id,
+        subsidiary_name,
+        subsidiary_hierarchy
+      FROM \`${this.dataset}.dim_customers\`
+      WHERE customer_id IS NOT NULL
+      ORDER BY customer_code
+    `;
+
+    try {
+      const [rows] = await this.bigquery.query({
+        query: query,
+        location: 'US'
+      });
+
+      return rows.map(row => ({
+        customer_id: row.customer_id,
+        customer_code: row.customer_code || '',
+        display_name: row.display_name || '',
+        display_name_with_id: row.display_name_with_id || '',
+        start_date_est: row.start_date_est && row.start_date_est.value ? row.start_date_est.value : row.start_date_est,
+        region_internal_id: row.region_internal_id ?? null,
+        region_name: row.region_name || '',
+        region_hierarchy: row.region_hierarchy || '',
+        subsidiary_internal_id: row.subsidiary_internal_id ?? null,
+        subsidiary_name: row.subsidiary_name || '',
+        subsidiary_hierarchy: row.subsidiary_hierarchy || ''
+      }));
+    } catch (error) {
+      console.error('Error fetching customer explorer data from BigQuery:', error);
+      throw new Error(`Failed to fetch customer explorer data: ${error.message}`);
+    }
+  }
 }
 
 module.exports = BigQueryService;

@@ -61,6 +61,28 @@ async function createApp() {
     console.warn('⚠️  DATABASE_URL not set - email configuration features disabled');
   }
 
+  // Ensure gcs_import_logs table exists (safety net)
+  if (process.env.DATABASE_URL && emailConfigService.isAvailable()) {
+    try {
+      await emailConfigService.pool.query(`
+        CREATE TABLE IF NOT EXISTS gcs_import_logs (
+          id SERIAL PRIMARY KEY,
+          started_at TIMESTAMPTZ NOT NULL,
+          completed_at TIMESTAMPTZ,
+          status VARCHAR(20) NOT NULL DEFAULT 'running',
+          duration_seconds NUMERIC(10,1),
+          tables_loaded JSONB,
+          transformation_status VARCHAR(20),
+          dimension_export_status VARCHAR(20),
+          error TEXT,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `);
+    } catch (error) {
+      console.warn('⚠️  Could not ensure gcs_import_logs table:', error.message);
+    }
+  }
+
   // Initialize user_roles table and auth middleware
   let requireAuth = (req, res, next) => next(); // no-op fallback
   if (process.env.DATABASE_URL && emailConfigService.isAvailable()) {
@@ -84,7 +106,7 @@ async function createApp() {
   app.use('/api', requireAuth);
 
   // Register routes
-  app.use('/api', createApiRoutes(storageService, bigQueryService));
+  app.use('/api', createApiRoutes(storageService, bigQueryService, emailConfigService.isAvailable() ? emailConfigService.pool : null));
   app.use('/api', emailConfigApiRoutes); // Email config API routes
   app.use('/', createViewRoutes());
 

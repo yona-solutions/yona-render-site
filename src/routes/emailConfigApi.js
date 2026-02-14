@@ -770,7 +770,15 @@ router.post('/report-schedules/:id/send-email', async (req, res) => {
     clearTimeout(timeout2);
 
     if (!dataResponse.ok) {
-      throw new Error(`Failed to fetch P&L data: ${dataResponse.status}`);
+      const errorText = await dataResponse.text();
+      let detail = errorText;
+      try {
+        const parsed = JSON.parse(errorText);
+        detail = parsed.message || parsed.error || errorText;
+      } catch (e) {
+        // keep raw text
+      }
+      throw new Error(`Failed to fetch P&L data: ${dataResponse.status} - ${detail}`);
     }
 
     const jsonData = await dataResponse.json();
@@ -1025,8 +1033,15 @@ router.post('/report-schedules/:id/send-to-groups', async (req, res) => {
     });
 
     if (!plResponse.ok) {
-      const errorData = await plResponse.json();
-      throw new Error(`Failed to fetch P&L data: ${errorData.error || 'Unknown error'}`);
+      const errorText = await plResponse.text();
+      let detail = errorText;
+      try {
+        const parsed = JSON.parse(errorText);
+        detail = parsed.message || parsed.error || errorText;
+      } catch (e) {
+        // keep raw text
+      }
+      throw new Error(`Failed to fetch P&L data: ${plResponse.status} - ${detail}`);
     }
 
     const plData = await plResponse.json();
@@ -1142,7 +1157,7 @@ router.post('/report-schedules/:id/send-to-groups', async (req, res) => {
 /**
  * Filter P&L report HTML to only include reports with non-zero net income
  * Uses regex instead of JSDOM to avoid memory issues
- * Checks BOTH Actuals and Budget - excludes only if both are zero
+ * Checks Current Month Actuals OR YTD Actuals - excludes only if both are zero
  */
 function filterReportsWithIncome(htmlContent) {
   // Match each pnl-report-container div
@@ -1165,25 +1180,37 @@ function filterReportsWithIncome(htmlContent) {
     return isNaN(num) ? 0 : num;
   }
 
-  // Filter to only containers with non-zero net income (Actuals OR Budget)
+  // Filter to only containers with non-zero net income (Current Month Actuals OR YTD Actuals)
   const kept = containers.filter(container => {
-    // Look for the Net Income row and capture Actuals and Budget values
-    // Pattern: <td...>Net Income</td><td...>ACTUALS</td><td...>BUDGET</td>
-    const incomeMatch = container.match(/<td[^>]*>\s*Net Income\s*<\/td>\s*<td[^>]*>([^<]*)<\/td>\s*<td[^>]*>([^<]*)<\/td>/i);
-
-    if (!incomeMatch) {
+    // Look for the Net Income row and capture the row contents
+    const rowMatch = container.match(/<tr[^>]*>[\s\S]*?<td[^>]*>\s*Net Income\s*<\/td>[\s\S]*?<\/tr>/i);
+    if (!rowMatch) {
       // No net income row found, keep the report
       return true;
     }
+    
+    const cells = [];
+    const cellRegex = /<td[^>]*>([^<]*)<\/td>/gi;
+    let cellMatch;
+    while ((cellMatch = cellRegex.exec(rowMatch[0])) !== null) {
+      cells.push(cellMatch[1]);
+    }
+    
+    // Expected columns:
+    // 0 label, 1 current month actuals, 2 %, 3 budget, 4 %, 5 act v bud, 6 gap, 7 YTD actuals, ...
+    if (cells.length < 8) {
+      // If unexpected structure, keep the report
+      return true;
+    }
 
-    const actualsValue = parseValue(incomeMatch[1]);
-    const budgetValue = parseValue(incomeMatch[2]);
+    const actualsMonthValue = parseValue(cells[1]);
+    const actualsYtdValue = parseValue(cells[7]);
 
-    // Keep if EITHER Actuals OR Budget is non-zero
-    return actualsValue !== 0 || budgetValue !== 0;
+    // Keep if EITHER Current Month Actuals OR YTD Actuals is non-zero
+    return actualsMonthValue !== 0 || actualsYtdValue !== 0;
   });
 
-  console.log(`   Filtered: ${kept.length} of ${containers.length} reports have non-zero net income (Actuals or Budget)`);
+  console.log(`   Filtered: ${kept.length} of ${containers.length} reports have non-zero net income (Actuals Month or YTD)`);
 
   if (kept.length === 0) {
     // If all filtered out, keep at least the first one
@@ -1608,7 +1635,15 @@ router.post('/report-schedules/:id/process', requireApiKey, async (req, res) => 
     const dataResponse = await fetch(dataUrl, { headers: internalHeaders });
 
     if (!dataResponse.ok) {
-      throw new Error(`Failed to fetch P&L data: ${dataResponse.status}`);
+      const errorText = await dataResponse.text();
+      let detail = errorText;
+      try {
+        const parsed = JSON.parse(errorText);
+        detail = parsed.message || parsed.error || errorText;
+      } catch (e) {
+        // keep raw text
+      }
+      throw new Error(`Failed to fetch P&L data: ${dataResponse.status} - ${detail}`);
     }
 
     const jsonData = await dataResponse.json();

@@ -858,11 +858,12 @@
     </div>
     <nav class="nav-menu">
       <div class="nav-item active">P&L View</div>
+      <div class="nav-item" onclick="window.location.href='/customer-explorer'">Customer Explorer</div>
+      <div class="nav-item" onclick="window.location.href='/pl-logic'">P&amp;L Logic</div>
       <div class="nav-item" onclick="window.location.href='/dimension-config'">Dimension Config</div>
       <div class="nav-item" onclick="window.location.href='/email-config'">Email Config</div>
       <div class="nav-item" onclick="window.location.href='/run-log'">Run Log</div>
-      <div class="nav-item" onclick="window.location.href='/fivetran-sync'">Fivetran Sync</div>
-      <div class="nav-item" onclick="window.location.href='/gcs-import'">GCS Import</div>
+      <div class="nav-item" onclick="window.location.href='/gcs-import'">NetSuite Sync</div>
     </nav>
   </div>
 
@@ -1726,7 +1727,7 @@
     /**
      * Decide if a single report page has a valid, non-zero "Net Income" row
      * @param {Element} containerEl - Report container element
-     * @returns {boolean} True if has non-zero net income
+     * @returns {boolean} True if has non-zero net income (Current Month Actuals OR YTD Actuals)
      */
     function hasNonZeroIncome(containerEl) {
       const table = containerEl.querySelector(".pnl-report-table");
@@ -1739,10 +1740,12 @@
         // first column text
         const label = (cells[0].textContent || "").trim();
         if (label === "Net Income") {
-          // Current Month is column #2 in your header layout (index 1)
+          // Current Month Actuals = index 1, YTD Actuals = index 7
           const currentMonthCell = cells[1];
-          const value = parseAccountingToNumber(currentMonthCell?.textContent || "");
-          return Math.abs(value) > 0.0001;
+          const ytdCell = cells[7];
+          const monthValue = parseAccountingToNumber(currentMonthCell?.textContent || "");
+          const ytdValue = parseAccountingToNumber(ytdCell?.textContent || "");
+          return Math.abs(monthValue) > 0.0001 || Math.abs(ytdValue) > 0.0001;
         }
       }
       // No "Net Income" row found

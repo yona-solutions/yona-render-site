@@ -10,6 +10,7 @@
 
 const { BigQuery } = require('@google-cloud/bigquery');
 const { Storage } = require('@google-cloud/storage');
+const { Pool } = require('pg');
 
 const BUCKET_NAME = 'yona-csv-uploads';
 const DATASET_ID = 'raw_netsuite_gcs_export';
@@ -198,6 +199,44 @@ async function writeStatus(bucket, status) {
   const file = bucket.file(STATUS_OBJECT);
   const body = JSON.stringify(status, null, 2);
   await file.save(body, { contentType: 'application/json' });
+}
+
+async function logRunToDatabase(logData) {
+  const databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl) {
+    console.warn('DATABASE_URL not set — skipping run log');
+    return;
+  }
+
+  const pool = new Pool({
+    connectionString: databaseUrl,
+    ssl: { rejectUnauthorized: false },
+    max: 1,
+    idleTimeoutMillis: 5000,
+  });
+
+  try {
+    await pool.query(
+      `INSERT INTO gcs_import_logs
+        (started_at, completed_at, status, duration_seconds, tables_loaded, transformation_status, dimension_export_status, error)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [
+        logData.startedAt,
+        logData.completedAt,
+        logData.status,
+        logData.durationSeconds,
+        logData.tablesLoaded ? JSON.stringify(logData.tablesLoaded) : null,
+        logData.transformationStatus || null,
+        logData.dimensionExportStatus || null,
+        logData.error || null,
+      ]
+    );
+    console.log('Run logged to database');
+  } catch (err) {
+    console.error('Failed to log run to database:', err.message);
+  } finally {
+    await pool.end();
+  }
 }
 
 exports.gcsToBigQuery = async (req, res) => {
@@ -440,6 +479,19 @@ exports.gcsToBigQuery = async (req, res) => {
   } finally {
     status.running = false;
     status.completedAt = new Date().toISOString();
+
+    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+    await logRunToDatabase({
+      startedAt: status.startedAt,
+      completedAt: status.completedAt,
+      status: status.stage === 'done' ? 'success' : 'failed',
+      durationSeconds: parseFloat(elapsed),
+      tablesLoaded: status.result?.tables || status.result?.success && status.result?.tables || null,
+      transformationStatus: status.result?.transformation?.status || null,
+      dimensionExportStatus: Array.isArray(status.result?.dimensionExport) ? 'success' : (status.result?.dimensionExport?.status || null),
+      error: status.error || null,
+    });
+
     await writeStatus(bucket, status);
   }
 };

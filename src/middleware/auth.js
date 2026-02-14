@@ -38,6 +38,7 @@ const ROLE_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 // Viewer-allowed API patterns
 const VIEWER_ALLOWED_PATTERNS = [
   /^\/api\/pl\//,
+  /^\/api\/customers\/explorer$/,
   /^\/api\/storage\/districts$/,
   /^\/api\/storage\/regions$/,
   /^\/api\/storage\/departments$/,

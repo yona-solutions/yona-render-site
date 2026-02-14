@@ -72,24 +72,13 @@ function formatMonthLabel(isoDate) {
  */
 function formatStartDate(dateStr) {
   if (!dateStr) return '';
-  
-  try {
-    // Handle various date formats
-    const date = new Date(dateStr);
-    
-    // Check if valid date
-    if (isNaN(date.getTime())) {
-      return dateStr; // Return original if can't parse
-    }
-    
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const year = date.getFullYear();
-    
-    return `${month}/${day}/${year}`;
-  } catch (e) {
-    return dateStr; // Return original if error
+  // Format without timezone conversion: prefer date-only parsing.
+  const raw = String(dateStr).trim();
+  const isoMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (isoMatch) {
+    return `${isoMatch[2]}/${isoMatch[3]}/${isoMatch[1]}`;
   }
+  return raw;
 }
 
 /**
@@ -459,8 +448,9 @@ async function generatePNLReport(monthData, ytdData, meta, accountConfig, childr
   
   // Check for no revenue (facilities only) using Net Income
   if (meta.typeLabel === 'Facility') {
-    const netIncome = valMonthAct['Net Income'] || 0;
-    if (Math.abs(netIncome) < 0.0001) {
+    const netIncomeMonth = valMonthAct['Net Income'] || 0;
+    const netIncomeYtd = valYtdAct['Net Income'] || 0;
+    if (Math.abs(netIncomeMonth) < 0.0001 && Math.abs(netIncomeYtd) < 0.0001) {
       return { noRevenue: true, html: '' };
     }
   }

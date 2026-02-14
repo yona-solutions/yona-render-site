@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SPHERE - GCS Import</title>
+  <title>SPHERE - NetSuite Sync</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -45,7 +45,6 @@
     }
     .header-left h1 { font-size: 24px; color: #1a202c; font-weight: 600; margin-bottom: 4px; }
     .header-left p { color: #718096; font-size: 14px; }
-    .header-actions { display: flex; gap: 12px; }
 
     .content { flex: 1; overflow-y: auto; padding: 25px 35px; }
 
@@ -54,19 +53,17 @@
       box-shadow: 0 1px 3px rgba(0,0,0,0.06); border: 1px solid #e2e8f0;
     }
 
-    .btn {
-      padding: 10px 20px; border: none; border-radius: 6px;
-      font-size: 14px; font-weight: 500; cursor: pointer;
-      transition: all 0.15s ease; display: inline-flex; align-items: center; gap: 8px;
-    }
-    .btn-secondary { background: #e2e8f0; color: #4a5568; }
-    .btn-secondary:hover { background: #cbd5e0; }
-    .btn-run { background: #3182ce; color: white; padding: 14px 32px; font-size: 15px; }
-    .btn-run:hover:not(:disabled) { background: #2b6cb0; box-shadow: 0 2px 8px rgba(49,130,206,0.3); }
-    .btn-run:disabled { background: #90cdf4; cursor: not-allowed; }
-
     .run-section { text-align: center; margin: 8px 0; }
     .run-section p { color: #718096; font-size: 13px; margin-top: 10px; }
+
+    .btn-run {
+      padding: 14px 32px; border: none; border-radius: 6px;
+      font-size: 15px; font-weight: 500; cursor: pointer;
+      transition: all 0.15s ease; display: inline-flex; align-items: center; gap: 8px;
+      background: #3182ce; color: white;
+    }
+    .btn-run:hover:not(:disabled) { background: #2b6cb0; box-shadow: 0 2px 8px rgba(49,130,206,0.3); }
+    .btn-run:disabled { background: #90cdf4; cursor: not-allowed; }
 
     .btn-spinner {
       display: inline-block; width: 16px; height: 16px;
@@ -75,44 +72,8 @@
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* Stages */
-    .stages { margin-top: 24px; }
-    .stage {
-      display: flex; align-items: flex-start; gap: 16px; padding: 16px 0;
-      border-bottom: 1px solid #edf2f7;
-    }
-    .stage:last-child { border-bottom: none; }
-
-    .stage-indicator {
-      width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 14px; font-weight: 700; transition: all 0.3s ease;
-    }
-    .stage-indicator.pending { background: #e2e8f0; color: #a0aec0; }
-    .stage-indicator.active { background: #ebf8ff; border: 2px solid #3182ce; color: #3182ce; }
-    .stage-indicator.done { background: #38a169; color: white; }
-    .stage-indicator.failed { background: #e53e3e; color: white; }
-
-    .stage-content { flex: 1; min-width: 0; }
-    .stage-title { font-size: 15px; font-weight: 600; color: #1a202c; margin-bottom: 2px; }
-    .stage-subtitle { font-size: 13px; color: #718096; }
-    .stage-detail { font-size: 13px; color: #4a5568; margin-top: 6px; font-weight: 500; }
-    .stage-detail.error { color: #e53e3e; }
-
-    .stage.pending .stage-title { color: #a0aec0; }
-    .stage.pending .stage-subtitle { color: #cbd5e0; }
-
-    .stage-spinner {
-      display: inline-block; width: 18px; height: 18px;
-      border: 2.5px solid #bee3f8; border-top-color: #3182ce;
-      border-radius: 50%; animation: spin 1s linear infinite;
-    }
-
-    .connector-line {
-      width: 2px; height: 16px; background: #e2e8f0; margin-left: 17px;
-    }
-    .connector-line.done { background: #38a169; }
-    .connector-line.active { background: #3182ce; }
+    .status-text { margin-top: 12px; font-size: 14px; color: #4a5568; }
+    .status-text.error { color: #e53e3e; }
 
     /* Toast */
     .toast-container { position: fixed; top: 20px; right: 20px; z-index: 1000; display: flex; flex-direction: column; gap: 10px; }
@@ -125,97 +86,83 @@
     .toast.info { background: #3182ce; color: white; }
     @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 
-    .last-run { margin-top: 24px; padding: 16px; background: #f7fafc; border-radius: 6px; border: 1px solid #e2e8f0; }
-    .last-run h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; color: #718096; margin-bottom: 8px; font-weight: 600; }
-    .last-run-detail { display: flex; justify-content: space-between; padding: 4px 0; font-size: 13px; }
-    .last-run-label { color: #718096; }
-    .last-run-value { color: #2d3748; font-weight: 500; }
-
-    .elapsed-timer { font-size: 13px; color: #718096; margin-top: 8px; }
-
-    .debug-log {
-      margin-top: 24px; padding: 12px 16px; background: #1a202c; border-radius: 6px;
-      font-family: 'SF Mono', 'Consolas', monospace; font-size: 11px; color: #a0aec0;
-      max-height: 250px; overflow-y: auto;
+    /* Run History Table */
+    .history-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    .history-header h2 { font-size: 16px; font-weight: 600; color: #1a202c; }
+    .history-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .history-table th {
+      text-align: left; padding: 8px 12px; background: #f7fafc;
+      border-bottom: 2px solid #e2e8f0; color: #4a5568; font-weight: 600;
+      white-space: nowrap;
     }
-    .debug-log h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #4a5568; margin-bottom: 8px; font-weight: 600; }
-    .debug-log .entry { padding: 1px 0; white-space: pre-wrap; word-break: break-all; }
-    .debug-log .entry .ts { color: #4a5568; }
-    #quip-timer { color: #3182ce; }
+    .history-table td {
+      padding: 8px 12px; border-bottom: 1px solid #edf2f7; color: #2d3748;
+      vertical-align: top;
+    }
+    .history-table tr:hover td { background: #f7fafc; }
+    .status-badge {
+      display: inline-block; padding: 2px 8px; border-radius: 10px;
+      font-size: 11px; font-weight: 600; text-transform: uppercase;
+    }
+    .status-badge.success { background: #c6f6d5; color: #22543d; }
+    .status-badge.failed { background: #fed7d7; color: #742a2a; }
+    .status-badge.running { background: #bee3f8; color: #2a4365; }
+    .tables-detail { font-size: 11px; color: #718096; max-width: 300px; }
+    .pagination { display: flex; justify-content: center; gap: 8px; margin-top: 16px; }
+    .pagination button {
+      padding: 6px 14px; border: 1px solid #e2e8f0; border-radius: 4px;
+      background: white; cursor: pointer; font-size: 13px; color: #4a5568;
+    }
+    .pagination button:hover:not(:disabled) { background: #f7fafc; border-color: #cbd5e0; }
+    .pagination button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .pagination .page-info { padding: 6px 0; font-size: 13px; color: #718096; }
+    .empty-state { text-align: center; padding: 32px; color: #a0aec0; font-size: 14px; }
   </style>
 </head>
 <body>
   <div class="sidebar">
     <div class="logo"><div class="logo-icon">S</div> SPHERE</div>
     <nav class="nav-menu">
-      <a href="/" class="nav-item">P&L View</a>
+      <a href="/" class="nav-item">P&amp;L View</a>
+      <a href="/customer-explorer" class="nav-item">Customer Explorer</a>
+      <a href="/pl-logic" class="nav-item">P&amp;L Logic</a>
       <a href="/dimension-config" class="nav-item">Dimension Config</a>
       <a href="/email-config" class="nav-item">Email Config</a>
       <a href="/run-log" class="nav-item">Run Log</a>
-      <a href="/fivetran-sync" class="nav-item">Fivetran Sync</a>
-      <a href="/gcs-import" class="nav-item active">GCS Import</a>
+      <a href="/gcs-import" class="nav-item active">NetSuite Sync</a>
     </nav>
   </div>
 
   <div class="main-content">
     <div class="header">
       <div class="header-left">
-        <h1>GCS Import</h1>
-        <p>Load CSV exports from GCS into BigQuery and trigger dbt transformation</p>
+        <h1>NetSuite Sync</h1>
+        <p>Sync data from NetSuite and load it into SPHERE for reporting</p>
       </div>
-      <div class="header-actions"></div>
     </div>
 
     <div class="content">
       <div class="section-card">
         <div class="run-section">
-          <button class="btn btn-run" id="run-btn" onclick="runImport()" disabled>
-            Run GCS Import
+          <button class="btn-run" id="run-btn" onclick="runImport()" disabled>
+            <span class="btn-spinner"></span> Checking...
           </button>
-          <p>Loads CSV files from the GCS bucket into BigQuery, clears the bucket, then triggers the dbt transformation.</p>
-          <div class="elapsed-timer" id="elapsed-timer"></div>
-          <div class="elapsed-timer" id="quip-timer"></div>
+          <div class="status-text" id="status-text"></div>
+          <div class="status-text" id="quip" style="color:#3182ce; margin-top:6px; font-style:italic;"></div>
         </div>
+      </div>
 
-        <div class="stages" id="stages-container">
-          <div class="stage pending" id="stage-load">
-            <div class="stage-indicator pending" id="indicator-load">1</div>
-            <div class="stage-content">
-              <div class="stage-title">Load CSVs to BigQuery</div>
-              <div class="stage-subtitle">Read CSV files from GCS and load into raw_netsuite_gcs_export tables</div>
-              <div class="stage-detail" id="detail-load"></div>
-            </div>
-          </div>
-          <div class="connector-line" id="line-1"></div>
-
-          <div class="stage pending" id="stage-cleanup">
-            <div class="stage-indicator pending" id="indicator-cleanup">2</div>
-            <div class="stage-content">
-              <div class="stage-title">Clean Up GCS Bucket</div>
-              <div class="stage-subtitle">Delete processed CSV files from the bucket</div>
-              <div class="stage-detail" id="detail-cleanup"></div>
-            </div>
-          </div>
-          <div class="connector-line" id="line-2"></div>
-
-          <div class="stage pending" id="stage-transform">
-            <div class="stage-indicator pending" id="indicator-transform">3</div>
-            <div class="stage-content">
-              <div class="stage-title">Trigger dbt Transformation</div>
-              <div class="stage-subtitle">Run Fivetran dbt transformation (justness_luminous)</div>
-              <div class="stage-detail" id="detail-transform"></div>
-            </div>
-          </div>
+      <div class="section-card">
+        <div class="history-header">
+          <h2>Run History</h2>
         </div>
-
-        <div class="last-run" id="last-run" style="display:none">
-          <h3>Last Run Summary</h3>
-          <div id="last-run-details"></div>
+        <div id="history-content">
+          <div class="empty-state">Loading...</div>
         </div>
-
-        <div class="debug-log" id="debug-log">
-          <h3>Debug Log</h3>
-          <div id="debug-log-entries"></div>
+        <div class="pagination" id="pagination" style="display:none">
+          <button id="prev-btn" onclick="changePage(-1)">Previous</button>
+          <span class="page-info" id="page-info"></span>
+          <button id="next-btn" onclick="changePage(1)">Next</button>
         </div>
       </div>
     </div>
@@ -229,37 +176,30 @@
 
   <script>
     let pollInterval = null;
-    let elapsedInterval = null;
+    let isRunning = false;
     let quipInterval = null;
-    let currentlyRunning = false;
-    let hasStatus = false;
+
     const quips = [
-      'Polishing NetSuite until it shines like a perfect sphere.',
       'Spheres roll; cubes just sit there. So we roll with it.',
-      'Round and reliable: turning NetSuite data into smooth insights.',
-      'Cube-free zone: keeping NetSuite beautifully spherical.',
-      'Orbiting your NetSuite data for maximum clarity.',
-      'Spherical thinking makes NetSuite better than ever.',
-      'Rolling up NetSuite data into a perfect sphere of truth.',
-      'Every import makes NetSuite less cubical and more celestial.',
-      'We smooth out NetSuite edges so your data can glide.',
-      'Spheres are the future. NetSuite is coming along nicely.',
-      'Smoothing NetSuite data until it’s perfectly round.',
-      'Cubes have corners; we prefer NetSuite without the sharp edges.'
+      'Rounding out your NetSuite data into something beautiful.',
+      'Cubes have corners. Corners cause problems. SPHERE has neither.',
+      'Making accounting easy, one smooth sync at a time.',
+      'NetSuite called. We told it to get in shape. Spherical shape.',
+      'Why settle for a cube when you can have a SPHERE?',
+      'Syncing NetSuite so you don\'t have to. You\'re welcome.',
+      'Turning raw data into round, polished financial insights.',
+      'Cubes are for Minecraft. Accounting deserves a SPHERE.',
+      'Rolling your NetSuite data downhill so the numbers add up faster.',
+      'No sharp edges here. Just smooth, spherical accounting.',
+      'NetSuite data goes in boxy. Comes out beautifully round.',
+      'SPHERE: because accountants deserve nice things too.',
+      'Flattening the complexity curve into a perfect circle.',
+      'If accounting were easy, everyone would do it. Oh wait, we made it easy.',
     ];
 
-    // ---- On page load, check status ----
     document.addEventListener('DOMContentLoaded', () => {
-      setButtonChecking();
       checkStatus();
     });
-
-    function debugLog(msg) {
-      const el = document.getElementById('debug-log-entries');
-      const ts = new Date().toLocaleTimeString();
-      el.innerHTML += `<div class="entry"><span class="ts">[${ts}]</span> ${msg}</div>`;
-      el.parentElement.scrollTop = el.parentElement.scrollHeight;
-    }
 
     function showToast(msg, type = 'info') {
       const c = document.getElementById('toast-container');
@@ -270,108 +210,30 @@
       setTimeout(() => t.remove(), 5000);
     }
 
-    function setStage(id, state, detail) {
-      const stage = document.getElementById(`stage-${id}`);
-      const indicator = document.getElementById(`indicator-${id}`);
-      const detailEl = document.getElementById(`detail-${id}`);
-
-      stage.className = `stage ${state}`;
-      indicator.className = `stage-indicator ${state}`;
-
-      if (state === 'active') {
-        indicator.innerHTML = '<div class="stage-spinner"></div>';
-      } else if (state === 'done') {
-        indicator.innerHTML = '&#10003;';
-      } else if (state === 'failed') {
-        indicator.innerHTML = '&#10007;';
+    function setButton(state) {
+      const btn = document.getElementById('run-btn');
+      if (state === 'running') {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="btn-spinner"></span> Import Running...';
+      } else if (state === 'checking') {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="btn-spinner"></span> Checking...';
       } else {
-        const num = id === 'load' ? '1' : id === 'cleanup' ? '2' : '3';
-        indicator.innerHTML = num;
-      }
-
-      if (detail) {
-        detailEl.textContent = detail;
-        detailEl.className = `stage-detail${state === 'failed' ? ' error' : ''}`;
-      } else {
-        detailEl.textContent = '';
+        btn.disabled = false;
+        btn.innerHTML = 'Run NetSuite Sync';
       }
     }
 
-    function setLine(num, state) {
-      document.getElementById(`line-${num}`).className = `connector-line ${state}`;
-    }
-
-    function resetStages() {
-      setStage('load', 'pending');
-      setStage('cleanup', 'pending');
-      setStage('transform', 'pending');
-      setLine(1, '');
-      setLine(2, '');
-      document.getElementById('last-run').style.display = 'none';
-    }
-
-    function setButtonRunning() {
-      const btn = document.getElementById('run-btn');
-      btn.disabled = true;
-      btn.innerHTML = '<span class="btn-spinner"></span> Running Import...';
-    }
-
-    function setButtonReady() {
-      const btn = document.getElementById('run-btn');
-      btn.disabled = false;
-      btn.innerHTML = 'Run GCS Import';
-    }
-
-    function setButtonChecking() {
-      const btn = document.getElementById('run-btn');
-      btn.disabled = true;
-      btn.innerHTML = '<span class="btn-spinner"></span> Checking Status...';
-    }
-
-    function startElapsedTimer(startedAt) {
-      stopElapsedTimer();
-      const start = new Date(startedAt).getTime();
-      const timerEl = document.getElementById('elapsed-timer');
-      elapsedInterval = setInterval(() => {
-        const seconds = Math.floor((Date.now() - start) / 1000);
-        const m = Math.floor(seconds / 60);
-        const s = seconds % 60;
-        timerEl.textContent = `Elapsed: ${m}:${String(s).padStart(2, '0')}`;
-      }, 1000);
-    }
-
-    function stopElapsedTimer() {
-      if (elapsedInterval) {
-        clearInterval(elapsedInterval);
-        elapsedInterval = null;
-      }
-      document.getElementById('elapsed-timer').textContent = '';
-    }
-
-    function startQuips() {
-      stopQuips();
-      const quipEl = document.getElementById('quip-timer');
-      if (!quipEl) return;
-      let idx = Math.floor(Math.random() * quips.length);
-      quipEl.textContent = quips[idx];
-      quipInterval = setInterval(() => {
-        idx = (idx + 1) % quips.length;
-        quipEl.textContent = quips[idx];
-      }, 4000);
-    }
-
-    function stopQuips() {
-      if (quipInterval) {
-        clearInterval(quipInterval);
-        quipInterval = null;
-      }
-      const quipEl = document.getElementById('quip-timer');
-      if (quipEl) quipEl.textContent = '';
+    function setStatusText(text, isError) {
+      const el = document.getElementById('status-text');
+      el.textContent = text;
+      el.className = isError ? 'status-text error' : 'status-text';
     }
 
     function startPolling() {
-      stopPolling();
-      pollInterval = setInterval(checkStatus, 3000);
+      if (!pollInterval) {
+        pollInterval = setInterval(checkStatus, 5000);
+      }
     }
 
     function stopPolling() {
@@ -381,146 +243,67 @@
       }
     }
 
-    // ---- Check current status from server ----
+    function startQuips() {
+      if (quipInterval) return;
+      const el = document.getElementById('quip');
+      let idx = Math.floor(Math.random() * quips.length);
+      el.textContent = quips[idx];
+      quipInterval = setInterval(() => {
+        idx = (idx + 1) % quips.length;
+        el.textContent = quips[idx];
+      }, 5000);
+    }
+
+    function stopQuips() {
+      if (quipInterval) {
+        clearInterval(quipInterval);
+        quipInterval = null;
+      }
+      document.getElementById('quip').textContent = '';
+    }
+
     async function checkStatus() {
-      debugLog('checkStatus() called');
       try {
         const res = await authFetch('/api/gcs-import/status');
         const status = await res.json();
-        debugLog(`checkStatus response: running=${status.running}, stage="${status.stage}", hasResult=${!!status.result}, error=${status.error || 'null'}`);
-        if (status.diagnostics) {
-          debugLog(`  diagnostics: source=${status.diagnostics.source}, cloudFetched=${status.diagnostics.cloudStatusFetched}, cloudError=${status.diagnostics.cloudStatusError || 'null'}`);
-        }
-        if (status.result) {
-          debugLog(`  result keys: ${Object.keys(status.result).join(', ')}`);
-          if (status.result.transformation) {
-            debugLog(`  result.transformation: ${JSON.stringify(status.result.transformation)}`);
+        const wasRunning = isRunning;
+        isRunning = status.running;
+
+        if (isRunning) {
+          setButton('running');
+          setStatusText('Import is in progress...');
+          startPolling();
+          startQuips();
+        } else {
+          stopPolling();
+          stopQuips();
+          setButton('ready');
+
+          if (wasRunning && status.stage === 'done') {
+            showToast('Import completed successfully!', 'success');
+            loadHistory();
+          } else if (wasRunning && status.stage === 'failed') {
+            showToast('Import failed: ' + (status.error || 'Unknown error'), 'error');
+            loadHistory();
+          }
+
+          if (status.stage === 'failed' && status.error) {
+            setStatusText('Last run failed: ' + status.error, true);
+          } else {
+            setStatusText('');
           }
         }
-        applyStatus(status);
       } catch (err) {
-        debugLog(`checkStatus ERROR: ${err.message}`);
-        console.error('Failed to check status:', err);
-        showToast('Failed to check status', 'error');
-        setButtonChecking();
+        setButton('ready');
+        setStatusText('');
       }
     }
 
-    function applyStatus(status) {
-      const { running, stage, startedAt, completedAt, result, error } = status;
-      hasStatus = true;
-      debugLog(`applyStatus: running=${running}, stage="${stage}", currentlyRunning=${currentlyRunning}`);
-
-      if (running) {
-        if (!currentlyRunning) {
-          debugLog('  Transitioning to running state');
-          currentlyRunning = true;
-          setButtonRunning();
-          startElapsedTimer(startedAt);
-        }
-        // Always update stage visuals on each poll
-        applyRunningStage(stage, result);
-        startPolling();
-        startQuips();
-      } else {
-        const wasRunning = currentlyRunning;
-        currentlyRunning = false;
-        stopPolling();
-        stopElapsedTimer();
-        stopQuips();
-        setButtonReady();
-        debugLog(`  Not running. wasRunning=${wasRunning}, stage="${stage}", hasResult=${!!result}`);
-
-        if (stage === 'done' && result) {
-          debugLog('  Calling applyCompletedResult');
-          applyCompletedResult(result);
-          if (wasRunning) showToast('GCS import completed successfully!', 'success');
-        } else if (stage === 'failed') {
-          debugLog(`  Calling applyFailedResult: error="${error}"`);
-          applyFailedResult(error, result);
-          if (wasRunning) showToast(`Import failed: ${error}`, 'error');
-        } else {
-          debugLog(`  No action taken for stage="${stage}"`);
-        }
-      }
-    }
-
-    function applyRunningStage(stage, result) {
-      debugLog(`applyRunningStage: stage="${stage}"`);
-      if (stage === 'loading') {
-        setStage('load', 'active', 'Loading CSV files into BigQuery...');
-        setStage('cleanup', 'pending');
-        setStage('transform', 'pending');
-        setLine(1, 'active');
-        setLine(2, '');
-      } else if (stage === 'cleanup') {
-        setStage('load', 'done', result?.tables ? formatTableSummary(result.tables) : 'Complete');
-        setStage('cleanup', 'active', 'Deleting files from bucket...');
-        setStage('transform', 'pending');
-        setLine(1, 'done');
-        setLine(2, 'active');
-      } else if (stage === 'transform') {
-        setStage('load', 'done', result?.tables ? formatTableSummary(result.tables) : 'Complete');
-        setStage('cleanup', 'done', 'Bucket cleared');
-        setStage('transform', 'active', 'Waiting for dbt transformation to complete...');
-        setLine(1, 'done');
-        setLine(2, 'done');
-      }
-    }
-
-    function applyCompletedResult(data) {
-      debugLog(`applyCompletedResult called. data keys: ${Object.keys(data).join(', ')}`);
-      debugLog(`  data.transformation: ${JSON.stringify(data.transformation)}`);
-      debugLog(`  data.tables: ${data.tables ? Object.keys(data.tables).join(', ') : 'null'}`);
-      // Stage 1: Done
-      setStage('load', 'done', formatTableSummary(data.tables));
-      setLine(1, 'done');
-
-      // Stage 2: Done
-      setStage('cleanup', 'done', 'Bucket cleared');
-      setLine(2, 'done');
-
-      // Stage 3
-      const tStatus = data.transformation?.status;
-      debugLog(`Transformation status: "${tStatus}"`);
-      if (tStatus === 'succeeded' || tStatus === 'triggered') {
-        setStage('transform', 'done', `Transformation ${tStatus}`);
-      } else if (tStatus === 'failed') {
-        setStage('transform', 'failed', data.transformation?.error || 'Transformation failed');
-      } else {
-        setStage('transform', 'failed', `Unexpected status: ${tStatus}`);
-      }
-
-      showLastRun(data);
-    }
-
-    function applyFailedResult(error, result) {
-      if (result && result.tables && Object.keys(result.tables).length > 0) {
-        // Loaded tables but failed after
-        setStage('load', 'done', formatTableSummary(result.tables));
-        setLine(1, 'done');
-        setStage('cleanup', 'failed', error || 'Failed');
-      } else {
-        setStage('load', 'failed', error || 'Failed to load CSVs');
-      }
-    }
-
-    // ---- Trigger the import ----
     async function runImport() {
-      if (!hasStatus) {
-        showToast('Checking status, please wait...', 'info');
-        return;
-      }
-      if (currentlyRunning) {
-        showToast('Import is already running', 'info');
-        return;
-      }
+      if (isRunning) return;
 
-      currentlyRunning = true;
-      setButtonRunning();
-      resetStages();
-      setStage('load', 'active', 'Loading CSV files into BigQuery...');
-      setLine(1, 'active');
+      setButton('running');
+      setStatusText('Starting import...');
 
       try {
         const res = await authFetch('/api/gcs-import/run', { method: 'POST' });
@@ -528,70 +311,129 @@
 
         if (res.status === 409) {
           showToast('Import is already running', 'info');
+          isRunning = true;
           startPolling();
-          startQuips();
           return;
         }
 
         if (!res.ok) {
-          currentlyRunning = false;
-          showToast(`Failed to start import: ${data.error}`, 'error');
-          setButtonReady();
-          resetStages();
+          setButton('ready');
+          setStatusText('Failed to start: ' + (data.error || 'Unknown error'), true);
           return;
         }
 
-        // Import started in background — begin polling
-        showToast('Import started', 'info');
+        isRunning = true;
+        setStatusText('Import is in progress...');
         startPolling();
-        startElapsedTimer(new Date().toISOString());
-        startQuips();
-
       } catch (err) {
-        currentlyRunning = false;
-        showToast(`Failed to start import: ${err.message}`, 'error');
-        setButtonReady();
-        resetStages();
-        stopQuips();
+        setButton('ready');
+        setStatusText('Failed to start: ' + err.message, true);
       }
     }
 
-    function showLastRun(data) {
-      const container = document.getElementById('last-run');
-      const details = document.getElementById('last-run-details');
-      container.style.display = 'block';
+    // ---- Run History ----
+    let historyPage = 1;
+    const historyLimit = 15;
+    let historyTotal = 0;
 
-      let html = `<div class="last-run-detail">
-        <span class="last-run-label">Duration</span>
-        <span class="last-run-value">${data.elapsed}</span>
-      </div>`;
-
-      if (data.tables) {
-        for (const [name, info] of Object.entries(data.tables)) {
-          html += `<div class="last-run-detail">
-            <span class="last-run-label">${name}</span>
-            <span class="last-run-value">${Number(info.rows).toLocaleString()} rows (${info.files} file${info.files > 1 ? 's' : ''})</span>
-          </div>`;
-        }
+    async function loadHistory() {
+      try {
+        const res = await authFetch(`/api/gcs-import/logs?page=${historyPage}&limit=${historyLimit}`);
+        const data = await res.json();
+        historyTotal = data.total;
+        renderHistory(data.logs);
+        updatePagination();
+      } catch (err) {
+        document.getElementById('history-content').innerHTML =
+          '<div class="empty-state">Failed to load run history</div>';
       }
-
-      if (data.transformation) {
-        html += `<div class="last-run-detail">
-          <span class="last-run-label">Transformation</span>
-          <span class="last-run-value">${data.transformation.status}${data.transformation.error ? ': ' + data.transformation.error : ''}</span>
-        </div>`;
-      }
-
-      details.innerHTML = html;
     }
 
-    function formatTableSummary(tables) {
-      if (!tables) return '';
-      const parts = Object.entries(tables).map(([name, info]) =>
-        `${name}: ${Number(info.rows).toLocaleString()} rows`
-      );
-      return parts.join(' | ');
+    function renderHistory(logs) {
+      const container = document.getElementById('history-content');
+      if (!logs || logs.length === 0) {
+        container.innerHTML = '<div class="empty-state">No import runs recorded yet</div>';
+        document.getElementById('pagination').style.display = 'none';
+        return;
+      }
+
+      const tzAbbr = new Date().toLocaleTimeString('en-US', { timeZoneName: 'short' }).split(' ').pop();
+
+      let html = `<table class="history-table">
+        <thead><tr>
+          <th>Started (${tzAbbr})</th>
+          <th>Completed (${tzAbbr})</th>
+          <th>Status</th>
+          <th>Duration</th>
+          <th>Tables</th>
+          <th>Transform</th>
+          <th>Dim Export</th>
+          <th>Error</th>
+        </tr></thead><tbody>`;
+
+      for (const log of logs) {
+        const started = log.started_at ? new Date(log.started_at).toLocaleString() : '-';
+        const completed = log.completed_at ? new Date(log.completed_at).toLocaleString() : '-';
+        const badge = `<span class="status-badge ${log.status}">${log.status}</span>`;
+        const duration = log.duration_seconds != null ? `${log.duration_seconds}s` : '-';
+        const tables = formatTablesCell(log.tables_loaded);
+        const transform = log.transformation_status || '-';
+        const dimExport = log.dimension_export_status || '-';
+        const error = log.error ? `<span title="${escapeHtml(log.error)}">${escapeHtml(truncate(log.error, 60))}</span>` : '-';
+
+        html += `<tr>
+          <td>${started}</td>
+          <td>${completed}</td>
+          <td>${badge}</td>
+          <td>${duration}</td>
+          <td>${tables}</td>
+          <td>${transform}</td>
+          <td>${dimExport}</td>
+          <td>${error}</td>
+        </tr>`;
+      }
+
+      html += '</tbody></table>';
+      container.innerHTML = html;
     }
+
+    function formatTablesCell(tablesJson) {
+      if (!tablesJson) return '-';
+      const tables = typeof tablesJson === 'string' ? JSON.parse(tablesJson) : tablesJson;
+      const entries = Object.entries(tables);
+      if (entries.length === 0) return '-';
+      return '<div class="tables-detail">' + entries.map(([name, info]) =>
+        `${name}: ${Number(info.rows).toLocaleString()}`
+      ).join('<br>') + '</div>';
+    }
+
+    function updatePagination() {
+      const totalPages = Math.max(1, Math.ceil(historyTotal / historyLimit));
+      const pag = document.getElementById('pagination');
+      pag.style.display = historyTotal > historyLimit ? 'flex' : 'none';
+      document.getElementById('page-info').textContent = `Page ${historyPage} of ${totalPages}`;
+      document.getElementById('prev-btn').disabled = historyPage <= 1;
+      document.getElementById('next-btn').disabled = historyPage >= totalPages;
+    }
+
+    function changePage(delta) {
+      historyPage += delta;
+      loadHistory();
+    }
+
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    function truncate(str, len) {
+      return str.length > len ? str.substring(0, len) + '...' : str;
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      setTimeout(loadHistory, 500);
+    });
   </script>
 </body>
 </html>

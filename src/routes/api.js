@@ -13,7 +13,7 @@ const accountService = require('../services/accountService');
 const pnlRenderService = require('../services/pnlRenderService');
 const googleSheetsService = require('../services/googleSheetsService');
 const censusService = require('../services/censusService');
-const fivetranService = require('../services/fivetranService');
+
 
 function normalizeCensusMonth(date) {
   if (!date) return null;
@@ -98,7 +98,7 @@ function sumCensusForCustomers(censusRecords, customers, date) {
  * @param {BigQueryService} bigQueryService - BigQuery service instance
  * @returns {Router} Configured Express router
  */
-function createApiRoutes(storageService, bigQueryService) {
+function createApiRoutes(storageService, bigQueryService, pgPool) {
   // Health check endpoint
   router.get('/health', (req, res) => {
     res.json({ 
@@ -1997,6 +1997,24 @@ function createApiRoutes(storageService, bigQueryService) {
   });
 
   /**
+   * GET /api/customers/explorer
+   *
+   * Get customers with region/subsidiary mapping for explorer view
+   */
+  router.get('/customers/explorer', async (req, res) => {
+    try {
+      const customers = await bigQueryService.getCustomerExplorerData();
+      res.json(customers);
+    } catch (error) {
+      console.error('Error fetching customer explorer data:', error);
+      res.status(500).json({
+        error: 'Failed to fetch customer explorer data',
+        code: 'CUSTOMERS_EXPLORER_FETCH_ERROR'
+      });
+    }
+  });
+
+  /**
    * PUT /api/config/:dimension
    * 
    * Save configuration for a specific dimension
@@ -2348,63 +2366,6 @@ function createApiRoutes(storageService, bigQueryService) {
     }
   });
 
-  // ============================================
-  // Fivetran API Endpoints
-  // ============================================
-
-  /**
-   * Get full pipeline status (connectors + transformation)
-   *
-   * GET /api/fivetran/status
-   */
-  router.get('/fivetran/status', async (req, res) => {
-    try {
-      if (!fivetranService.isConfigured()) {
-        return res.status(503).json({
-          error: 'Fivetran service not configured',
-          message: 'FIVETRAN_API_KEY and FIVETRAN_API_SECRET environment variables are required'
-        });
-      }
-
-      const status = await fivetranService.getPipelineStatus();
-      res.json({ success: true, ...status });
-    } catch (error) {
-      console.error('Error fetching Fivetran pipeline status:', error);
-      res.status(500).json({
-        error: 'Failed to fetch pipeline status',
-        message: error.message
-      });
-    }
-  });
-
-  /**
-   * Trigger a manual sync for a single connector
-   *
-   * POST /api/fivetran/connectors/:connectorId/sync
-   */
-  router.post('/fivetran/connectors/:connectorId/sync', async (req, res) => {
-    try {
-      if (!fivetranService.isConfigured()) {
-        return res.status(503).json({ error: 'Fivetran service not configured' });
-      }
-
-      const { connectorId } = req.params;
-      const result = await fivetranService.triggerSync(connectorId);
-
-      res.json({
-        success: true,
-        message: `Sync triggered for connector ${connectorId}`,
-        result
-      });
-    } catch (error) {
-      console.error(`Error triggering sync for ${req.params.connectorId}:`, error);
-      res.status(500).json({
-        error: 'Failed to trigger sync',
-        message: error.message
-      });
-    }
-  });
-
   // ==================== GCS Import ====================
 
   const GCS_FUNCTION_URL = 'https://gcs-to-bigquery-abdw3vfmia-uc.a.run.app';
@@ -2453,21 +2414,11 @@ function createApiRoutes(storageService, bigQueryService) {
         diagnostics.source = 'cloud';
         diagnostics.cloudStatusFetched = true;
 
-        if (gcsImportState.running) {
-          // While running, update stage and result from cloud so UI sees progress
-          if (cloudStatus.stage) {
-            gcsImportState.stage = cloudStatus.stage;
-          }
-          if (cloudStatus.result) {
-            gcsImportState.result = cloudStatus.result;
-          }
-        } else {
-          // Not running locally — adopt full cloud state
-          gcsImportState = {
-            ...gcsImportState,
-            ...cloudStatus,
-          };
-        }
+        // Always adopt the cloud state as the source of truth
+        gcsImportState = {
+          ...gcsImportState,
+          ...cloudStatus,
+        };
       }
     } catch (error) {
       // If Cloud Run is unreachable, fall back to local state
@@ -2535,6 +2486,41 @@ function createApiRoutes(storageService, bigQueryService) {
     } finally {
       gcsImportState.running = false;
       gcsImportState.completedAt = new Date().toISOString();
+    }
+  });
+
+  /**
+   * Get GCS import run history
+   *
+   * GET /api/gcs-import/logs?page=1&limit=20
+   */
+  router.get('/gcs-import/logs', async (req, res) => {
+    if (!pgPool) {
+      return res.status(503).json({ error: 'Database not available' });
+    }
+
+    try {
+      const page = Math.max(1, parseInt(req.query.page) || 1);
+      const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
+      const offset = (page - 1) * limit;
+
+      const [logsResult, countResult] = await Promise.all([
+        pgPool.query(
+          'SELECT * FROM gcs_import_logs ORDER BY started_at DESC LIMIT $1 OFFSET $2',
+          [limit, offset]
+        ),
+        pgPool.query('SELECT COUNT(*) FROM gcs_import_logs'),
+      ]);
+
+      res.json({
+        logs: logsResult.rows,
+        total: parseInt(countResult.rows[0].count),
+        page,
+        limit,
+      });
+    } catch (error) {
+      console.error('Error fetching GCS import logs:', error);
+      res.status(500).json({ error: 'Failed to fetch import logs' });
     }
   });
 
