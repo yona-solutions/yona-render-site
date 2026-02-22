@@ -927,17 +927,12 @@
           </div>
         </div>
 
-        <!-- District Tag Filter (only visible when Subsidiary tab is active) -->
-        <div class="control-group" id="districtTagFilterGroup" style="display: none;">
-          <label class="control-label">District Tag</label>
-          <div class="searchable-select" id="districtTagFilterWrapper">
-            <input 
-              type="text" 
-              id="districtTagFilterInput" 
-              placeholder="Optional: Filter by district tag..." 
-              readonly
-            />
-            <div class="searchable-select-dropdown" id="districtTagFilterDropdown"></div>
+        <!-- Service Filter (only visible when Subsidiary tab is active) -->
+        <div class="control-group" id="serviceFilterGroup" style="display: none;">
+          <label class="control-label">Service</label>
+          <div class="searchable-select" id="serviceFilterWrapper">
+            <input type="text" id="serviceFilterInput" placeholder="Optional: Filter by service..." readonly />
+            <div class="searchable-select-dropdown" id="serviceFilterDropdown"></div>
           </div>
         </div>
 
@@ -1121,7 +1116,7 @@
     // Initialize Page
     // ============================================
     
-    let monthSelect, districtSelect, subsidiaryFilterSelect, districtTagFilterSelect;
+    let monthSelect, districtSelect, subsidiaryFilterSelect, serviceFilterSelect;
     
     /**
      * Load available dates from BigQuery and populate the month dropdown
@@ -1259,32 +1254,28 @@
     }
 
     /**
-     * Load district tags for the subsidiary filter dropdown
-     * Shows only tag items, no default selection
+     * Load services for the subsidiary service filter dropdown
      */
-    async function loadDistrictTagsForFilter() {
+    async function loadServicesForFilter() {
       try {
-        console.log('📡 Fetching district tags for filter dropdown...');
-        const response = await authFetch('/api/storage/districts');
+        console.log('📡 Fetching services for filter dropdown...');
+        const response = await authFetch('/api/storage/services');
 
         if (!response.ok) {
-          throw new Error('Failed to fetch districts');
+          throw new Error('Failed to fetch services');
         }
 
         const items = await response.json();
-        const tagItems = items.filter(item => item.type === 'tag');
+        const options = [
+          { value: '', label: '— No filter —' },
+          ...items.map(item => ({ value: item.id, label: item.label }))
+        ];
 
-        const options = tagItems.map(item => ({
-          value: item.id,
-          label: item.label,
-          type: item.type
-        }));
-
-        districtTagFilterSelect.setOptions(options, false);
-        console.log(`✅ Loaded ${options.length} district tags`);
+        serviceFilterSelect.setOptions(options, false);
+        console.log(`✅ Loaded ${options.length} services`);
       } catch (error) {
-        console.error('Error loading district tags for filter:', error);
-        districtTagFilterSelect.setOptions([], false);
+        console.error('Error loading services for filter:', error);
+        serviceFilterSelect.setOptions([], false);
       }
     }
     
@@ -1294,7 +1285,7 @@
       monthSelect = new SearchableSelect('monthSelectWrapper');
       districtSelect = new SearchableSelect('districtSelectWrapper');
       subsidiaryFilterSelect = new SearchableSelect('subsidiaryFilterWrapper', [], false);
-      districtTagFilterSelect = new SearchableSelect('districtTagFilterWrapper', [], false);
+      serviceFilterSelect = new SearchableSelect('serviceFilterWrapper', [], false);
       
       // Set up change handlers
       monthSelect.onChange = (value, label) => {
@@ -1361,28 +1352,28 @@
         // Show/hide subsidiary filter based on hierarchy type
         const subsidiaryFilterGroup = document.getElementById('subsidiaryFilterGroup');
         
-        const districtTagFilterGroup = document.getElementById('districtTagFilterGroup');
+        const serviceFilterGroup = document.getElementById('serviceFilterGroup');
 
         if (hierarchyType === 'region' || hierarchyType === 'district') {
           subsidiaryFilterGroup.style.display = 'block';
-          districtTagFilterGroup.style.display = 'none';
+          serviceFilterGroup.style.display = 'none';
           // Load subsidiaries for the filter dropdown
           loadSubsidiariesForFilter();
-          // Clear district tag filter selection
-          districtTagFilterSelect.selectOption(null, '');
+          // Clear service filter selection
+          serviceFilterSelect.selectOption(null, '');
         } else if (hierarchyType === 'subsidiary') {
           subsidiaryFilterGroup.style.display = 'none';
-          districtTagFilterGroup.style.display = 'block';
-          // Load district tags for the filter dropdown
-          loadDistrictTagsForFilter();
+          serviceFilterGroup.style.display = 'block';
+          // Load services for the filter dropdown
+          loadServicesForFilter();
           // Clear subsidiary filter selection
           subsidiaryFilterSelect.selectOption(null, '');
         } else {
           subsidiaryFilterGroup.style.display = 'none';
-          districtTagFilterGroup.style.display = 'none';
+          serviceFilterGroup.style.display = 'none';
           // Clear both filter selections
           subsidiaryFilterSelect.selectOption(null, '');
-          districtTagFilterSelect.selectOption(null, '');
+          serviceFilterSelect.selectOption(null, '');
         }
         
         // Load the appropriate hierarchy data from API
@@ -1511,12 +1502,12 @@
           }
         }
 
-        // Add district tag filter if Subsidiary hierarchy and a tag is selected
-        if (hierarchy === 'subsidiary' && districtTagFilterSelect && districtTagFilterSelect.selectedValue) {
-          const districtTagFilter = districtTagFilterSelect.selectedValue;
-          if (districtTagFilter && districtTagFilter !== 'all') {
-            url += `&districtTagFilter=${encodeURIComponent(districtTagFilter)}`;
-            console.log(`   📎 Applying district tag filter: ${districtTagFilterSelect.selectedLabel || districtTagFilter}`);
+        // Add service filter if Subsidiary hierarchy and a service is selected
+        if (hierarchy === 'subsidiary' && serviceFilterSelect && serviceFilterSelect.selectedValue) {
+          const serviceFilter = serviceFilterSelect.selectedValue;
+          if (serviceFilter && serviceFilter !== 'all') {
+            url += `&serviceFilter=${encodeURIComponent(serviceFilter)}`;
+            console.log(`   ⚙️ Applying service filter: ${serviceFilterSelect.selectedLabel || serviceFilter}`);
           }
         }
 

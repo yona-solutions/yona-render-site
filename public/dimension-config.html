@@ -1136,6 +1136,11 @@
           <span>Mark as District</span>
         </label>
 
+        <label id="isServiceLabel">
+          <input type="checkbox" id="editIsService">
+          <span>Mark as Service</span>
+        </label>
+
         <label id="districtReportingExcludedLabel" style="display: none; margin-left: 20px;">
           <input type="checkbox" id="editDistrictReportingExcluded">
           <span>Exclude District from Reporting</span>
@@ -1143,7 +1148,7 @@
 
         <label id="districtSummaryExcludedLabel" style="display: none; margin-left: 20px;">
           <input type="checkbox" id="editDistrictSummaryExcluded">
-          <span>Hide District Summary (still show facilities)</span>
+          <span>Hide District Summary (still show facilities, exclude from census count)</span>
         </label>
       </div>
 
@@ -1244,6 +1249,14 @@
         <div id="departmentMappingHint" class="field-hint" style="display: none;"></div>
       </div>
 
+      <!-- Department Checkboxes -->
+      <div id="departmentCheckboxesSection" class="field-group checkbox-group" style="display: none;">
+        <label>
+          <input type="checkbox" id="editDepartmentFilterExcluded">
+          <span>Hide from filter dropdowns</span>
+        </label>
+      </div>
+
       <!-- Department Tags Section -->
       <div id="departmentTagsSection" class="field-group" style="display: none;">
         <label class="field-label">Subsidiary Tags</label>
@@ -1302,6 +1315,13 @@
             </div>
           </div>
           <div class="legend-item">
+            <div class="legend-icon">⚙️</div>
+            <div class="legend-description">
+              <strong>Service</strong>
+              <span>Indicates this is a service node (group of districts). When selected as a filter on the Subsidiary P&L, summaries are scoped to only the customers within this service.</span>
+            </div>
+          </div>
+          <div class="legend-item">
             <div class="legend-icon">👤</div>
             <div class="legend-description">
               <strong>Customer / Facility</strong>
@@ -1350,7 +1370,14 @@
             <div class="legend-icon" style="color: #6D4C41; font-weight: bold;">👁️‍🗨️</div>
             <div class="legend-description">
               <strong>District Summary Hidden</strong>
-              <span>Hide district summary in Region/Subsidiary views, but show facilities</span>
+              <span>District summary row is hidden in Region/Subsidiary views, but facilities still show. Customers in this district are also excluded from the census count on parent summaries.</span>
+            </div>
+          </div>
+          <div class="legend-item">
+            <div class="legend-icon" style="opacity: 0.75;">🚫</div>
+            <div class="legend-description">
+              <strong>Hidden from Filters</strong>
+              <span>This subsidiary does not appear in the P&L page or email report filter dropdowns.</span>
             </div>
           </div>
         </div>
@@ -1577,8 +1604,10 @@
       const label = document.createElement('span');
       label.className = 'node-label';
       
-      // Add district icon
-      if (node.isDistrict) {
+      // Add service/district icon
+      if (node.isService) {
+        label.innerHTML += '⚙️ ';
+      } else if (node.isDistrict) {
         label.innerHTML += '🏢 ';
       }
       
@@ -1648,12 +1677,21 @@
         const icon = document.createElement('span');
         icon.className = 'inline-icon';
         icon.innerHTML = '👁️‍🗨️';
-        icon.setAttribute('data-tooltip', 'District Summary Hidden: District summary is hidden in Region/Subsidiary views, but facilities still show');
+        icon.setAttribute('data-tooltip', 'District Summary Hidden: District summary is hidden in Region/Subsidiary views, facilities still show, and customers in this district are excluded from the census count');
         icon.style.color = '#6D4C41';
         icon.style.fontWeight = 'bold';
         label.appendChild(icon);
       }
-      
+
+      if (node.filterExcluded) {
+        const icon = document.createElement('span');
+        icon.className = 'inline-icon';
+        icon.innerHTML = '🚫';
+        icon.setAttribute('data-tooltip', 'Hidden from Filters: This subsidiary does not appear in P&L or email report filter dropdowns');
+        icon.style.opacity = '0.75';
+        label.appendChild(icon);
+      }
+
       // Add tags
       if (AppState.currentDimension === 'customer') {
         if (node.districtTags && node.districtTags.length > 0) {
@@ -2665,6 +2703,7 @@
       document.getElementById('regionTagsSection').style.display = isRegionTab ? 'block' : 'none';
 
       document.getElementById('departmentMappingSection').style.display = isDepartmentTab ? 'block' : 'none';
+      document.getElementById('departmentCheckboxesSection').style.display = isDepartmentTab ? 'block' : 'none';
       document.getElementById('departmentTagsSection').style.display = isDepartmentTab ? 'block' : 'none';
 
       // Hide parent section for department tab (subsidiaries are managed in BigQuery)
@@ -2693,7 +2732,9 @@
 
       if (isCustomerTab) {
         const isDistrict = node.isDistrict || false;
+        const isService = node.isService || false;
         document.getElementById('editIsDistrict').checked = isDistrict;
+        document.getElementById('editIsService').checked = isService;
         document.getElementById('editDistrictReportingExcluded').checked = node.districtReportingExcluded || false;
         document.getElementById('editDistrictSummaryExcluded').checked = node.districtSummaryExcluded || false;
         const districtReportingLabel = document.getElementById('districtReportingExcludedLabel');
@@ -2701,6 +2742,13 @@
         districtReportingLabel.style.display = isDistrict ? 'block' : 'none';
         districtSummaryLabel.style.display = isDistrict ? 'block' : 'none';
         document.getElementById('districtRegionSection').style.display = isDistrict ? 'block' : 'none';
+        // If isService, hide district sub-options (they are mutually exclusive)
+        if (isService) {
+          document.getElementById('editIsDistrict').checked = false;
+          districtReportingLabel.style.display = 'none';
+          districtSummaryLabel.style.display = 'none';
+          document.getElementById('districtRegionSection').style.display = 'none';
+        }
         document.getElementById('editDistrictRegion').value = node.districtRegion || node.region_label || '';
         document.getElementById('editStartDate').value = node.start_date_est || '';
         populateDistrictTags(node.districtTags || []);
@@ -2715,6 +2763,17 @@
             document.getElementById('editDistrictSummaryExcluded').checked = false;
             document.getElementById('editDistrictRegion').value = '';
           }
+          if (isChecked) {
+            document.getElementById('editIsService').checked = false;
+          }
+        };
+        document.getElementById('editIsService').onchange = function(e) {
+          if (e.target.checked) {
+            document.getElementById('editIsDistrict').checked = false;
+            districtReportingLabel.style.display = 'none';
+            districtSummaryLabel.style.display = 'none';
+            document.getElementById('districtRegionSection').style.display = 'none';
+          }
         };
       }
 
@@ -2723,6 +2782,7 @@
       }
 
       if (isDepartmentTab) {
+        document.getElementById('editDepartmentFilterExcluded').checked = node.filterExcluded || false;
         populateDepartmentTags(node.tags || []);
       }
 
@@ -2851,8 +2911,12 @@
           delete configData[nodeId].customer_display_name;
         }
 
-        // Get checkbox values
+        // Get checkbox values (isService and isDistrict are mutually exclusive)
+        configData[nodeId].isService = document.getElementById('editIsService').checked;
         configData[nodeId].isDistrict = document.getElementById('editIsDistrict').checked;
+        if (configData[nodeId].isService) {
+          configData[nodeId].isDistrict = false;
+        }
         configData[nodeId].districtReportingExcluded = document.getElementById('editDistrictReportingExcluded').checked;
         configData[nodeId].districtSummaryExcluded = document.getElementById('editDistrictSummaryExcluded').checked;
         const districtRegionValue = document.getElementById('editDistrictRegion').value.trim();
@@ -2895,6 +2959,9 @@
         } else {
           delete configData[nodeId].subsidiary_internal_id;
         }
+
+        // Save filter exclusion
+        configData[nodeId].filterExcluded = document.getElementById('editDepartmentFilterExcluded').checked;
 
         // Save tags
         configData[nodeId].tags = node.tags || [];

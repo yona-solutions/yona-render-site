@@ -293,14 +293,14 @@ class StorageService {
     for (const [id, config] of Object.entries(configData)) {
       // Include only leaf nodes (parent === '2')
       // This excludes root "Department" (parent null) and "All Departments" (parent '1')
-      if (config.parent === '2' && !config.displayExcluded && !config.operationalExcluded) {
+      if (config.parent === '2' && !config.displayExcluded && !config.operationalExcluded && !config.filterExcluded) {
         items.push({
           id: id,
           label: config.label,
           type: 'department'
         });
       }
-      
+
       // Collect all unique tag values from the tags field
       const tags = config.tags || [];
       tags.forEach(tag => uniqueTags.add(tag));
@@ -486,6 +486,57 @@ class StorageService {
       districtRegion: districtRegionLabel,
       isTag
     };
+  }
+
+  /**
+   * Get all service nodes from customer configuration
+   *
+   * @returns {Promise<Array>} Array of {id, label} objects sorted by label
+   */
+  async getServices() {
+    const configData = await this.getFileAsJson('customer_config.json');
+    const services = [];
+    for (const [id, config] of Object.entries(configData)) {
+      if (config.isService && !config.displayExcluded) {
+        services.push({ id, label: config.label });
+      }
+    }
+    return services.sort((a, b) => a.label.localeCompare(b.label));
+  }
+
+  /**
+   * Get all customers belonging to a service node (via its district children)
+   *
+   * @param {string} serviceId - Service node ID
+   * @returns {Promise<{customers: Array, serviceName: string}>}
+   */
+  async getCustomersForService(serviceId) {
+    const configData = await this.getFileAsJson('customer_config.json');
+    const serviceConfig = configData[serviceId];
+    const serviceName = serviceConfig?.label || serviceId;
+
+    // Step 1: find all district children of this service
+    const districtIds = new Set();
+    for (const [id, config] of Object.entries(configData)) {
+      if (config.parent === serviceId && config.isDistrict) {
+        districtIds.add(id);
+      }
+    }
+
+    // Step 2: find all customer children of those districts
+    const customers = [];
+    const seenIds = new Set();
+    for (const [id, config] of Object.entries(configData)) {
+      if (config.parent && districtIds.has(config.parent) && config.customer_internal_id != null && !seenIds.has(config.customer_internal_id)) {
+        seenIds.add(config.customer_internal_id);
+        customers.push({
+          customer_internal_id: config.customer_internal_id,
+          label: config.label,
+          configId: id
+        });
+      }
+    }
+    return { customers, serviceName };
   }
 
   /**
