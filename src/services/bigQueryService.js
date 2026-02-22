@@ -279,10 +279,11 @@ class BigQueryService {
     if (subsidiaryInternalId) {
       const subsidiaryIds = Array.isArray(subsidiaryInternalId) ? subsidiaryInternalId : [subsidiaryInternalId];
       if (subsidiaryIds.length === 1) {
-        whereClause += ' AND subsidiary_internal_id = @subsidiaryInternalId';
+        // subsidiary_internal_id is now an array in dim_customers — check containment
+        whereClause += ' AND @subsidiaryInternalId IN UNNEST(subsidiary_internal_id)';
         params.subsidiaryInternalId = subsidiaryIds[0];
       } else {
-        whereClause += ' AND subsidiary_internal_id IN UNNEST(@subsidiaryInternalIds)';
+        whereClause += ' AND EXISTS (SELECT 1 FROM UNNEST(subsidiary_internal_id) AS sid WHERE sid IN UNNEST(@subsidiaryInternalIds))';
         params.subsidiaryInternalIds = subsidiaryIds;
       }
     }
@@ -347,11 +348,12 @@ class BigQueryService {
     const params = {};
     
     if (subsidiaryIds.length === 1) {
-      whereClause = 'subsidiary_internal_id = @subsidiaryInternalId';
+      // subsidiary_internal_id is now an array in dim_customers — check containment
+      whereClause = '@subsidiaryInternalId IN UNNEST(subsidiary_internal_id)';
       params.subsidiaryInternalId = subsidiaryIds[0];
     } else {
-      // Multiple subsidiaries - use IN clause
-      whereClause = 'subsidiary_internal_id IN UNNEST(@subsidiaryInternalIds)';
+      // Multiple subsidiaries — check if any requested ID appears in the customer's array
+      whereClause = 'EXISTS (SELECT 1 FROM UNNEST(subsidiary_internal_id) AS sid WHERE sid IN UNNEST(@subsidiaryInternalIds))';
       params.subsidiaryInternalIds = subsidiaryIds;
     }
     
@@ -689,9 +691,9 @@ class BigQueryService {
         region_internal_id: row.region_internal_id ?? null,
         region_name: row.region_name || '',
         region_hierarchy: row.region_hierarchy || '',
-        subsidiary_internal_id: row.subsidiary_internal_id ?? null,
-        subsidiary_name: row.subsidiary_name || '',
-        subsidiary_hierarchy: row.subsidiary_hierarchy || ''
+        subsidiary_internal_id: Array.isArray(row.subsidiary_internal_id) ? row.subsidiary_internal_id : [],
+        subsidiary_name: Array.isArray(row.subsidiary_name) ? row.subsidiary_name : [],
+        subsidiary_hierarchy: Array.isArray(row.subsidiary_hierarchy) ? row.subsidiary_hierarchy : []
       }));
     } catch (error) {
       console.error('Error fetching customer explorer data from BigQuery:', error);
