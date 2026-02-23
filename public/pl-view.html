@@ -1780,12 +1780,12 @@
         root.querySelectorAll(".page-break:not(.pnl-report-container)").forEach(el => el.remove());
 
         // Mark long tables as compact so they fit a single PDF page
-        const compactRowThreshold = 80;
+        const compactAccountThreshold = 65;
         root.querySelectorAll(".pnl-report-container").forEach(container => {
           const table = container.querySelector(".pnl-report-table");
           if (!table) return;
-          const rowCount = table.querySelectorAll("tbody tr").length;
-          if (rowCount > compactRowThreshold) {
+          const accountCount = table.querySelectorAll("tbody tr:not(.section-header-row)").length;
+          if (accountCount > compactAccountThreshold) {
             table.classList.add("pnl-compact-table");
           }
         });
@@ -1925,9 +1925,9 @@
     }
 
     .pnl-compact-table tbody td {
-      padding: 0.75px 1px;
-      height: 9px;
-      line-height: 1.05;
+      padding: 1px 1px;
+      height: 10px;
+      line-height: 1.1;
       font-size: 6.5px;
     }
 
