@@ -7,6 +7,7 @@
 
 const express = require('express');
 const admin = require('firebase-admin');
+const { GoogleAuth } = require('google-auth-library');
 const emailService = require('../services/emailService');
 const emailConfigService = require('../services/emailConfigService');
 
@@ -29,18 +30,6 @@ const ADMIN_EMAILS = [
   'daniel@flowsensesolutions.com',
   'elan@flowsensesolutions.com'
 ];
-
-/**
- * Generate a random password
- */
-function generatePassword(length = 12) {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%';
-  let password = '';
-  for (let i = 0; i < length; i++) {
-    password += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return password;
-}
 
 /**
  * Check if email domain is allowed
@@ -103,14 +92,10 @@ router.post('/request-access', async (req, res) => {
       }
     }
 
-    // Generate password
-    const password = generatePassword();
-
-    // Create Firebase user
+    // Create Firebase user without a password — they'll set one via the reset link
     const userRecord = await admin.auth().createUser({
       email: normalizedEmail,
-      password: password,
-      emailVerified: true // Skip email verification since we're sending them the password
+      emailVerified: true
     });
 
     console.log(`✅ Created Firebase user: ${normalizedEmail} (${userRecord.uid})`);
@@ -125,45 +110,37 @@ router.post('/request-access', async (req, res) => {
       console.log(`✅ Added ${normalizedEmail} to user_roles table with role: ${role}`);
     }
 
-    // Send password email
-    if (emailService.isAvailable()) {
-      const subject = 'Your SPHERE Account Password';
-      const text = `Hello,
+    // Send password setup email via Firebase's own email system
+    const serviceAccount = JSON.parse(process.env.GCP_SERVICE_ACCOUNT_KEY);
+    const auth = new GoogleAuth({
+      credentials: serviceAccount,
+      scopes: ['https://www.googleapis.com/auth/cloud-platform']
+    });
+    const client = await auth.getClient();
+    const token = await client.getAccessToken();
 
-Your SPHERE account has been created.
+    const oobResponse = await fetch('https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + token.token,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        requestType: 'PASSWORD_RESET',
+        email: normalizedEmail
+      })
+    });
 
-Email: ${normalizedEmail}
-Password: ${password}
-
-Please sign in at: ${process.env.APP_URL || 'https://yona-render-site.onrender.com'}/login.html
-
-We recommend changing your password after your first login.
-
-Best regards,
-Yona Solutions`;
-
-      const html = `
-        <p>Hello,</p>
-        <p>Your SPHERE account has been created.</p>
-        <p><strong>Email:</strong> ${normalizedEmail}<br>
-        <strong>Password:</strong> <code style="background:#f0f0f0;padding:2px 6px;border-radius:3px;">${password}</code></p>
-        <p>Please sign in at: <a href="${process.env.APP_URL || 'https://yona-render-site.onrender.com'}/login.html">SPHERE Login</a></p>
-        <p>We recommend changing your password after your first login.</p>
-        <p>Best regards,<br>Yona Solutions</p>
-      `;
-
-      await emailService.sendEmail(normalizedEmail, subject, text, html);
-    } else {
-      console.warn('⚠️  Email service not available - password not sent');
-      // In development, log password to console
-      if (process.env.NODE_ENV !== 'production') {
-        console.log(`   DEV: Password for ${normalizedEmail}: ${password}`);
-      }
+    const oobData = await oobResponse.json();
+    if (oobData.error) {
+      throw new Error(oobData.error.message);
     }
+
+    console.log(`✅ Sent Firebase password setup email to: ${normalizedEmail}`);
 
     res.json({
       success: true,
-      message: 'Account created. Check your email for your password.'
+      message: 'Account created. Check your email for a link to set your password.'
     });
 
   } catch (error) {
@@ -187,7 +164,7 @@ Yona Solutions`;
 /**
  * POST /api/auth/forgot-password
  *
- * Generates a new password and sends it via email.
+ * Sends a Firebase password reset link via Firebase's own email system.
  * Only works for existing users from allowed domains.
  */
 router.post('/forgot-password', async (req, res) => {
@@ -211,66 +188,50 @@ router.post('/forgot-password', async (req, res) => {
       });
     }
 
-    // Check if user exists
-    let userRecord;
+    // Check if user exists (don't reveal result for security)
     try {
-      userRecord = await admin.auth().getUserByEmail(normalizedEmail);
+      await admin.auth().getUserByEmail(normalizedEmail);
     } catch (error) {
       if (error.code === 'auth/user-not-found') {
-        // Don't reveal if user exists or not for security
         return res.json({
           success: true,
-          message: 'If an account exists with this email, a new password will be sent.'
+          message: 'If an account exists with this email, a password reset link will be sent.'
         });
       }
       throw error;
     }
 
-    // Generate new password
-    const password = generatePassword();
+    // Send password reset email via Firebase's own email system
+    const serviceAccount = JSON.parse(process.env.GCP_SERVICE_ACCOUNT_KEY);
+    const auth = new GoogleAuth({
+      credentials: serviceAccount,
+      scopes: ['https://www.googleapis.com/auth/cloud-platform']
+    });
+    const client = await auth.getClient();
+    const token = await client.getAccessToken();
 
-    // Update user's password
-    await admin.auth().updateUser(userRecord.uid, {
-      password: password
+    const response = await fetch('https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + token.token,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        requestType: 'PASSWORD_RESET',
+        email: normalizedEmail
+      })
     });
 
-    console.log(`✅ Reset password for: ${normalizedEmail}`);
-
-    // Send password email
-    if (emailService.isAvailable()) {
-      const subject = 'Your SPHERE Password Has Been Reset';
-      const text = `Hello,
-
-Your SPHERE password has been reset.
-
-Email: ${normalizedEmail}
-New Password: ${password}
-
-Please sign in at: ${process.env.APP_URL || 'https://yona-render-site.onrender.com'}/login.html
-
-Best regards,
-Yona Solutions`;
-
-      const html = `
-        <p>Hello,</p>
-        <p>Your SPHERE password has been reset.</p>
-        <p><strong>Email:</strong> ${normalizedEmail}<br>
-        <strong>New Password:</strong> <code style="background:#f0f0f0;padding:2px 6px;border-radius:3px;">${password}</code></p>
-        <p>Please sign in at: <a href="${process.env.APP_URL || 'https://yona-render-site.onrender.com'}/login.html">SPHERE Login</a></p>
-        <p>Best regards,<br>Yona Solutions</p>
-      `;
-
-      await emailService.sendEmail(normalizedEmail, subject, text, html);
-    } else {
-      console.warn('⚠️  Email service not available - password not sent');
-      if (process.env.NODE_ENV !== 'production') {
-        console.log(`   DEV: New password for ${normalizedEmail}: ${password}`);
-      }
+    const data = await response.json();
+    if (data.error) {
+      throw new Error(data.error.message);
     }
+
+    console.log(`✅ Sent Firebase password reset email to: ${normalizedEmail}`);
 
     res.json({
       success: true,
-      message: 'If an account exists with this email, a new password will be sent.'
+      message: 'If an account exists with this email, a password reset link will be sent.'
     });
 
   } catch (error) {
