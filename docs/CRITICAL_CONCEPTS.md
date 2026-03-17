@@ -201,7 +201,7 @@ Facilities are only included if `Income > 0` after rollups:
    - ID mapping: `region_internal_id`
 
 3. **Subsidiary**: Legal entities/departments
-   - Data source: `department_config.json`
+   - Data source: `subsidiary_config.json`
    - Filter: `parent === '2'` (leaf nodes only)
    - ID mapping: `subsidiary_internal_id`
 

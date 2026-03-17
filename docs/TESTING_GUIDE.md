@@ -57,7 +57,7 @@ Click **"Dimension Configuration"** in the sidebar.
   - District Reporting Excluded badges (red)
 
 #### Departments Tab
-- Should load department configurations from `department_config.json`
+- Should load department configurations from `subsidiary_config.json`
 - Look for:
   - Subsidiary hierarchy
   - Subsidiary internal IDs
@@ -151,7 +151,7 @@ Click **"Dimension Configuration"** in the sidebar.
    - Verify files exist in `dimension_configurations` bucket:
      - `account_config.json`
      - `customer_config.json`
-     - `department_config.json`
+     - `subsidiary_config.json`
      - `region_config.json`
      - `vendor_config.json`
    - Check GCP Console or use storage browser
@@ -205,7 +205,7 @@ Navigate to: http://localhost:3000/storage-browser
 You should see the configuration files listed:
 - account_config.json
 - customer_config.json
-- department_config.json
+- subsidiary_config.json
 - region_config.json
 - vendor_config.json
 

@@ -284,11 +284,11 @@ class StorageService {
    * @throws {Error} If storage is not initialized or file cannot be parsed
    */
   async getDepartments() {
-    const configData = await this.getFileAsJson('department_config.json');
-    
+    const configData = await this.getFileAsJson('subsidiary_config.json');
+
     const items = [];
     const uniqueTags = new Set();
-    
+
     // First pass: collect individual departments (leaf nodes only) and tag values
     for (const [id, config] of Object.entries(configData)) {
       // Include only leaf nodes (parent === '2')
@@ -301,9 +301,11 @@ class StorageService {
         });
       }
 
-      // Collect all unique tag values from the tags field
-      const tags = config.tags || [];
-      tags.forEach(tag => uniqueTags.add(tag));
+      // Collect tags only from entries not excluded from filter
+      if (!config.filterExcluded) {
+        const tags = config.tags || [];
+        tags.forEach(tag => uniqueTags.add(tag));
+      }
     }
     
     // Add unique tag values as selectable items
@@ -572,7 +574,7 @@ class StorageService {
    * @throws {Error} If storage is not initialized or file cannot be parsed
    */
   async getSubsidiaryInternalId(departmentId) {
-    const configData = await this.getFileAsJson('department_config.json');
+    const configData = await this.getFileAsJson('subsidiary_config.json');
     
     // Check if this is a tag selection (IDs starting with "tag_" are tags)
     const isTag = departmentId.startsWith('tag_');

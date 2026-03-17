@@ -137,7 +137,7 @@ npm start
 - Internal customer IDs
 - District reporting flags
 
-### 3. **Departments** (department_config.json)
+### 3. **Departments** (subsidiary_config.json)
 - Organizational structure
 - Subsidiary mappings
 - Subsidiary internal IDs

@@ -1948,7 +1948,7 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
    */
   router.get('/config/department', async (req, res) => {
     try {
-      const config = await storageService.getFileAsJson('department_config.json');
+      const config = await storageService.getFileAsJson('subsidiary_config.json');
       res.json(config);
     } catch (error) {
       console.error('Error fetching department config:', error);
@@ -2083,7 +2083,9 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
         });
       }
       
-      const filename = `${dimension}_config.json`;
+      const filenameMap = { department: 'subsidiary' };
+      const fileKey = filenameMap[dimension] || dimension;
+      const filename = `${fileKey}_config.json`;
       await storageService.saveFileAsJson(filename, config);
       
       console.log(`✅ Saved ${filename} to GCS`);

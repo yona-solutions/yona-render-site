@@ -34,7 +34,7 @@ User clicks tab → Frontend requests data → API endpoint → StorageService �
 #### 3. Service Layer (src/services/storageService.js)
 - **getDistricts()**: Parses customer_config.json
 - **getRegions()**: Parses region_config.json
-- **getDepartments()**: Parses department_config.json
+- **getDepartments()**: Parses subsidiary_config.json
 
 ---
 
@@ -45,7 +45,7 @@ User clicks tab → Frontend requests data → API endpoint → StorageService �
 #### Files Used:
 1. **customer_config.json** - District configurations
 2. **region_config.json** - Region configurations
-3. **department_config.json** - Subsidiary/department configurations
+3. **subsidiary_config.json** - Subsidiary/department configurations
 
 ---
 
@@ -129,7 +129,7 @@ config.parent === '2'
 
 ---
 
-### department_config.json (Subsidiaries)
+### subsidiary_config.json (Subsidiaries)
 
 ```json
 {
@@ -489,7 +489,7 @@ Subsidiary Summary (aggregate only)
 
 **Data Flow:**
 1. User selects a subsidiary from dropdown
-2. System looks up `subsidiary_internal_id` in `department_config.json`
+2. System looks up `subsidiary_internal_id` in `subsidiary_config.json`
 3. Queries BigQuery with `subsidiary_internal_id = @subsidiaryId`
 4. Generates single aggregate P&L
 

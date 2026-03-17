@@ -73,7 +73,7 @@ The P&L (Profit & Loss) generation system creates hierarchical financial reports
    - `account_config.json`: Account hierarchy and properties
    - `customer_config.json`: Customer (facility) mappings to districts
    - `region_config.json`: Region configurations and mappings
-   - `department_config.json`: Subsidiary configurations and mappings
+   - `subsidiary_config.json`: Subsidiary configurations and mappings
 
 2. **BigQuery Tables**
    - `fct_transactions_summary`: Financial transaction data
@@ -199,7 +199,7 @@ The P&L (Profit & Loss) generation system creates hierarchical financial reports
 │    - account_config.json from GCS                            │
 │    - customer_config.json (if needed)                        │
 │    - region_config.json (if needed)                          │
-│    - department_config.json (if needed)                      │
+│    - subsidiary_config.json (if needed)                      │
 └────────────────────┬────────────────────────────────────────┘
                      │
                      ▼
@@ -314,7 +314,7 @@ Maps regions to BigQuery region IDs.
 - `region_internal_id`: Maps to BigQuery region ID
 - `tags`: Array of region tags
 
-### Department/Subsidiary Configuration (`department_config.json`)
+### Subsidiary Configuration (`subsidiary_config.json`)
 
 Maps subsidiaries to BigQuery subsidiary IDs.
 

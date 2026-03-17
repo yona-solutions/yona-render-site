@@ -58,7 +58,7 @@ It's in the left sidebar!
 Files from GCP bucket `dimension_configurations`:
 - `account_config.json`
 - `customer_config.json`
-- `department_config.json`
+- `subsidiary_config.json`
 - `region_config.json`
 - `vendor_config.json`
 

@@ -153,7 +153,7 @@ The application supports three hierarchical views for P&L reporting: Districts, 
 **Backend (src/services/storageService.js)**
 - `getDistricts()` - Parses customer_config.json
 - `getRegions()` - Parses region_config.json
-- `getDepartments()` - Parses department_config.json
+- `getDepartments()` - Parses subsidiary_config.json
 
 **API Endpoints (src/routes/api.js)**
 - `GET /api/storage/districts` - Returns districts + tags
@@ -172,7 +172,7 @@ All configuration files stored in GCP Storage bucket: `dimension_configurations`
    - Filter: `parent === '2' && !displayExcluded && !operationalExcluded`
    - Returns: 12 regions (leaf nodes only)
 
-3. **department_config.json** - Subsidiary configurations
+3. **subsidiary_config.json** - Subsidiary configurations
    - Filter: `parent === '2' && !displayExcluded && !operationalExcluded`
    - Returns: 7 departments (leaf nodes only)
 
