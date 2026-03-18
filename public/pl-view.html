@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/png" href="/yona-sphere-blue-glow.png">
   <title>SPHERE - P&L View</title>
   <style>
     * {
@@ -40,24 +41,26 @@
       border-bottom: 1px solid #dfe3e8;
       display: flex;
       align-items: center;
-      gap: 10px;
-      font-size: 19px;
+      gap: 6px;
+      font-size: 27px;
       font-weight: 600;
-      color: #1a202c;
+      color: #4a7a9b;
       letter-spacing: -0.3px;
     }
 
     .logo-icon {
       width: 28px;
       height: 28px;
-      background: linear-gradient(135deg, #3b5998 0%, #2d4373 100%);
-      border-radius: 6px;
       display: flex;
       align-items: center;
       justify-content: center;
-      color: white;
-      font-size: 14px;
-      font-weight: bold;
+    }
+
+    .logo-icon img {
+      width: 28px;
+      height: 28px;
+      object-fit: contain;
+     
     }
 
     .nav-menu {
@@ -853,7 +856,7 @@
   <!-- Sidebar -->
   <div class="sidebar">
     <div class="logo">
-      <div class="logo-icon">◈</div>
+      <div class="logo-icon"><img src="yona-sphere-blue-glow.png" alt="Sphere"></div>
       <span>SPHERE</span>
     </div>
     <nav class="nav-menu">

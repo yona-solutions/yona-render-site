@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/png" href="/yona-sphere-blue-glow.png">
   <title>SPHERE - Sign In</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -16,14 +17,13 @@
       box-shadow: 0 2px 12px rgba(0,0,0,0.08); border: 1px solid #e2e8f0;
       text-align: center; max-width: 400px; width: 100%;
     }
-    .logo { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 32px; }
+    .logo { display: flex; align-items: center; justify-content: center; gap: 6px; margin-bottom: 32px; }
     .logo-icon {
       width: 36px; height: 36px;
-      background: linear-gradient(135deg, #3b5998 0%, #2d4373 100%);
-      border-radius: 8px; display: flex; align-items: center; justify-content: center;
-      color: white; font-size: 18px; font-weight: bold;
+      display: flex; align-items: center; justify-content: center;
     }
-    .logo span { font-size: 24px; font-weight: 600; color: #1a202c; letter-spacing: -0.3px; }
+    .logo-icon img { width: 36px; height: 36px; object-fit: contain; }
+    .logo span { font-size: 27px; font-weight: 600; color: #4a7a9b; letter-spacing: -0.3px; }
     .login-card h2 { font-size: 18px; color: #2d3748; margin-bottom: 8px; font-weight: 500; }
     .login-card p { font-size: 14px; color: #718096; margin-bottom: 24px; }
 
@@ -83,7 +83,7 @@
 <body>
   <div class="login-card">
     <div class="logo">
-      <div class="logo-icon">&#9672;</div>
+      <div class="logo-icon"><img src="yona-sphere-blue-glow.png" alt="Sphere"></div>
       <span>SPHERE</span>
     </div>
 
