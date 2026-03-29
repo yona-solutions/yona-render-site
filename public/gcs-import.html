@@ -117,6 +117,74 @@
     .pagination button:disabled { opacity: 0.5; cursor: not-allowed; }
     .pagination .page-info { padding: 6px 0; font-size: 13px; color: #718096; }
     .empty-state { text-align: center; padding: 32px; color: #a0aec0; font-size: 14px; }
+
+    /* Info Cards Row */
+    .info-cards-row {
+      display: flex; gap: 16px; margin-bottom: 24px;
+    }
+    .info-cards-row > * { flex: 1; margin-bottom: 0 !important; }
+
+    /* Data Freshness Card */
+    .freshness-card {
+      background: white; border-radius: 8px; padding: 18px 24px;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+      display: flex; align-items: center; gap: 16px;
+      border-left: 4px solid #4a7c9e;
+    }
+    .freshness-icon {
+      flex-shrink: 0; width: 36px; height: 36px; border-radius: 50%;
+      background: #ebf4ff; display: flex; align-items: center; justify-content: center;
+    }
+    .freshness-icon svg { color: #4a7c9e; }
+    .freshness-body { flex: 1; min-width: 0; }
+    .freshness-label {
+      font-size: 11px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.6px; color: #a0aec0; margin-bottom: 3px;
+    }
+    .freshness-time {
+      font-size: 15px; font-weight: 600; color: #1a202c;
+    }
+    .freshness-time.empty { color: #a0aec0; font-weight: 400; font-style: italic; }
+    .freshness-age {
+      flex-shrink: 0; font-size: 12px; font-weight: 500;
+      padding: 3px 10px; border-radius: 12px;
+      background: #ebf8ff; color: #2b6cb0;
+    }
+    .freshness-age.syncing {
+      background: #bee3f8; color: #2a4365;
+      display: flex; align-items: center; gap: 5px;
+    }
+    .freshness-age.stale { background: #fefcbf; color: #744210; }
+
+    /* Schedule Card */
+    .schedule-card {
+      background: white; border-radius: 8px; padding: 18px 24px;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+      display: flex; align-items: center; gap: 16px;
+      border-left: 4px solid #805ad5;
+    }
+    .schedule-icon {
+      flex-shrink: 0; width: 36px; height: 36px; border-radius: 50%;
+      background: #faf5ff; display: flex; align-items: center; justify-content: center;
+      color: #805ad5;
+    }
+    .schedule-body { flex: 1; min-width: 0; }
+    .schedule-label {
+      font-size: 11px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.6px; color: #a0aec0; margin-bottom: 3px;
+    }
+    .schedule-value { font-size: 15px; font-weight: 600; color: #1a202c; }
+    .schedule-cron {
+      font-size: 11px; color: #a0aec0; margin-top: 2px;
+      font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+    }
+    .schedule-badge {
+      flex-shrink: 0; display: flex; align-items: center; gap: 5px;
+      font-size: 11px; font-weight: 500; color: #6b7280;
+      background: #f3f4f6; border-radius: 12px; padding: 3px 10px;
+    }
   </style>
 </head>
 <body>
@@ -142,6 +210,46 @@
     </div>
 
     <div class="content">
+
+      <!-- Info Cards Row -->
+      <div class="info-cards-row">
+
+      <!-- Data Freshness -->
+      <div class="freshness-card" id="freshness-card">
+        <div class="freshness-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+          </svg>
+        </div>
+        <div class="freshness-body">
+          <div class="freshness-label">Data current as of</div>
+          <div class="freshness-time empty" id="freshness-time">No sync recorded yet</div>
+        </div>
+        <div class="freshness-age" id="freshness-age" style="display:none"></div>
+      </div>
+
+      <!-- Sync Schedule -->
+      <div class="schedule-card">
+        <div class="schedule-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+          </svg>
+        </div>
+        <div class="schedule-body">
+          <div class="schedule-label">Automatic Sync Schedule</div>
+          <div class="schedule-value">Daily at 4:30 AM Eastern Time</div>
+          <div class="schedule-cron">30 4 * * * &nbsp;·&nbsp; America/New_York</div>
+        </div>
+        <div class="schedule-badge">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+          </svg>
+          Read-only
+        </div>
+      </div>
+
+      </div><!-- end info-cards-row -->
+
       <div class="section-card">
         <div class="run-section">
           <button class="btn-run" id="run-btn" onclick="runImport()" disabled>
@@ -262,12 +370,55 @@
       document.getElementById('quip').textContent = '';
     }
 
+    function relativeTime(isoString) {
+      const diff = Math.floor((Date.now() - new Date(isoString)) / 1000);
+      if (diff < 60)              return 'just now';
+      if (diff < 3600)            return `${Math.floor(diff / 60)}m ago`;
+      if (diff < 86400)           return `${Math.floor(diff / 3600)}h ago`;
+      return `${Math.floor(diff / 86400)}d ago`;
+    }
+
+    function updateFreshnessCard(lastSyncedAt, running) {
+      const timeEl = document.getElementById('freshness-time');
+      const ageEl  = document.getElementById('freshness-age');
+
+      if (running) {
+        timeEl.className = 'freshness-time';
+        timeEl.textContent = lastSyncedAt
+          ? new Date(lastSyncedAt).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York', timeZoneName: 'short' })
+          : 'Syncing now…';
+        ageEl.style.display = 'flex';
+        ageEl.className = 'freshness-age syncing';
+        ageEl.innerHTML = '<span class="btn-spinner" style="width:10px;height:10px;border-width:1.5px;border-color:rgba(42,67,101,0.3);border-top-color:#2a4365"></span> Syncing';
+        return;
+      }
+
+      if (!lastSyncedAt) {
+        timeEl.className = 'freshness-time empty';
+        timeEl.textContent = 'No sync recorded yet';
+        ageEl.style.display = 'none';
+        return;
+      }
+
+      const d = new Date(lastSyncedAt);
+      const hoursOld = (Date.now() - d) / 3600000;
+
+      timeEl.className = 'freshness-time';
+      timeEl.textContent = d.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York', timeZoneName: 'short' });
+
+      ageEl.style.display = 'block';
+      ageEl.className = 'freshness-age' + (hoursOld > 24 ? ' stale' : '');
+      ageEl.textContent = relativeTime(lastSyncedAt);
+    }
+
     async function checkStatus() {
       try {
         const res = await authFetch('/api/gcs-import/status');
         const status = await res.json();
         const wasRunning = isRunning;
         isRunning = status.running;
+
+        updateFreshnessCard(status.lastSyncedAt, status.running);
 
         if (isRunning) {
           setButton('running');

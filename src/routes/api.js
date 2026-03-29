@@ -2422,17 +2422,16 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
   };
 
   async function fetchCloudRunImportStatus() {
-    const { GoogleAuth } = require('google-auth-library');
+    // Read status directly from GCS instead of calling the Cloud Function,
+    // so this never blocks on the running sync (maxInstanceRequestConcurrency=1).
+    const { Storage } = require('@google-cloud/storage');
     const gcpKey = JSON.parse(process.env.GCP_SERVICE_ACCOUNT_KEY);
-
-    const auth = new GoogleAuth({ credentials: gcpKey });
-    const client = await auth.getIdTokenClient(GCS_FUNCTION_URL);
-    const response = await client.request({
-      url: `${GCS_FUNCTION_URL}?status=1`,
-      method: 'GET',
-      timeout: 10000, // 10 seconds for status check
-    });
-    return response.data;
+    const storage = new Storage({ credentials: gcpKey, projectId: gcpKey.project_id });
+    const file = storage.bucket('yona-csv-uploads').file('__gcs_import_status.json');
+    const [exists] = await file.exists();
+    if (!exists) return null;
+    const [contents] = await file.download();
+    return JSON.parse(contents.toString('utf8'));
   }
 
   /**
@@ -2467,7 +2466,16 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
       console.warn('Failed to fetch Cloud Run status:', error.message);
     }
 
-    res.json({ ...gcsImportState, diagnostics });
+    // Fetch last_synced_at from DB
+    let lastSyncedAt = null;
+    if (pgPool) {
+      try {
+        const { rows } = await pgPool.query(`SELECT value FROM sync_metadata WHERE key = 'last_synced_at'`);
+        if (rows.length > 0) lastSyncedAt = rows[0].value;
+      } catch (_) {}
+    }
+
+    res.json({ ...gcsImportState, lastSyncedAt, diagnostics });
   });
 
   /**
