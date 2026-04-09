@@ -1627,8 +1627,9 @@
       const childrenByParent = {};
       const roots = [];
       
-      // Initialize all nodes
+      // Initialize all nodes (skip internal metadata keys)
       for (const [id, data] of Object.entries(flatData)) {
+        if (id === '_meta') continue;
         nodeMap.set(id, { id, ...data, children: [] });
       }
       
