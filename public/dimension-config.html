@@ -825,6 +825,124 @@
       transform: translateY(0);
     }
 
+    .btn-primary:disabled {
+      opacity: 0.7;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .save-toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: #2e7d32;
+      color: white;
+      padding: 10px 20px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      opacity: 0;
+      transition: opacity 0.2s, transform 0.2s;
+      pointer-events: none;
+      z-index: 9999;
+    }
+
+    .save-toast.visible {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* Add Scenario Modal */
+    .scenario-modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.4);
+      z-index: 10000;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .scenario-modal-overlay.open {
+      display: flex;
+    }
+
+    .scenario-modal {
+      background: white;
+      border-radius: 10px;
+      padding: 28px 28px 24px;
+      width: 360px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+    }
+
+    .scenario-modal h3 {
+      font-size: 16px;
+      font-weight: 600;
+      color: #1a2332;
+      margin-bottom: 18px;
+    }
+
+    .scenario-modal label {
+      display: block;
+      font-size: 11px;
+      font-weight: 600;
+      color: #4a7c9e;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+
+    .scenario-modal input[type="text"] {
+      width: 100%;
+      padding: 9px 12px;
+      border: 1px solid #dfe3e8;
+      border-radius: 6px;
+      font-size: 14px;
+      background: #f8f9fa;
+      box-sizing: border-box;
+      outline: none;
+    }
+
+    .scenario-modal input[type="text"]:focus {
+      border-color: #4a7c9e;
+      background: white;
+    }
+
+    .scenario-modal-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 22px;
+    }
+
+    .scenario-modal-actions .btn-cancel {
+      flex: 1;
+      padding: 10px;
+      border-radius: 6px;
+      border: 1px solid #dfe3e8;
+      background: white;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    .scenario-modal-actions .btn-save {
+      flex: 1;
+      padding: 10px;
+      border-radius: 6px;
+      border: 1px solid #4a7c9e;
+      background: linear-gradient(135deg, #4a7c9e 0%, #3d6a8a 100%);
+      color: white;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+
+    .scenario-modal-actions .btn-save:disabled {
+      opacity: 0.7;
+      cursor: not-allowed;
+    }
+
     .field-hint {
       margin-top: 6px;
       font-size: 11px;
@@ -1015,6 +1133,7 @@
       <button class="tab" data-dimension="department">Subsidiary</button>
       <button class="tab" data-dimension="region">Regions</button>
       <button class="tab" data-dimension="vendor">Vendors</button>
+      <button class="tab" data-dimension="scenario">Scenarios</button>
       <button class="tab unmapped-tab" data-dimension="unmapped-accounts">⚠️ Unmapped Accounts</button>
       <button class="tab unmapped-tab" data-dimension="unmapped-customers">⚠️ Unmapped Customers</button>
     </div>
@@ -1055,6 +1174,21 @@
   </div>
 
   <!-- Edit Sidebar -->
+  <div id="saveToast" class="save-toast">Saved successfully</div>
+
+  <!-- Add Scenario Modal -->
+  <div id="scenarioModalOverlay" class="scenario-modal-overlay" onclick="closeScenarioModal(event)">
+    <div class="scenario-modal" onclick="event.stopPropagation()">
+      <h3>Add Scenario</h3>
+      <label for="scenarioNameInput">Name</label>
+      <input type="text" id="scenarioNameInput" placeholder="e.g. Budget v2" autocomplete="off" />
+      <div class="scenario-modal-actions">
+        <button class="btn-cancel" onclick="closeScenarioModal()">Cancel</button>
+        <button class="btn-save" id="scenarioModalSaveBtn" onclick="saveNewScenario()">Save</button>
+      </div>
+    </div>
+  </div>
+
   <div id="editSidebar" class="edit-sidebar">
     <div class="edit-sidebar-header">
       <h3>Edit Item</h3>
@@ -1461,6 +1595,21 @@
       accountRollupMap: {}
     };
 
+    const READ_ONLY_DIMENSIONS = new Set(['region', 'vendor']);
+    const PROTECTED_SCENARIOS = new Set(['Actuals', 'Census Actuals', 'Census Budget']);
+
+    function isReadOnlyDimension(dimensionType) {
+      return READ_ONLY_DIMENSIONS.has(dimensionType);
+    }
+
+    function isUnmappedDimension(dimensionType) {
+      return dimensionType === 'unmapped-accounts' || dimensionType === 'unmapped-customers';
+    }
+
+    function isNonEditableDimension(dimensionType) {
+      return isReadOnlyDimension(dimensionType) || isUnmappedDimension(dimensionType);
+    }
+
     // API Functions
     async function loadDimension(dimensionType) {
       const response = await authFetch(`/api/config/${dimensionType}`);
@@ -1622,11 +1771,11 @@
       // Label text
       const labelText = document.createTextNode(node.label || node.id);
       label.appendChild(labelText);
-      
+
       // Add mapping indicator (support both customer field names; use != null to treat 0 as mapped)
       if (node.account_internal_id != null || node.customer_internal_id != null || node.customer_id != null ||
           node.region_internal_id != null || node.subsidiary_internal_id != null ||
-          node.vendor_internal_id != null) {
+          node.scenario_internal_id != null || node.vendor_internal_id != null) {
         const mappedIcon = document.createElement('span');
         mappedIcon.className = 'inline-icon';
         mappedIcon.innerHTML = 'Ⓜ️';
@@ -1634,6 +1783,27 @@
         mappedIcon.style.fontWeight = 'bold';
         mappedIcon.setAttribute('data-tooltip', 'Mapped to NetSuite: This item is mapped to the corresponding NetSuite dimension (required for P&L reporting)');
         label.appendChild(mappedIcon);
+      }
+
+      // Add read-only badge for protected scenarios (after the M icon)
+      if (AppState.currentDimension === 'scenario' && (node.is_system || PROTECTED_SCENARIOS.has(node.label))) {
+        const systemBadge = document.createElement('span');
+        systemBadge.textContent = 'Read Only';
+        systemBadge.style.cssText = `
+          display: inline-block;
+          margin-left: 7px;
+          padding: 1px 7px;
+          font-size: 10px;
+          font-weight: 600;
+          letter-spacing: 0.04em;
+          background: #e8f0fe;
+          color: #3d6a8a;
+          border: 1px solid #b3c9e0;
+          border-radius: 10px;
+          vertical-align: middle;
+        `;
+        systemBadge.setAttribute('data-tooltip', 'System scenario — read-only');
+        label.appendChild(systemBadge);
       }
       
       // Add exclusion indicators
@@ -1782,9 +1952,8 @@
         actionsDiv.appendChild(dragHandle);
       }
       
-      // Add "+" button to create new child (not for region, vendor, and unmapped tabs)
-      if (AppState.currentDimension !== 'region' && AppState.currentDimension !== 'vendor' &&
-          AppState.currentDimension !== 'unmapped-accounts' && AppState.currentDimension !== 'unmapped-customers') {
+      // Add "+" button to create new child (not for read-only, unmapped, or scenario tabs — scenario is flat only)
+      if (!isNonEditableDimension(AppState.currentDimension) && AppState.currentDimension !== 'scenario') {
         const addBtn = document.createElement('button');
         addBtn.className = 'btn-add-child';
         addBtn.innerHTML = '+';
@@ -1798,8 +1967,9 @@
       
       const isClassificationRoot = node.label === 'Income Statement' || node.label === 'Balance Sheet';
 
-      // Add edit and delete buttons (not for region and vendor tabs)
-      if (!isClassificationRoot && AppState.currentDimension !== 'region' && AppState.currentDimension !== 'vendor') {
+      // Add edit button (not for read-only tabs, not for protected scenarios)
+      const isProtectedScenario = AppState.currentDimension === 'scenario' && PROTECTED_SCENARIOS.has(node.label);
+      if (!isClassificationRoot && !isReadOnlyDimension(AppState.currentDimension) && !isProtectedScenario) {
         const editBtn = document.createElement('button');
         editBtn.className = 'btn-edit';
         editBtn.innerHTML = '✏️';
@@ -1809,7 +1979,12 @@
           openEditSidebar(node);
         };
         actionsDiv.appendChild(editBtn);
+      }
 
+      // Add delete button (not for read-only tabs, not for protected scenarios)
+      const isDeletable = !isClassificationRoot && !isReadOnlyDimension(AppState.currentDimension) &&
+        !(AppState.currentDimension === 'scenario' && PROTECTED_SCENARIOS.has(node.label));
+      if (isDeletable) {
         const deleteBtn = document.createElement('button');
         deleteBtn.className = 'btn-delete';
         deleteBtn.innerHTML = '🗑️';
@@ -2325,9 +2500,8 @@
       const addRootBtn = document.getElementById('addRootItemBtn');
       const refreshBtn = document.getElementById('refreshBtn');
       if (addRootBtn) {
-        // Hide for region, vendor, and unmapped tabs
-        if (dimensionType === 'region' || dimensionType === 'vendor' || 
-            dimensionType === 'unmapped-accounts' || dimensionType === 'unmapped-customers') {
+        // Hide for read-only and unmapped tabs
+        if (isNonEditableDimension(dimensionType)) {
           addRootBtn.style.display = 'none';
         } else {
           addRootBtn.style.display = 'inline-block';
@@ -2473,18 +2647,90 @@
       });
     });
 
+    // Scenario Modal Functions
+    function openScenarioModal() {
+      const input = document.getElementById('scenarioNameInput');
+      input.value = '';
+      document.getElementById('scenarioModalOverlay').classList.add('open');
+      setTimeout(() => input.focus(), 50);
+    }
+
+    function closeScenarioModal(e) {
+      if (e && e.target !== document.getElementById('scenarioModalOverlay')) return;
+      document.getElementById('scenarioModalOverlay').classList.remove('open');
+    }
+
+    async function saveNewScenario() {
+      const input = document.getElementById('scenarioNameInput');
+      const name = input.value.trim();
+      if (!name) { input.focus(); return; }
+
+      const saveBtn = document.getElementById('scenarioModalSaveBtn');
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Saving…';
+
+      try {
+        // Add new node to local config
+        if (!AppState.dimensions['scenario']) AppState.dimensions['scenario'] = {};
+        const timestamp = Date.now();
+        const newId = `new_${timestamp}_${Math.floor(Math.random() * 1000)}`;
+        AppState.dimensions['scenario'][newId] = { id: newId, label: name, parent: null, order: 999999 };
+
+        const response = await authFetch('/api/config/scenario', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(AppState.dimensions['scenario'])
+        });
+
+        if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        const result = await response.json();
+        if (!result.success) throw new Error('Save failed');
+
+        // Reload config from server so auto-assigned IDs are reflected (M icon)
+        const fresh = await authFetch('/api/config/scenario');
+        if (fresh.ok) {
+          AppState.dimensions['scenario'] = await fresh.json();
+        }
+
+        AppState.trees['scenario'] = buildTree(AppState.dimensions['scenario']);
+        renderTree(AppState.trees['scenario'], AppState.searchQuery);
+
+        document.getElementById('scenarioModalOverlay').classList.remove('open');
+
+        const toast = document.getElementById('saveToast');
+        if (toast) {
+          toast.classList.add('visible');
+          setTimeout(() => toast.classList.remove('visible'), 2500);
+        }
+      } catch (error) {
+        console.error('Error saving scenario:', error);
+        alert(`Failed to save: ${error.message}`);
+      } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Save';
+      }
+    }
+
     // Add Root Item Function
     function addRootItem() {
       const dimension = AppState.currentDimension;
-      
-      // Don't allow adding root items for region, vendor, and unmapped tabs
-      if (dimension === 'region' || dimension === 'vendor' || 
-          dimension === 'unmapped-accounts' || dimension === 'unmapped-customers') {
+
+      // Don't allow adding root items for read-only or unmapped tabs
+      if (isNonEditableDimension(dimension)) {
         return;
       }
-      
+
+      // Scenario uses its own simple modal
+      if (dimension === 'scenario') {
+        openScenarioModal();
+        return;
+      }
+
+      if (!AppState.dimensions[dimension]) {
+        AppState.dimensions[dimension] = {};
+      }
       const configData = AppState.dimensions[dimension];
-      
+
       // Generate unique ID (timestamp-based)
       const timestamp = Date.now();
       const randomSuffix = Math.floor(Math.random() * 1000);
@@ -2536,6 +2782,12 @@
     // Delete Item Function
     async function deleteItem(node) {
       const dimension = AppState.currentDimension;
+
+      if (isReadOnlyDimension(dimension)) {
+        console.warn(`Deleting is disabled for ${dimension}`);
+        return;
+      }
+
       const configData = AppState.dimensions[dimension];
       
       // Check if node has children
@@ -2543,7 +2795,9 @@
       
       // Confirmation message
       let confirmMessage = `Are you sure you want to delete "${node.label || node.id}"?`;
-      if (hasChildren) {
+      if (dimension === 'scenario') {
+        confirmMessage = `Are you sure you want to delete the scenario "${node.label || node.id}"?\n\nThis will also remove it from BigQuery.`;
+      } else if (hasChildren) {
         confirmMessage = `"${node.label || node.id}" has ${node.children.length} child item(s).\n\nDeleting this item will also delete all its children.\n\nAre you sure you want to continue?`;
       }
       
@@ -2599,9 +2853,8 @@
     function addNewChild(parentNode) {
       const dimension = AppState.currentDimension;
       
-      // Don't allow adding children for region, vendor, and unmapped tabs
-      if (dimension === 'region' || dimension === 'vendor' || 
-          dimension === 'unmapped-accounts' || dimension === 'unmapped-customers') {
+      // Don't allow adding children for read-only or unmapped tabs
+      if (isNonEditableDimension(dimension)) {
         return;
       }
       
@@ -2680,6 +2933,10 @@
 
     // Edit Sidebar Functions
     async function openEditSidebar(node) {
+      if (isReadOnlyDimension(AppState.currentDimension)) {
+        return;
+      }
+
       AppState.editingNode = node;
 
       // Populate fields
@@ -2709,8 +2966,9 @@
       document.getElementById('departmentCheckboxesSection').style.display = isDepartmentTab ? 'block' : 'none';
       document.getElementById('departmentTagsSection').style.display = isDepartmentTab ? 'block' : 'none';
 
-      // Hide parent section for department tab (subsidiaries are managed in BigQuery)
-      document.getElementById('parentSection').style.display = isDepartmentTab ? 'none' : 'block';
+      // Hide parent section for department (managed in BigQuery) and scenario (flat only)
+      const isScenarioTab = AppState.currentDimension === 'scenario';
+      document.getElementById('parentSection').style.display = (isDepartmentTab || isScenarioTab) ? 'none' : 'block';
 
       const isClassificationRoot = node.label === 'Income Statement' || node.label === 'Balance Sheet';
       if (isClassificationRoot) {
@@ -2832,6 +3090,11 @@
       const node = AppState.editingNode;
       const nodeId = node.id;
       const dimension = AppState.currentDimension;
+
+      if (isReadOnlyDimension(dimension)) {
+        console.warn(`Editing is disabled for ${dimension}`);
+        return;
+      }
       
       // Get updated values from form
       const newLabel = document.getElementById('editName').value.trim();
@@ -2971,6 +3234,12 @@
       }
 
       // Save to backend
+      const saveBtn = document.querySelector('#editSidebar .btn-primary');
+      const originalText = saveBtn ? saveBtn.textContent : '';
+      if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Saving…';
+      }
       try {
         const response = await authFetch(`/api/config/${dimension}`, {
           method: 'PUT',
@@ -2987,19 +3256,31 @@
         const result = await response.json();
         if (result.success) {
           console.log('✅ Configuration saved successfully');
-          
+
           // Rebuild tree from updated data and re-render
           AppState.trees[dimension] = buildTree(configData);
           renderTree(AppState.trees[dimension], AppState.searchQuery);
-          
+
           // Close sidebar
           closeEditSidebar();
+
+          // Show toast
+          const toast = document.getElementById('saveToast');
+          if (toast) {
+            toast.classList.add('visible');
+            setTimeout(() => toast.classList.remove('visible'), 2500);
+          }
         } else {
           throw new Error('Save failed');
         }
       } catch (error) {
         console.error('Error saving configuration:', error);
         alert(`Failed to save: ${error.message}`);
+      } finally {
+        if (saveBtn) {
+          saveBtn.disabled = false;
+          saveBtn.textContent = originalText;
+        }
       }
     }
 
@@ -4116,6 +4397,11 @@
     // Initialize - load and expand all by default
     document.addEventListener('DOMContentLoaded', () => {
       switchDimension('account');
+
+      document.getElementById('scenarioNameInput').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') saveNewScenario();
+        if (e.key === 'Escape') document.getElementById('scenarioModalOverlay').classList.remove('open');
+      });
     });
   </script>
 </body>

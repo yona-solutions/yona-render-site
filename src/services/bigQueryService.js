@@ -653,6 +653,70 @@ class BigQueryService {
    * @returns {Promise<Array>} Array of customer records with hierarchy info
    * @throws {Error} If BigQuery is not initialized or query fails
    */
+  /**
+   * Sync scenario config to BigQuery sphere_config.scenario_config table.
+   * Creates the dataset and table if they don't exist, then does a full replace.
+   *
+   * @param {Object|Array} config - The scenario config tree from GCS
+   * @returns {Promise<number>} Number of scenarios synced
+   */
+  async syncScenarios(config) {
+    if (!this.isAvailable()) {
+      throw new Error('BigQuery not initialized');
+    }
+
+    const projectId = 'yona-solutions-poc';
+    const datasetId = 'sphere_config';
+    const tableId = 'scenario_config';
+    const fullTableId = `\`${projectId}.${datasetId}.${tableId}\``;
+
+    // Build rows from flat config object — include all nodes that have a scenario_internal_id
+    const syncedAt = new Date().toISOString();
+    const nodes = Array.isArray(config) ? config : Object.values(config);
+    const rows = nodes
+      .filter(node => node.scenario_internal_id != null)
+      .map(node => ({
+        scenario_internal_id: parseInt(node.scenario_internal_id, 10),
+        scenario: node.label || '',
+        is_system: node.is_system === true,
+        synced_at: syncedAt
+      }));
+
+    // Ensure dataset exists
+    const dataset = this.bigquery.dataset(datasetId);
+    const [datasetExists] = await dataset.exists();
+    if (!datasetExists) {
+      await dataset.create({ location: 'US' });
+      console.log(`✅ Created BigQuery dataset ${datasetId}`);
+    }
+
+    // Use CREATE OR REPLACE TABLE to avoid streaming buffer DELETE restriction.
+    // Build the full table as a UNION ALL query so it's a single atomic replace.
+    let query;
+    if (rows.length === 0) {
+      query = `CREATE OR REPLACE TABLE ${fullTableId} (
+        scenario_internal_id INT64,
+        scenario STRING,
+        is_system BOOL,
+        synced_at TIMESTAMP
+      )`;
+    } else {
+      const [first, ...rest] = rows;
+      const firstRow = `SELECT ${first.scenario_internal_id} AS scenario_internal_id, '${first.scenario.replace(/'/g, "\\'")}' AS scenario, ${first.is_system} AS is_system, TIMESTAMP '${first.synced_at}' AS synced_at`;
+      const restRows = rest.map(r =>
+        `SELECT ${r.scenario_internal_id}, '${r.scenario.replace(/'/g, "\\'")}', ${r.is_system}, TIMESTAMP '${r.synced_at}'`
+      ).join('\nUNION ALL ');
+      const unionAll = rest.length > 0 ? `${firstRow}\nUNION ALL ${restRows}` : firstRow;
+      query = `CREATE OR REPLACE TABLE ${fullTableId} AS ${unionAll}`;
+    }
+
+    const [job] = await this.bigquery.createQueryJob({ query, location: 'US' });
+    await job.promise();
+
+    console.log(`✅ Synced ${rows.length} scenarios to BigQuery ${datasetId}.${tableId}`);
+    return rows.length;
+  }
+
   async getCustomerExplorerData() {
     if (!this.isAvailable()) {
       throw new Error('BigQuery not initialized');

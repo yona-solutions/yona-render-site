@@ -2005,6 +2005,27 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
   });
 
   /**
+   * Get scenario configuration
+   * 
+   * GET /api/config/scenario
+   */
+  router.get('/config/scenario', async (req, res) => {
+    try {
+      const config = await storageService.getFileAsJson('scenario_config.json');
+      res.json(config);
+    } catch (error) {
+      if (error.message === 'File not found') {
+        return res.json({});
+      }
+      console.error('Error fetching scenario config:', error);
+      res.status(500).json({
+        error: error.message,
+        code: 'CONFIG_FETCH_ERROR'
+      });
+    }
+  });
+
+  /**
    * GET /api/accounts
    * 
    * Get all accounts from dim_accounts table
@@ -2076,29 +2097,59 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
       const config = req.body;
       
       // Validate dimension
-      const validDimensions = ['account', 'customer', 'department', 'region', 'vendor'];
+      const validDimensions = ['account', 'customer', 'department', 'region', 'vendor', 'scenario'];
       if (!validDimensions.includes(dimension)) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           error: 'Invalid dimension',
           code: 'INVALID_DIMENSION'
         });
       }
-      
+
       // Validate config is an object
       if (!config || typeof config !== 'object') {
-        return res.status(400).json({ 
+        return res.status(400).json({
           error: 'Invalid configuration data',
           code: 'INVALID_CONFIG'
         });
       }
-      
+
       const filenameMap = { department: 'subsidiary' };
       const fileKey = filenameMap[dimension] || dimension;
       const filename = `${fileKey}_config.json`;
       await storageService.saveFileAsJson(filename, config);
-      
+
       console.log(`✅ Saved ${filename} to GCS`);
-      
+
+      if (dimension === 'scenario') {
+        const SYSTEM_SCENARIOS = new Set(['Actuals', 'Census Actuals', 'Census Budget']);
+
+        // Stamp is_system and auto-assign scenario_internal_id where missing
+        const existingIds = Object.values(config)
+          .map(n => n.scenario_internal_id)
+          .filter(id => id != null)
+          .map(Number);
+        let nextId = existingIds.length > 0 ? Math.max(...existingIds) + 1 : 1;
+        let needsPersist = false;
+        for (const node of Object.values(config)) {
+          const shouldBeSystem = SYSTEM_SCENARIOS.has(node.label);
+          if (node.is_system !== shouldBeSystem) {
+            node.is_system = shouldBeSystem;
+            needsPersist = true;
+          }
+          if (node.scenario_internal_id == null) {
+            node.scenario_internal_id = nextId++;
+            needsPersist = true;
+          }
+        }
+        if (needsPersist) {
+          await storageService.saveFileAsJson(filename, config);
+          console.log('✅ Persisted scenario metadata to GCS');
+        }
+        const count = await bigQueryService.syncScenarios(config);
+        console.log(`✅ BQ scenario sync complete: ${count} rows`);
+        return res.json({ success: true });
+      }
+
       res.json({ success: true });
     } catch (error) {
       console.error('Error saving config:', error);
