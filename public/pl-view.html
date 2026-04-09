@@ -916,7 +916,7 @@
           </div>
         </div>
 
-        <!-- Subsidiary Filter (only visible when Region tab is active) -->
+        <!-- Subsidiary Filter (visible when Region or District tab is active) -->
         <div class="control-group" id="subsidiaryFilterGroup" style="display: none;">
           <label class="control-label">Subsidiary</label>
           <div class="searchable-select" id="subsidiaryFilterWrapper">
@@ -1282,8 +1282,46 @@
       }
     }
     
+    async function applyHierarchySelection(hierarchyType, hierarchyLabelText = null) {
+      const labelText = hierarchyLabelText || (hierarchyType.charAt(0).toUpperCase() + hierarchyType.slice(1));
+
+      console.log('Hierarchy changed to:', hierarchyType);
+
+      // Update the dropdown label to match selected hierarchy
+      const hierarchyLabel = document.querySelector('.control-group:nth-child(3) .control-label');
+      hierarchyLabel.textContent = labelText;
+
+      // Update the dropdown placeholder
+      districtSelect.input.setAttribute('placeholder', `Select ${hierarchyType}...`);
+
+      // Show/hide filters based on hierarchy type
+      const subsidiaryFilterGroup = document.getElementById('subsidiaryFilterGroup');
+      const serviceFilterGroup = document.getElementById('serviceFilterGroup');
+
+      if (hierarchyType === 'region' || hierarchyType === 'district') {
+        subsidiaryFilterGroup.style.display = 'block';
+        serviceFilterGroup.style.display = 'none';
+        await loadSubsidiariesForFilter();
+        serviceFilterSelect.selectOption(null, '');
+      } else if (hierarchyType === 'subsidiary') {
+        subsidiaryFilterGroup.style.display = 'none';
+        serviceFilterGroup.style.display = 'block';
+        await loadServicesForFilter();
+        subsidiaryFilterSelect.selectOption(null, '');
+      } else {
+        subsidiaryFilterGroup.style.display = 'none';
+        serviceFilterGroup.style.display = 'none';
+        subsidiaryFilterSelect.selectOption(null, '');
+        serviceFilterSelect.selectOption(null, '');
+      }
+
+      // Load the appropriate hierarchy data from API
+      // Maps to: /api/storage/districts, /api/storage/regions, or /api/storage/departments
+      await loadHierarchyOptions(hierarchyType);
+    }
+
     // Initialize searchable selects and load data
-    document.addEventListener('DOMContentLoaded', () => {
+    document.addEventListener('DOMContentLoaded', async () => {
       // Initialize searchable select components
       monthSelect = new SearchableSelect('monthSelectWrapper');
       districtSelect = new SearchableSelect('districtSelectWrapper');
@@ -1301,9 +1339,12 @@
         // TODO: Refresh P&L data based on selected district
       };
       
-      // Load data
+      // Load data for the initially active hierarchy tab
       loadAvailableDates();
-      loadHierarchyOptions();
+      const activeTab = document.querySelector('.tab.active');
+      const initialHierarchy = activeTab ? activeTab.textContent.toLowerCase().trim() : currentHierarchy;
+      const initialLabel = activeTab ? activeTab.textContent.trim() : null;
+      await applyHierarchySelection(initialHierarchy, initialLabel);
     });
 
     // ============================================
@@ -1335,53 +1376,15 @@
      * - Subsidiaries (7 items) when Subsidiary tab is active
      */
     document.querySelectorAll('.tab').forEach(tab => {
-      tab.addEventListener('click', function() {
+      tab.addEventListener('click', async function() {
         // Remove active state from all tabs
         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
         // Add active state to clicked tab
         this.classList.add('active');
         
         // Get hierarchy type from tab text (lowercase for API compatibility)
-        const hierarchyType = this.textContent.toLowerCase();
-        console.log('Hierarchy changed to:', hierarchyType);
-        
-        // Update the dropdown label to match selected hierarchy
-        const hierarchyLabel = document.querySelector('.control-group:nth-child(3) .control-label');
-        hierarchyLabel.textContent = this.textContent;
-        
-        // Update the dropdown placeholder
-        districtSelect.input.setAttribute('placeholder', `Select ${hierarchyType}...`);
-        
-        // Show/hide subsidiary filter based on hierarchy type
-        const subsidiaryFilterGroup = document.getElementById('subsidiaryFilterGroup');
-        
-        const serviceFilterGroup = document.getElementById('serviceFilterGroup');
-
-        if (hierarchyType === 'region' || hierarchyType === 'district') {
-          subsidiaryFilterGroup.style.display = 'block';
-          serviceFilterGroup.style.display = 'none';
-          // Load subsidiaries for the filter dropdown
-          loadSubsidiariesForFilter();
-          // Clear service filter selection
-          serviceFilterSelect.selectOption(null, '');
-        } else if (hierarchyType === 'subsidiary') {
-          subsidiaryFilterGroup.style.display = 'none';
-          serviceFilterGroup.style.display = 'block';
-          // Load services for the filter dropdown
-          loadServicesForFilter();
-          // Clear subsidiary filter selection
-          subsidiaryFilterSelect.selectOption(null, '');
-        } else {
-          subsidiaryFilterGroup.style.display = 'none';
-          serviceFilterGroup.style.display = 'none';
-          // Clear both filter selections
-          subsidiaryFilterSelect.selectOption(null, '');
-          serviceFilterSelect.selectOption(null, '');
-        }
-        
-        // Load the appropriate hierarchy data from API
-        // Maps to: /api/storage/districts, /api/storage/regions, or /api/storage/departments
-        loadHierarchyOptions(hierarchyType);
+        const hierarchyType = this.textContent.toLowerCase().trim();
+        await applyHierarchySelection(hierarchyType, this.textContent.trim());
       });
     });
 

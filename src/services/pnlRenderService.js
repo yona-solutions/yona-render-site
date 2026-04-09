@@ -446,11 +446,22 @@ async function generatePNLReport(monthData, ytdData, meta, accountConfig, childr
     ytdBud: valYtdBud['Income'] || 0
   };
   
-  // Check for no revenue (facilities only) using Net Income
-  if (meta.typeLabel === 'Facility') {
-    const netIncomeMonth = valMonthAct['Net Income'] || 0;
-    const netIncomeYtd = valYtdAct['Net Income'] || 0;
-    if (Math.abs(netIncomeMonth) < 0.0001 && Math.abs(netIncomeYtd) < 0.0001) {
+  const epsilon = 0.0001;
+  const netIncomeMonth = valMonthAct['Net Income'] || 0;
+  const netIncomeYtd = valYtdAct['Net Income'] || 0;
+  const revenueMonth = valMonthAct['Income'] || 0;
+  const revenueYtd = valYtdAct['Income'] || 0;
+
+  // Facilities, districts, and regions are included only when they have non-zero net income.
+  if (['Facility', 'District', 'District Tag', 'Region'].includes(meta.typeLabel)) {
+    if (Math.abs(netIncomeMonth) < epsilon && Math.abs(netIncomeYtd) < epsilon) {
+      return { noRevenue: true, html: '' };
+    }
+  }
+
+  // Subsidiary summaries still use revenue to decide whether the overall page should render.
+  if (['Subsidiary', 'Subsidiary Tag'].includes(meta.typeLabel)) {
+    if (Math.abs(revenueMonth) < epsilon && Math.abs(revenueYtd) < epsilon) {
       return { noRevenue: true, html: '' };
     }
   }

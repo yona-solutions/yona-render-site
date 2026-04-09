@@ -932,17 +932,25 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
           const subsidiaryIds = subsidiaryResult.subsidiaryIds;
           console.log(`   Using subsidiary filter: subsidiary_internal_id=${JSON.stringify(subsidiaryIds)}`);
 
-          // Query dim_customers to find which of these customers belong to the filtered subsidiary
+          // Query dim_customers to find which of these customers belong to the filtered subsidiary.
+          // The subsidiary dimension is stored as an array on dim_customers, so we need
+          // to check containment rather than compare the array column directly.
           const customerInternalIds = customers.map(c => c.customer_internal_id);
+          const subsidiaryWhereClause = subsidiaryIds.length === 1
+            ? '@subsidiaryId IN UNNEST(subsidiary_internal_id)'
+            : 'EXISTS (SELECT 1 FROM UNNEST(subsidiary_internal_id) AS sid WHERE sid IN UNNEST(@subsidiaryIds))';
+          const subsidiaryQueryParams = subsidiaryIds.length === 1
+            ? { customerIds: customerInternalIds, subsidiaryId: subsidiaryIds[0] }
+            : { customerIds: customerInternalIds, subsidiaryIds };
           const [rows] = await bigQueryService.bigquery.query({
             query: `
               SELECT customer_id
               FROM \`yona-solutions-poc.dbt_production.dim_customers\`
               WHERE customer_id IN UNNEST(@customerIds)
-                AND subsidiary_internal_id IN UNNEST(@subsidiaryIds)
+                AND ${subsidiaryWhereClause}
             `,
             location: 'US',
-            params: { customerIds: customerInternalIds, subsidiaryIds: subsidiaryIds }
+            params: subsidiaryQueryParams
           });
 
           const validCustomerIds = new Set(rows.map(r => r.customer_id));
@@ -1370,7 +1378,7 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
         console.log(`   Generating P&Ls for ${queryParams.districtGroups.length} groups (tags + districts)...`);
         let totalFacilityCount = 0;
         const totalFacilitySeen = new Set();
-        let totalDistrictCount = 0; // Track districts/tags with revenue
+        let totalDistrictCount = 0; // Track districts/tags that pass the visibility rule
         
         for (const districtGroup of queryParams.districtGroups) {
           const districtCustomerIds = districtGroup.customers.map(c => c.customer_internal_id);
@@ -1405,13 +1413,13 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
             sectionConfig
           );
           
-          // Only include district if it has revenue
+          // Only include district if it passes the summary visibility rule
           if (!districtResult.noRevenue) {
             let districtHtmlIndex = null;
             if (!districtGroup.districtSummaryExcluded) {
               districtHtmlIndex = htmlParts.length; // Remember position for later update
               htmlParts.push(districtResult.html); // Temporary placeholder
-              totalDistrictCount++; // Count this district (has revenue)
+              totalDistrictCount++; // Count this district (visible summary)
             }
             
             // 3b. Generate facility P&Ls for customers in this district (filter in memory)
@@ -1445,7 +1453,7 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
                 sectionConfig
               );
               
-              // Only include facilities with revenue
+              // Only include facilities that pass the visibility rule
               if (!facilityResult.noRevenue) {
                 htmlParts.push(facilityResult.html);
                 districtFacilityCount++;
@@ -1475,14 +1483,14 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
               htmlParts[districtHtmlIndex] = correctedDistrictResult.html;
             }
           } else {
-            console.log(`     ⊘ District has no revenue, skipping`);
+            console.log(`     ⊘ District did not meet visibility rule, skipping`);
           }
         }
         
         console.log(`✅ Generated region summary + ${totalDistrictCount} districts + ${totalFacilityCount} facility P&Ls`);
         console.log(`   🚀 Performance: Used only 4 BigQuery queries instead of ${2 + queryParams.districtGroups.length * 2 + queryParams.customersInRegion.length * 2}`);
         
-        // Regenerate region header with actual counts (only districts/facilities with revenue)
+        // Regenerate region header with actual counts (only visible districts/facilities)
         regionMeta.districtCount = totalDistrictCount;
         regionMeta.facilityCount = totalFacilityCount;
         
@@ -1599,6 +1607,7 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
         let totalRegionCount = 0;
         let totalDistrictCount = 0;
         let totalFacilityCount = 0;
+        const totalFacilitySeen = new Set();
         
         const subsidiaryCustomersForCensus = uniqueCustomersById(
           regionGroups.flatMap(region =>
@@ -1700,7 +1709,7 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
           );
           
           if (regionResult.noRevenue) {
-            console.log(`      ⚠️  Region "${region.regionLabel}" has no revenue - skipping`);
+            console.log(`      ⚠️  Region "${region.regionLabel}" did not meet visibility rule - skipping`);
             continue;
           }
           
@@ -1747,7 +1756,7 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
           );
           
           if (districtResult.noRevenue) {
-            console.log(`         ⚠️  District "${district.districtLabel}" has no revenue - skipping`);
+            console.log(`         ⚠️  District "${district.districtLabel}" did not meet visibility rule - skipping`);
             continue;
           }
           
