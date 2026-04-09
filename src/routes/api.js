@@ -2123,14 +2123,19 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
       if (dimension === 'scenario') {
         const SYSTEM_SCENARIOS = new Set(['Actuals', 'Census Actuals', 'Census Budget']);
 
-        // Stamp is_system and auto-assign scenario_internal_id where missing
-        const existingIds = Object.values(config)
-          .map(n => n.scenario_internal_id)
+        // Stamp is_system and auto-assign scenario_internal_id where missing.
+        // Use a _meta.lastAssignedId watermark so deleted IDs are never recycled.
+        const meta = config._meta || {};
+        const existingIds = Object.entries(config)
+          .filter(([k]) => k !== '_meta')
+          .map(([, n]) => n.scenario_internal_id)
           .filter(id => id != null)
           .map(Number);
-        let nextId = existingIds.length > 0 ? Math.max(...existingIds) + 1 : 1;
+        const highWatermark = Math.max(meta.lastAssignedId || 0, existingIds.length > 0 ? Math.max(...existingIds) : 0);
+        let nextId = highWatermark + 1;
         let needsPersist = false;
-        for (const node of Object.values(config)) {
+        for (const [key, node] of Object.entries(config)) {
+          if (key === '_meta') continue;
           const shouldBeSystem = SYSTEM_SCENARIOS.has(node.label);
           if (node.is_system !== shouldBeSystem) {
             node.is_system = shouldBeSystem;
@@ -2140,6 +2145,12 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
             node.scenario_internal_id = nextId++;
             needsPersist = true;
           }
+        }
+        // Always persist the watermark so it survives deletions
+        const newWatermark = nextId - 1;
+        if (!config._meta || config._meta.lastAssignedId !== newWatermark) {
+          config._meta = { lastAssignedId: newWatermark };
+          needsPersist = true;
         }
         if (needsPersist) {
           await storageService.saveFileAsJson(filename, config);

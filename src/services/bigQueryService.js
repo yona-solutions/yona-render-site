@@ -672,7 +672,7 @@ class BigQueryService {
 
     // Build rows from flat config object — include all nodes that have a scenario_internal_id
     const syncedAt = new Date().toISOString();
-    const nodes = Array.isArray(config) ? config : Object.values(config);
+    const nodes = Array.isArray(config) ? config : Object.entries(config).filter(([k]) => k !== '_meta').map(([, v]) => v);
     const rows = nodes
       .filter(node => node.scenario_internal_id != null)
       .map(node => ({
