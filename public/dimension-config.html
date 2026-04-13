@@ -3221,7 +3221,7 @@
         const departmentMappingInput = document.getElementById('editDepartmentMapping');
         const departmentMappingValue = departmentMappingInput.dataset.selectedValue;
         
-        if (departmentMappingValue) {
+        if (departmentMappingValue !== '' && departmentMappingValue != null) {
           configData[nodeId].subsidiary_internal_id = parseInt(departmentMappingValue);
         } else {
           delete configData[nodeId].subsidiary_internal_id;
@@ -3883,7 +3883,7 @@
 
         for (const [itemId, itemData] of Object.entries(currentData)) {
           // Exclude current node (compare as strings to handle type mismatches)
-          if (String(itemId) !== String(node.id) && itemData.subsidiary_internal_id) {
+          if (String(itemId) !== String(node.id) && itemData.subsidiary_internal_id != null) {
             mappedSubsidiaryIds.add(parseInt(itemData.subsidiary_internal_id));
           }
         }
