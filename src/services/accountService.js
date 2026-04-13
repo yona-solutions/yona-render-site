@@ -117,7 +117,7 @@ function buildAccountTotals(data, scenario) {
  * @param {Array<number>} customerIds - Array of customer internal IDs to include
  * @returns {Object} Filtered data in the same array format
  */
-function filterDataByCustomers(data, customerIds) {
+function filterDataByCustomers(data, customerIds, regionIdForNoCustomer = null) {
   if (!data?.Account || !data?.customer_internal_id) {
     return {
       Account: [],
@@ -128,10 +128,10 @@ function filterDataByCustomers(data, customerIds) {
       subsidiary_internal_id: []
     };
   }
-  
+
   // Convert customerIds to Set for faster lookup
   const customerIdSet = new Set(customerIds.map(id => Number(id)));
-  
+
   const filtered = {
     Account: [],
     Scenario: [],
@@ -140,10 +140,21 @@ function filterDataByCustomers(data, customerIds) {
     region_internal_id: [],
     subsidiary_internal_id: []
   };
-  
+
   for (let i = 0; i < data.Account.length; i++) {
     const customerId = Number(data.customer_internal_id[i]);
-    if (customerIdSet.has(customerId)) {
+    let include;
+
+    if (customerId === 0 && regionIdForNoCustomer != null) {
+      // Customer 0 (No Customer) spans multiple regions in fct_transactions_summary.
+      // When a region context is provided, only include its rows for that region so
+      // each region's district/facility breakdown shows only the slice that belongs there.
+      include = Number(data.region_internal_id[i]) === Number(regionIdForNoCustomer);
+    } else {
+      include = customerIdSet.has(customerId);
+    }
+
+    if (include) {
       filtered.Account.push(data.Account[i]);
       filtered.Scenario.push(data.Scenario[i]);
       filtered.Value.push(data.Value[i]);
@@ -152,7 +163,7 @@ function filterDataByCustomers(data, customerIds) {
       filtered.subsidiary_internal_id.push(data.subsidiary_internal_id[i]);
     }
   }
-  
+
   return filtered;
 }
 

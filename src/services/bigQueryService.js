@@ -117,13 +117,13 @@ class BigQueryService {
     if (hierarchy === 'district' && customerIds && customerIds.length > 0) {
       whereClause = 'customer_internal_id IN UNNEST(@customerIds)';
       queryParams.customerIds = customerIds;
-    } else if (hierarchy === 'region' && regionId) {
+    } else if (hierarchy === 'region' && regionId != null) {
       // Region filtering - can optionally include subsidiary filter
       whereClause = 'region_internal_id = @regionId';
       queryParams.regionId = regionId;
 
       // Add subsidiary filter if provided (supports both single ID and array for subsidiary tags)
-      if (subsidiaryId) {
+      if (subsidiaryId != null) {
         const subsidiaryIds = Array.isArray(subsidiaryId) ? subsidiaryId : [subsidiaryId];
         if (subsidiaryIds.length === 1) {
           whereClause += ' AND subsidiary_internal_id = @subsidiaryId';
@@ -272,21 +272,25 @@ class BigQueryService {
       throw new Error('BigQuery not initialized');
     }
 
-    // Build WHERE clause based on whether subsidiary filter is provided
-    let whereClause = 'region_internal_id = @regionInternalId';
+    // Build WHERE clause based on whether subsidiary filter is provided.
+    // customer_id = 0 (No Customer) is always included regardless of region or subsidiary —
+    // its transactions appear across all regions in fct_transactions_summary.
+    let regionClause = 'region_internal_id = @regionInternalId';
     const params = { regionInternalId: regionInternalId };
-    
+
     if (subsidiaryInternalId) {
       const subsidiaryIds = Array.isArray(subsidiaryInternalId) ? subsidiaryInternalId : [subsidiaryInternalId];
       if (subsidiaryIds.length === 1) {
         // subsidiary_internal_id is now an array in dim_customers — check containment
-        whereClause += ' AND @subsidiaryInternalId IN UNNEST(subsidiary_internal_id)';
+        regionClause += ' AND @subsidiaryInternalId IN UNNEST(subsidiary_internal_id)';
         params.subsidiaryInternalId = subsidiaryIds[0];
       } else {
-        whereClause += ' AND EXISTS (SELECT 1 FROM UNNEST(subsidiary_internal_id) AS sid WHERE sid IN UNNEST(@subsidiaryInternalIds))';
+        regionClause += ' AND EXISTS (SELECT 1 FROM UNNEST(subsidiary_internal_id) AS sid WHERE sid IN UNNEST(@subsidiaryInternalIds))';
         params.subsidiaryInternalIds = subsidiaryIds;
       }
     }
+
+    const whereClause = `(${regionClause}) OR customer_id = 0`;
 
     const query = `
       SELECT
@@ -356,11 +360,15 @@ class BigQueryService {
       whereClause = 'EXISTS (SELECT 1 FROM UNNEST(subsidiary_internal_id) AS sid WHERE sid IN UNNEST(@subsidiaryInternalIds))';
       params.subsidiaryInternalIds = subsidiaryIds;
     }
-    
-    if (regionInternalId) {
+
+    if (regionInternalId != null) {
       whereClause += ' AND region_internal_id = @regionInternalId';
       params.regionInternalId = regionInternalId;
     }
+
+    // Always include customer 0 (No Customer) regardless of subsidiary/region filters —
+    // its transactions span all regions and subsidiaries
+    whereClause = `(${whereClause}) OR customer_id = 0`;
 
     const query = `
       SELECT

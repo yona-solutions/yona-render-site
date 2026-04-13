@@ -379,7 +379,7 @@ class StorageService {
       // Check if this entry's parent is one of our districts
       if (config.parent && districtIdsToSearch.includes(config.parent)) {
         // This is a child of one of our districts
-        if (config.customer_internal_id) {
+        if (config.customer_internal_id != null) {
           customerIds.add(config.customer_internal_id);
           console.log(`   ✓ Customer found: ${config.label} (customer_internal_id: ${config.customer_internal_id})`);
         } else {
@@ -782,13 +782,21 @@ class StorageService {
   async groupCustomersByRegionAndDistrict(customers) {
     const customerConfig = await this.getFileAsJson('customer_config.json');
     const regionConfig = await this.getFileAsJson('region_config.json');
-    
+
+    // Build config order map (preserves JSON file order) — used for customer sort
+    const configOrder = {};
+    let orderIdx = 0;
+    for (const configId of Object.keys(customerConfig)) {
+      configOrder[configId] = orderIdx++;
+    }
+
     // Build reverse lookup: customer_internal_id -> config entry
     const customerIdToConfig = {};
     for (const [configId, config] of Object.entries(customerConfig)) {
       if (config.customer_internal_id != null) {
         customerIdToConfig[config.customer_internal_id] = {
           configId,
+          configOrderIndex: configOrder[configId],
           ...config
         };
       }
@@ -812,7 +820,7 @@ class StorageService {
     for (const customer of customers) {
       const regionId = customer.region_internal_id;
       
-      if (!regionId) {
+      if (regionId == null) {
         console.warn(`⚠ Customer ${customer.customer_internal_id} has no region_internal_id`);
         continue;
       }
@@ -928,12 +936,18 @@ class StorageService {
           matchingGroups.forEach(group => {
             group.customers.push({
               ...customer,
-              configId: customerConfigEntry.configId
+              configId: customerConfigEntry.configId,
+              configOrderIndex: customerConfigEntry.configOrderIndex
             });
           });
         } else {
           console.warn(`⚠ Customer ${customerId} parent district ${parentDistrictId} not in any group (likely excluded)`);
         }
+      }
+
+      // Sort customers within each group by config file order (mirrors groupCustomersByDistrict)
+      for (const group of groups) {
+        group.customers.sort((a, b) => (a.configOrderIndex ?? Infinity) - (b.configOrderIndex ?? Infinity));
       }
 
       // Convert to array, filter out empty groups, and sort alphabetically by district label
@@ -948,7 +962,44 @@ class StorageService {
       // Remove the flat customers array as we've organized them into districts
       delete regionData.customers;
     }
-    
+
+    // Inject customer 0 (No Customer) into every region that doesn't already have it.
+    // Customer 0's dim_customers region may not match where its transactions actually
+    // live, so we add it to every region. Within each region, place it in the district
+    // that matches its customer_config parent — keeping it under the correct district
+    // (e.g. "Fountain Square - Corporate") rather than just the first alphabetical one.
+    const noCustomer = customers.find(c => c.customer_internal_id === 0);
+    if (noCustomer) {
+      const noCustomerConfigEntry = customerIdToConfig[0];
+      const noCustomerParentDistrictId = noCustomerConfigEntry?.parent;
+
+      for (const regionData of Object.values(regionMap)) {
+        const alreadyHasNoCustomer = regionData.districts.some(d =>
+          d.customers.some(c => c.customer_internal_id === 0)
+        );
+        if (alreadyHasNoCustomer) continue;
+        if (regionData.districts.length === 0) continue;
+
+        // Prefer the district whose districtId matches customer 0's config parent
+        let targetDistrict = null;
+        if (noCustomerParentDistrictId) {
+          targetDistrict = regionData.districts.find(d =>
+            Array.isArray(d.districtIds) && d.districtIds.includes(noCustomerParentDistrictId)
+          );
+        }
+        // Fall back to first district if the parent district isn't in this region
+        if (!targetDistrict) targetDistrict = regionData.districts[0];
+
+        targetDistrict.customers.push({
+          ...noCustomer,
+          configId: noCustomerConfigEntry?.configId,
+          configOrderIndex: noCustomerConfigEntry?.configOrderIndex
+        });
+        // Re-sort so customer 0 lands in its correct config-file position
+        targetDistrict.customers.sort((a, b) => (a.configOrderIndex ?? Infinity) - (b.configOrderIndex ?? Infinity));
+      }
+    }
+
     // Convert to array and sort regions by their config order
     const regionConfigOrder = Object.keys(regionConfig);
     const result = Object.values(regionMap)

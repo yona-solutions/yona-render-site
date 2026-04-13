@@ -472,6 +472,7 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
 
       // Group customers by region and district
       const regionGroups = await storageService.groupCustomersByRegionAndDistrict(customersInSubsidiary);
+
       const allowedCustomerIds = Array.from(new Set(
         regionGroups.flatMap(region =>
           region.districts.flatMap(district =>
@@ -642,8 +643,11 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
 
         for (const district of region.districts) {
           const districtCustomerIds = district.customers.map(c => c.customer_internal_id);
-          const districtMonthData = accountService.filterDataByCustomers(allCustomersMonthData, districtCustomerIds);
-          const districtYtdData = accountService.filterDataByCustomers(allCustomersYtdData, districtCustomerIds);
+          // Customer 0 spans all regions in fct_transactions_summary; pass the current
+          // region so only its transactions for this region are included.
+          const noCustomerRegionId = districtCustomerIds.includes(0) ? region.regionInternalId : null;
+          const districtMonthData = accountService.filterDataByCustomers(allCustomersMonthData, districtCustomerIds, noCustomerRegionId);
+          const districtYtdData = accountService.filterDataByCustomers(allCustomersYtdData, districtCustomerIds, noCustomerRegionId);
 
         const districtCensus = sumCensusForCustomers(censusRecords, district.customers, date);
 
@@ -681,8 +685,9 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
           let districtFacilityCount = 0;
 
           for (const customer of district.customers) {
-            const facilityMonthData = accountService.filterDataByCustomers(allCustomersMonthData, [customer.customer_internal_id]);
-            const facilityYtdData = accountService.filterDataByCustomers(allCustomersYtdData, [customer.customer_internal_id]);
+            const facilityRegionId = customer.customer_internal_id === 0 ? region.regionInternalId : null;
+            const facilityMonthData = accountService.filterDataByCustomers(allCustomersMonthData, [customer.customer_internal_id], facilityRegionId);
+            const facilityYtdData = accountService.filterDataByCustomers(allCustomersYtdData, [customer.customer_internal_id], facilityRegionId);
 
             const customerCode = customer.customer_code || getCustomerCodeFromLabel(customer.label);
             const census = sumCensusForCodes(censusRecords, customerCode ? [customerCode] : [], date);
@@ -1116,6 +1121,7 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
 
         // Group customers by region, then by district
         const regionGroups = await storageService.groupCustomersByRegionAndDistrict(customersInSubsidiary);
+
         const allowedCustomerIds = Array.from(new Set(
           regionGroups.flatMap(region =>
             region.districts.flatMap(district =>
@@ -1712,24 +1718,25 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
             console.log(`      ⚠️  Region "${region.regionLabel}" did not meet visibility rule - skipping`);
             continue;
           }
-          
+
           totalRegionCount++;
           let regionDistrictCount = 0;
           let regionFacilityCount = 0;
           const regionFacilitySeen = new Set();
-          
+
           let regionHeaderHtml = regionResult.html.split('<div class="pnl-content">')[0];
           const districtReports = [];
-          
+
           // Generate district and facility reports for this region
           for (const district of region.districts) {
             console.log(`      Processing District: ${district.districtLabel} (${district.customers.length} customers)`);
-            
+
             const districtCustomerIds = district.customers.map(c => c.customer_internal_id);
-            
-            // Filter data for this district
-            const districtMonthData = accountService.filterDataByCustomers(allCustomersMonthData, districtCustomerIds);
-            const districtYtdData = accountService.filterDataByCustomers(allCustomersYtdData, districtCustomerIds);
+            // Customer 0 spans all regions; pass the current region so only its
+            // transactions for this region appear in the district/facility breakdown.
+            const noCustomerRegionId = districtCustomerIds.includes(0) ? region.regionInternalId : null;
+            const districtMonthData = accountService.filterDataByCustomers(allCustomersMonthData, districtCustomerIds, noCustomerRegionId);
+            const districtYtdData = accountService.filterDataByCustomers(allCustomersYtdData, districtCustomerIds, noCustomerRegionId);
             
             const districtCensus = sumCensusForCustomers(censusRecords, district.customers, date);
 
@@ -1770,12 +1777,13 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
             
             // Generate facility reports for this district
             for (const customer of district.customers) {
-              const facilityMonthData = accountService.filterDataByCustomers(allCustomersMonthData, [customer.customer_internal_id]);
-              const facilityYtdData = accountService.filterDataByCustomers(allCustomersYtdData, [customer.customer_internal_id]);
-              
+              const facilityRegionId = customer.customer_internal_id === 0 ? region.regionInternalId : null;
+              const facilityMonthData = accountService.filterDataByCustomers(allCustomersMonthData, [customer.customer_internal_id], facilityRegionId);
+              const facilityYtdData = accountService.filterDataByCustomers(allCustomersYtdData, [customer.customer_internal_id], facilityRegionId);
+
               const customerCode = customer.customer_code || getCustomerCodeFromLabel(customer.label);
               const census = sumCensusForCodes(censusRecords, customerCode ? [customerCode] : [], date);
-              
+
               const facilityMeta = {
                 typeLabel: 'Facility',
                 entityName: customer.label,
