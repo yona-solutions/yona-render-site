@@ -2228,17 +2228,18 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
       // Fetch account config
       const accountConfig = await storageService.getFileAsJson('account_config.json');
       
-      // Create a set of mapped account IDs from config
+      // Create a set of mapped account IDs from config (stringify to avoid type mismatch
+      // between config strings and BigQuery integer account_ids)
       const mappedAccountIds = new Set();
       Object.values(accountConfig).forEach(account => {
-        if (account.account_internal_id) {
-          mappedAccountIds.add(account.account_internal_id);
+        if (account.account_internal_id != null) {
+          mappedAccountIds.add(String(account.account_internal_id));
         }
       });
-      
+
       // Filter to only unmapped accounts
-      const unmappedAccounts = allAccounts.filter(account => 
-        !mappedAccountIds.has(account.account_id)
+      const unmappedAccounts = allAccounts.filter(account =>
+        !mappedAccountIds.has(String(account.account_id))
       );
       
       res.json({
