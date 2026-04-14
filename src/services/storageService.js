@@ -476,7 +476,8 @@ class StorageService {
             customer_code: customerCode,
             label: config.label,
             configId: id,
-            start_date_est: config.start_date_est
+            start_date_est: config.start_date_est,
+            customerPnlHidden: Boolean(config.customerPnlHidden)
           });
         }
       }
@@ -534,7 +535,8 @@ class StorageService {
         customers.push({
           customer_internal_id: config.customer_internal_id,
           label: config.label,
-          configId: id
+          configId: id,
+          customerPnlHidden: Boolean(config.customerPnlHidden)
         });
       }
     }
@@ -745,7 +747,9 @@ class StorageService {
         matchingGroups.forEach(group => {
           group.customers.push({
             ...customer,
-            configId: customerConfig.configId
+            configId: customerConfig.configId,
+            configOrderIndex: customerConfig.configOrderIndex,
+            customerPnlHidden: Boolean(customerConfig.customerPnlHidden)
           });
         });
       } else {
@@ -937,7 +941,8 @@ class StorageService {
             group.customers.push({
               ...customer,
               configId: customerConfigEntry.configId,
-              configOrderIndex: customerConfigEntry.configOrderIndex
+              configOrderIndex: customerConfigEntry.configOrderIndex,
+              customerPnlHidden: Boolean(customerConfigEntry.customerPnlHidden)
             });
           });
         } else {
@@ -993,7 +998,8 @@ class StorageService {
         targetDistrict.customers.push({
           ...noCustomer,
           configId: noCustomerConfigEntry?.configId,
-          configOrderIndex: noCustomerConfigEntry?.configOrderIndex
+          configOrderIndex: noCustomerConfigEntry?.configOrderIndex,
+          customerPnlHidden: Boolean(noCustomerConfigEntry?.customerPnlHidden)
         });
         // Re-sort so customer 0 lands in its correct config-file position
         targetDistrict.customers.sort((a, b) => (a.configOrderIndex ?? Infinity) - (b.configOrderIndex ?? Infinity));

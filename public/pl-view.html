@@ -151,8 +151,62 @@
 
     .controls-row {
       display: flex;
-      gap: 18px;
+      gap: 14px;
       align-items: flex-end;
+      flex-wrap: wrap;
+    }
+
+    .control-group-narrow .searchable-select {
+      min-width: 132px;
+      width: 132px;
+    }
+
+    .control-group-main .searchable-select {
+      min-width: 204px;
+      width: 204px;
+    }
+
+    .control-group-subsidiary .searchable-select {
+      min-width: 196px;
+      width: 196px;
+    }
+
+    .control-group-header .searchable-select {
+      min-width: 196px;
+      width: 196px;
+    }
+
+    .control-group-header .control-label {
+      color: #276b62;
+    }
+
+    .control-group-header .searchable-select input {
+      background-color: #f1fbf6;
+      border-color: #acd9c2;
+      color: #214f45;
+    }
+
+    .control-group-header .searchable-select input:focus {
+      border-color: #5aa879;
+      box-shadow: 0 0 0 3px rgba(90, 168, 121, 0.14);
+    }
+
+    .control-group-header .searchable-select input::placeholder {
+      color: #7ea696;
+    }
+
+    .control-group-header .searchable-select-dropdown {
+      background: #fbfffd;
+      border-color: #acd9c2;
+    }
+
+    .control-group-header .searchable-select-option:hover {
+      background: #edf8f2;
+    }
+
+    .control-group-header .searchable-select-option.selected {
+      background: #dff3e8;
+      color: #214f45;
     }
 
     .control-group {
@@ -180,7 +234,7 @@
     }
 
     .toggle-btn {
-      padding: 9px 32px;
+      padding: 9px 16px;
       background: white;
       border: none;
       cursor: pointer;
@@ -189,6 +243,7 @@
       transition: all 0.15s;
       font-weight: 400;
       border-right: 1px solid #e2e8f0;
+      min-width: 96px;
     }
 
     .toggle-btn:last-child {
@@ -882,7 +937,7 @@
     <!-- Controls -->
     <div class="controls">
       <div class="controls-row">
-        <div class="control-group">
+        <div class="control-group control-group-toggle">
           <label class="control-label">P&L Type</label>
           <div class="toggle-group">
             <button class="toggle-btn active" data-type="standard">Standard</button>
@@ -890,7 +945,7 @@
           </div>
         </div>
 
-        <div class="control-group">
+        <div class="control-group control-group-narrow">
           <label class="control-label">Month</label>
           <div class="searchable-select" id="monthSelectWrapper">
             <input 
@@ -903,7 +958,7 @@
           </div>
         </div>
 
-        <div class="control-group">
+        <div class="control-group control-group-main">
           <label class="control-label">District</label>
           <div class="searchable-select" id="districtSelectWrapper">
             <input 
@@ -917,7 +972,7 @@
         </div>
 
         <!-- Subsidiary Filter (visible when Region or District tab is active) -->
-        <div class="control-group" id="subsidiaryFilterGroup" style="display: none;">
+        <div class="control-group control-group-subsidiary" id="subsidiaryFilterGroup" style="display: none;">
           <label class="control-label">Subsidiary</label>
           <div class="searchable-select" id="subsidiaryFilterWrapper">
             <input 
@@ -931,11 +986,24 @@
         </div>
 
         <!-- Service Filter (only visible when Subsidiary tab is active) -->
-        <div class="control-group" id="serviceFilterGroup" style="display: none;">
+        <div class="control-group control-group-subsidiary" id="serviceFilterGroup" style="display: none;">
           <label class="control-label">Service</label>
           <div class="searchable-select" id="serviceFilterWrapper">
             <input type="text" id="serviceFilterInput" placeholder="Optional: Filter by service..." readonly />
             <div class="searchable-select-dropdown" id="serviceFilterDropdown"></div>
+          </div>
+        </div>
+
+        <div class="control-group control-group-header" id="subsidiaryHeaderGroup">
+          <label class="control-label">Subsidiary Header</label>
+          <div class="searchable-select" id="subsidiaryHeaderWrapper">
+            <input
+              type="text"
+              id="subsidiaryHeaderInput"
+              placeholder="Optional header label..."
+              readonly
+            />
+            <div class="searchable-select-dropdown" id="subsidiaryHeaderDropdown"></div>
           </div>
         </div>
 
@@ -1119,7 +1187,21 @@
     // Initialize Page
     // ============================================
     
-    let monthSelect, districtSelect, subsidiaryFilterSelect, serviceFilterSelect;
+    let monthSelect, districtSelect, subsidiaryFilterSelect, serviceFilterSelect, subsidiaryHeaderSelect;
+
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/[&<>"']/g, char => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+      }[char]));
+    }
+
+    function getSelectedSubsidiaryHeaderLabel() {
+      return subsidiaryHeaderSelect?.selectedLabel?.trim() || '';
+    }
     
     /**
      * Load available dates from BigQuery and populate the month dropdown
@@ -1257,6 +1339,34 @@
     }
 
     /**
+     * Load subsidiaries for the display-only report header dropdown.
+     * This selection only supplies header text; it never filters report data.
+     */
+    async function loadSubsidiariesForHeader() {
+      try {
+        console.log('📡 Fetching subsidiaries for header dropdown...');
+        const response = await authFetch('/api/storage/departments');
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch subsidiaries');
+        }
+
+        const items = await response.json();
+        const options = items.map(item => ({
+          value: item.id,
+          label: item.label,
+          type: item.type
+        }));
+
+        subsidiaryHeaderSelect.setOptions(options, false);
+        console.log(`✅ Loaded ${items.length} subsidiaries for header dropdown`);
+      } catch (error) {
+        console.error('Error loading subsidiaries for header:', error);
+        subsidiaryHeaderSelect.setOptions([], false);
+      }
+    }
+
+    /**
      * Load services for the subsidiary service filter dropdown
      */
     async function loadServicesForFilter() {
@@ -1327,6 +1437,7 @@
       districtSelect = new SearchableSelect('districtSelectWrapper');
       subsidiaryFilterSelect = new SearchableSelect('subsidiaryFilterWrapper', [], false);
       serviceFilterSelect = new SearchableSelect('serviceFilterWrapper', [], false);
+      subsidiaryHeaderSelect = new SearchableSelect('subsidiaryHeaderWrapper', [], false);
       
       // Set up change handlers
       monthSelect.onChange = (value, label) => {
@@ -1339,8 +1450,13 @@
         // TODO: Refresh P&L data based on selected district
       };
       
+      subsidiaryHeaderSelect.onChange = (value, label) => {
+        console.log('Subsidiary header changed to:', label || value);
+      };
+
       // Load data for the initially active hierarchy tab
       loadAvailableDates();
+      loadSubsidiariesForHeader();
       const activeTab = document.querySelector('.tab.active');
       const initialHierarchy = activeTab ? activeTab.textContent.toLowerCase().trim() : currentHierarchy;
       const initialLabel = activeTab ? activeTab.textContent.trim() : null;
@@ -1441,7 +1557,7 @@
         alert('Please select a month first');
         return;
       }
-      
+
       try {
         // Show loading state with spinner and progress steps
         const resultsSection = document.getElementById('bigqueryResults');
@@ -1497,6 +1613,12 @@
         
         // Build API URL
         let url = `/api/pl/data?hierarchy=${hierarchy}&selectedId=${encodeURIComponent(selectedId)}&date=${selectedDate}&plType=${plType}`;
+
+        const selectedHeaderLabel = getSelectedSubsidiaryHeaderLabel();
+        if (selectedHeaderLabel) {
+          url += `&orgLabel=${encodeURIComponent(selectedHeaderLabel)}`;
+          console.log(`   🏷️ Using subsidiary header label: ${selectedHeaderLabel}`);
+        }
 
         // Add subsidiary filter if Region or District hierarchy and a subsidiary is selected
         if ((hierarchy === 'region' || hierarchy === 'district') && subsidiaryFilterSelect && subsidiaryFilterSelect.selectedValue) {
@@ -1643,25 +1765,27 @@
       // Display meta information
       const queryInfo = document.getElementById('queryInfo');
       let metaInfoHtml = '<strong>Report Information:</strong><br>';
-      metaInfoHtml += `<strong>Type:</strong> ${meta.typeLabel}<br>`;
-      metaInfoHtml += `<strong>Entity:</strong> ${selectedLabel}<br>`;
-      metaInfoHtml += `<strong>Period:</strong> ${date}<br>`;
+      metaInfoHtml += `<strong>Type:</strong> ${escapeHtml(meta.typeLabel)}<br>`;
+      metaInfoHtml += `<strong>Entity:</strong> ${escapeHtml(selectedLabel)}<br>`;
+      metaInfoHtml += `<strong>Period:</strong> ${escapeHtml(date)}<br>`;
+      if (meta.orgLabel) {
+        metaInfoHtml += `<strong>Header:</strong> ${escapeHtml(meta.orgLabel)}<br>`;
+      }
 
       if (meta.facilityCount) {
         metaInfoHtml += `<strong>Facilities:</strong> ${meta.facilityCount}<br>`;
       }
 
-      metaInfoHtml += `<strong>P&L Type:</strong> ${meta.plType || 'Standard'}`;
+      metaInfoHtml += `<strong>P&L Type:</strong> ${escapeHtml(meta.plType || 'Standard')}`;
 
       // Show region → customer structure for subsidiary views
       if (meta.regionStructure && meta.regionStructure.length > 0) {
         metaInfoHtml += '<br><br><strong>Regions:</strong>';
         for (const r of meta.regionStructure) {
-          const regionId = r.region.replace(/[^a-zA-Z0-9]/g, '_');
-          const customerList = r.customers.map(c => `<div style="padding:2px 0 2px 16px; font-size:0.9em">${c}</div>`).join('');
+          const customerList = r.customers.map(c => `<div style="padding:2px 0 2px 16px; font-size:0.9em">${escapeHtml(c)}</div>`).join('');
           metaInfoHtml += `
             <details style="margin-top:4px">
-              <summary style="cursor:pointer"><strong>${r.region}</strong> (${r.customers.length} customers)</summary>
+              <summary style="cursor:pointer"><strong>${escapeHtml(r.region)}</strong> (${r.customers.length} customers)</summary>
               <div style="margin-left:8px">${customerList}</div>
             </details>`;
         }

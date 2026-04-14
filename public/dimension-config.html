@@ -1287,6 +1287,11 @@
           <input type="checkbox" id="editDistrictSummaryExcluded">
           <span>Hide District Summary (still show facilities, exclude from census count)</span>
         </label>
+
+        <label id="customerPnlHiddenLabel" style="display: none; margin-left: 20px;">
+          <input type="checkbox" id="editCustomerPnlHidden">
+          <span>Hide Customer P&amp;L (still include in rollups/counts)</span>
+        </label>
       </div>
 
       <!-- District Region Field (Customers only, when marked as District) -->
@@ -1508,6 +1513,13 @@
             <div class="legend-description">
               <strong>District Summary Hidden</strong>
               <span>District summary row is hidden in Region/Subsidiary views, but facilities still show. Customers in this district are also excluded from the census count on parent summaries.</span>
+            </div>
+          </div>
+          <div class="legend-item">
+            <div class="legend-icon" style="color: #00897B; font-weight: bold;">⊗</div>
+            <div class="legend-description">
+              <strong>Customer P&amp;L Hidden</strong>
+              <span>Facility-level P&amp;L is hidden, but the customer remains in district, region, and subsidiary rollups and counts.</span>
             </div>
           </div>
           <div class="legend-item">
@@ -1853,6 +1865,16 @@
         icon.innerHTML = '👁️‍🗨️';
         icon.setAttribute('data-tooltip', 'District Summary Hidden: District summary is hidden in Region/Subsidiary views, facilities still show, and customers in this district are excluded from the census count');
         icon.style.color = '#6D4C41';
+        icon.style.fontWeight = 'bold';
+        label.appendChild(icon);
+      }
+
+      if (node.customerPnlHidden) {
+        const icon = document.createElement('span');
+        icon.className = 'inline-icon';
+        icon.innerHTML = '⊗';
+        icon.setAttribute('data-tooltip', 'Customer P&L Hidden: Facility-level P&L is hidden, but values and counts remain in rollups');
+        icon.style.color = '#00897B';
         icon.style.fontWeight = 'bold';
         label.appendChild(icon);
       }
@@ -2757,6 +2779,7 @@
       if (dimension === 'customer') {
         newNode.isDistrict = false;
         newNode.districtReportingExcluded = false;
+        newNode.customerPnlHidden = false;
         newNode.districtTags = [];
         newNode.customerTags = [];
       } else if (dimension === 'account') {
@@ -2886,6 +2909,7 @@
       if (dimension === 'customer') {
         newNode.isDistrict = false;
         newNode.districtReportingExcluded = false;
+        newNode.customerPnlHidden = false;
         newNode.districtTags = [];
         newNode.customerTags = [];
       } else if (dimension === 'account') {
@@ -2999,16 +3023,20 @@
         document.getElementById('editIsService').checked = isService;
         document.getElementById('editDistrictReportingExcluded').checked = node.districtReportingExcluded || false;
         document.getElementById('editDistrictSummaryExcluded').checked = node.districtSummaryExcluded || false;
+        document.getElementById('editCustomerPnlHidden').checked = node.customerPnlHidden || false;
         const districtReportingLabel = document.getElementById('districtReportingExcludedLabel');
         const districtSummaryLabel = document.getElementById('districtSummaryExcludedLabel');
+        const customerPnlHiddenLabel = document.getElementById('customerPnlHiddenLabel');
         districtReportingLabel.style.display = isDistrict ? 'block' : 'none';
         districtSummaryLabel.style.display = isDistrict ? 'block' : 'none';
+        customerPnlHiddenLabel.style.display = (!isDistrict && !isService) ? 'block' : 'none';
         document.getElementById('districtRegionSection').style.display = isDistrict ? 'block' : 'none';
         // If isService, hide district sub-options (they are mutually exclusive)
         if (isService) {
           document.getElementById('editIsDistrict').checked = false;
           districtReportingLabel.style.display = 'none';
           districtSummaryLabel.style.display = 'none';
+          customerPnlHiddenLabel.style.display = 'none';
           document.getElementById('districtRegionSection').style.display = 'none';
         }
         document.getElementById('editDistrictRegion').value = node.districtRegion || node.region_label || '';
@@ -3019,11 +3047,15 @@
         document.getElementById('editIsDistrict').onchange = function(e) {
           const isChecked = e.target.checked;
           districtReportingLabel.style.display = isChecked ? 'block' : 'none';
+          districtSummaryLabel.style.display = isChecked ? 'block' : 'none';
+          customerPnlHiddenLabel.style.display = isChecked ? 'none' : 'block';
           document.getElementById('districtRegionSection').style.display = isChecked ? 'block' : 'none';
           if (!isChecked) {
             document.getElementById('editDistrictReportingExcluded').checked = false;
             document.getElementById('editDistrictSummaryExcluded').checked = false;
             document.getElementById('editDistrictRegion').value = '';
+          } else {
+            document.getElementById('editCustomerPnlHidden').checked = false;
           }
           if (isChecked) {
             document.getElementById('editIsService').checked = false;
@@ -3034,7 +3066,11 @@
             document.getElementById('editIsDistrict').checked = false;
             districtReportingLabel.style.display = 'none';
             districtSummaryLabel.style.display = 'none';
+            customerPnlHiddenLabel.style.display = 'none';
+            document.getElementById('editCustomerPnlHidden').checked = false;
             document.getElementById('districtRegionSection').style.display = 'none';
+          } else {
+            customerPnlHiddenLabel.style.display = 'block';
           }
         };
       }
@@ -3186,6 +3222,10 @@
         }
         configData[nodeId].districtReportingExcluded = document.getElementById('editDistrictReportingExcluded').checked;
         configData[nodeId].districtSummaryExcluded = document.getElementById('editDistrictSummaryExcluded').checked;
+        configData[nodeId].customerPnlHidden =
+          !configData[nodeId].isDistrict &&
+          !configData[nodeId].isService &&
+          document.getElementById('editCustomerPnlHidden').checked;
         const districtRegionValue = document.getElementById('editDistrictRegion').value.trim();
         if (configData[nodeId].isDistrict && districtRegionValue) {
           configData[nodeId].districtRegion = districtRegionValue;

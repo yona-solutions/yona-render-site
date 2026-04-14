@@ -91,6 +91,23 @@ function sumCensusForCustomers(censusRecords, customers, date) {
   return sumCensusForCodes(censusRecords, codes, date);
 }
 
+function isCustomerPnlHidden(customer) {
+  return Boolean(customer?.customerPnlHidden);
+}
+
+function getOrgLabelFromQuery(query) {
+  const rawValue = Array.isArray(query?.orgLabel) ? query.orgLabel[0] : query?.orgLabel;
+  const orgLabel = rawValue == null ? '' : String(rawValue).trim();
+  return orgLabel || null;
+}
+
+function applyOrgLabel(meta, orgLabel) {
+  if (orgLabel) {
+    meta.orgLabel = orgLabel;
+  }
+  return meta;
+}
+
 /**
  * Configure API routes
  * 
@@ -362,6 +379,7 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
 
     try {
       const { hierarchy, selectedId, date, plType } = req.query;
+      const orgLabel = getOrgLabelFromQuery(req.query);
 
       // Validate required parameters
       if (!hierarchy || !selectedId || !date) {
@@ -554,6 +572,7 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
         budgetCensus: subsidiaryCensus.budget,
         headcount: subsidiaryCensus.headcount
       };
+      applyOrgLabel(subsidiaryMeta, orgLabel);
 
       const subsidiaryResultReport = await pnlRenderService.generatePNLReport(
         subsidiaryMonthData,
@@ -620,6 +639,7 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
           budgetCensus: regionCensus.budget,
           headcount: regionCensus.headcount
         };
+        applyOrgLabel(regionMeta, orgLabel);
 
         const regionResult = await pnlRenderService.generatePNLReport(
           regionMonthData,
@@ -662,6 +682,7 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
           budgetCensus: districtCensus.budget,
           headcount: districtCensus.headcount
         };
+        applyOrgLabel(districtMeta, orgLabel);
 
           const districtResult = await pnlRenderService.generatePNLReport(
             districtMonthData,
@@ -704,6 +725,7 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
               parentDistrict: district.districtLabel,
               parentRegion: district.districtRegion || region.regionLabel
             };
+            applyOrgLabel(facilityMeta, orgLabel);
 
             const facilityResult = await pnlRenderService.generatePNLReport(
               facilityMonthData,
@@ -718,7 +740,9 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
               continue;
             }
 
-            facilityReports.push(facilityResult.html);
+            if (!isCustomerPnlHidden(customer)) {
+              facilityReports.push(facilityResult.html);
+            }
             districtFacilityCount++;
             if (!district.districtSummaryExcluded) {
               if (!regionFacilitySeen.has(customer.customer_internal_id)) {
@@ -840,6 +864,7 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
   router.get('/pl/data', async (req, res) => {
     try {
       const { hierarchy, selectedId, date, plType } = req.query;
+      const orgLabel = getOrgLabelFromQuery(req.query);
 
       // Validate required parameters
       if (!hierarchy || !selectedId || !date) {
@@ -1200,6 +1225,7 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
           budgetCensus: districtCensus.budget,
           headcount: districtCensus.headcount
         };
+        applyOrgLabel(districtMeta, orgLabel);
         
         console.log('   Generating district summary P&L (header will be updated with actual counts)...');
         const districtResult = await pnlRenderService.generatePNLReport(
@@ -1255,6 +1281,7 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
             headcount: census.headcount,
             startDateEst: customer.start_date_est
           };
+          applyOrgLabel(facilityMeta, orgLabel);
           
           const facilityResult = await pnlRenderService.generatePNLReport(
             facilityMonthData,
@@ -1267,7 +1294,9 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
           
           // Only include facilities with revenue
           if (!facilityResult.noRevenue) {
-            facilityReports.push(facilityResult.html);
+            if (!isCustomerPnlHidden(customer)) {
+              facilityReports.push(facilityResult.html);
+            }
             facilityCount++;
           }
         }
@@ -1348,6 +1377,7 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
           budgetCensus: regionCensus.budget,
           headcount: regionCensus.headcount
         };
+        applyOrgLabel(regionMeta, orgLabel);
         
         console.log('   Generating region summary P&L (header will be updated with actual counts)...');
         const regionResult = await pnlRenderService.generatePNLReport(
@@ -1409,6 +1439,7 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
             budgetCensus: districtCensus.budget,
             headcount: districtCensus.headcount
           };
+          applyOrgLabel(districtMeta, orgLabel);
           
           const districtResult = await pnlRenderService.generatePNLReport(
             districtData,
@@ -1449,6 +1480,7 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
                 headcount: census.headcount,
                 startDateEst: customer.start_date_est
               };
+              applyOrgLabel(facilityMeta, orgLabel);
               
               const facilityResult = await pnlRenderService.generatePNLReport(
                 facilityData,
@@ -1461,7 +1493,9 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
               
               // Only include facilities that pass the visibility rule
               if (!facilityResult.noRevenue) {
-                htmlParts.push(facilityResult.html);
+                if (!isCustomerPnlHidden(customer)) {
+                  htmlParts.push(facilityResult.html);
+                }
                 districtFacilityCount++;
                 if (!totalFacilitySeen.has(customer.customer_internal_id)) {
                   totalFacilitySeen.add(customer.customer_internal_id);
@@ -1635,6 +1669,7 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
           budgetCensus: subsidiaryCensus.budget,
           headcount: subsidiaryCensus.headcount
         };
+        applyOrgLabel(subsidiaryMeta, orgLabel);
         
         const subsidiaryResult = await pnlRenderService.generatePNLReport(
           subsidiaryMonthData,
@@ -1704,6 +1739,7 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
             budgetCensus: regionCensus.budget,
             headcount: regionCensus.headcount
           };
+          applyOrgLabel(regionMeta, orgLabel);
           
           const regionResult = await pnlRenderService.generatePNLReport(
             regionMonthData,
@@ -1752,6 +1788,7 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
               budgetCensus: districtCensus.budget,
               headcount: districtCensus.headcount
             };
+            applyOrgLabel(districtMeta, orgLabel);
             
           const districtResult = await pnlRenderService.generatePNLReport(
             districtMonthData,
@@ -1796,6 +1833,7 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
                 parentDistrict: district.districtLabel,
                 parentRegion: district.districtRegion || region.regionLabel
               };
+              applyOrgLabel(facilityMeta, orgLabel);
               
               const facilityResult = await pnlRenderService.generatePNLReport(
                 facilityMonthData,
@@ -1810,7 +1848,9 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
                 continue;
               }
               
-              facilityReports.push(facilityResult.html);
+              if (!isCustomerPnlHidden(customer)) {
+                facilityReports.push(facilityResult.html);
+              }
               districtFacilityCount++;
               if (!district.districtSummaryExcluded) {
                 if (!regionFacilitySeen.has(customer.customer_internal_id)) {

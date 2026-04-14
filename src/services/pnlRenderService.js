@@ -8,6 +8,16 @@
 
 const accountService = require('./accountService');
 
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, char => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  }[char]));
+}
+
 /**
  * Formats a number for display in P&L reports
  * Negative numbers shown in parentheses
@@ -134,7 +144,11 @@ function generateHeader(meta) {
   } = meta;
   
   const formattedMonth = formatMonthLabel(monthLabel);
-  const organization = orgLabel || 'Yona Solutions';
+  const organization = orgLabel || '';
+  const subsidiaryServiceSuffix = typeof entityName === 'string' && entityName.includes(' — Service: ')
+    ? entityName.slice(entityName.indexOf(' — Service: '))
+    : '';
+  const subsidiaryTitle = orgLabel ? `${orgLabel}${subsidiaryServiceSuffix}` : entityName;
   const resolvedAccountCount = accountCount != null ? accountCount : facilityCount;
   const resolvedReportType = reportTypeLabel || (() => {
     if (typeLabel === 'Facility') return 'Account';
@@ -160,7 +174,7 @@ function generateHeader(meta) {
     ].join('');
     const htmlParts = parts.map((part, idx) => {
       const sep = idx === 0 ? '' : '<span class="pnl-sep" style="margin:0 2px; color:#888">|</span>';
-      return `${sep}<span class="pnl-header-item" style="white-space:nowrap">${part}</span>`;
+      return `${sep}<span class="pnl-header-item" style="white-space:nowrap">${escapeHtml(part)}</span>`;
     });
 
     return `<div class="${rowClass}" style="${inlineStyle}">${htmlParts.join('')}</div>`;
@@ -178,7 +192,7 @@ function generateHeader(meta) {
     
     return `
       <div class="pnl-report-header" style="text-align:center; margin-bottom:10px">
-        <div class="pnl-title" style="font-weight:700">${entityName}</div>
+        <div class="pnl-title" style="font-weight:700">${escapeHtml(entityName)}</div>
         ${buildRow([organization, parentRegion, parentDistrict], { bold: true, className: 'pnl-header-row-secondary' })}
         ${buildRow([
           formattedMonth,
@@ -191,7 +205,7 @@ function generateHeader(meta) {
   } else if (typeLabel === 'Subsidiary') {
     return `
       <div class="pnl-report-header" style="text-align:center; margin-bottom:10px">
-        <div class="pnl-title" style="font-weight:700">${entityName}</div>
+        <div class="pnl-title" style="font-weight:700">${escapeHtml(subsidiaryTitle)}</div>
         <div class="pnl-subtitle" style="font-weight:700">Actual vs Budget</div>
         ${buildRow([
           formattedMonth,
@@ -213,7 +227,7 @@ function generateHeader(meta) {
   } else if (typeLabel === 'Subsidiary Tag') {
     return `
       <div class="pnl-report-header" style="text-align:center; margin-bottom:10px">
-        <div class="pnl-title" style="font-weight:700">${entityName}</div>
+        <div class="pnl-title" style="font-weight:700">${escapeHtml(subsidiaryTitle)}</div>
         <div class="pnl-subtitle" style="font-weight:700">Actual vs Budget</div>
         ${buildRow([
           formattedMonth,
@@ -235,8 +249,8 @@ function generateHeader(meta) {
   } else if (typeLabel === 'Region') {
     return `
       <div class="pnl-report-header" style="text-align:center; margin-bottom:10px">
-        <div class="pnl-title" style="font-weight:700">${entityName}</div>
-        <div class="pnl-subtitle" style="font-weight:700">${organization}</div>
+        <div class="pnl-title" style="font-weight:700">${escapeHtml(entityName)}</div>
+        <div class="pnl-subtitle" style="font-weight:700">${escapeHtml(organization)}</div>
         ${buildRow([
           formattedMonth,
           districtCount != null ? `Districts: ${districtCount}` : '',
@@ -256,7 +270,7 @@ function generateHeader(meta) {
   } else if (typeLabel === 'District') {
     return `
       <div class="pnl-report-header" style="text-align:center; margin-bottom:10px">
-        <div class="pnl-title" style="font-weight:700">${entityName}</div>
+        <div class="pnl-title" style="font-weight:700">${escapeHtml(entityName)}</div>
         ${buildRow([organization, parentRegion], { bold: true, className: 'pnl-header-row-secondary' })}
         ${buildRow([
           formattedMonth,
@@ -276,7 +290,7 @@ function generateHeader(meta) {
   } else if (typeLabel === 'District Tag') {
     return `
       <div class="pnl-report-header" style="text-align:center; margin-bottom:10px">
-        <div class="pnl-title" style="font-weight:700">${entityName}</div>
+        <div class="pnl-title" style="font-weight:700">${escapeHtml(entityName)}</div>
         ${buildRow([organization, parentRegion], { bold: true, className: 'pnl-header-row-secondary' })}
         ${buildRow([
           formattedMonth,
