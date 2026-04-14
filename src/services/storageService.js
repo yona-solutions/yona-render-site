@@ -9,6 +9,10 @@
 
 const BUCKET_NAME = 'dimension_configurations';
 
+function getDistrictTags(config) {
+  return Array.isArray(config?.districtTags) ? config.districtTags : [];
+}
+
 /**
  * Storage Service Class
  * 
@@ -181,7 +185,7 @@ class StorageService {
    * 
    * Returns both individual districts and unique tag values.
    * Individual districts with districtReportingExcluded are excluded.
-   * Tag values are extracted from the 'tags' field across all entries.
+   * Tag values are extracted from the 'districtTags' field on district entries.
    * 
    * @returns {Promise<Array<{id: string, label: string, type: string}>>} Array of districts and tags
    * @throws {Error} If storage is not initialized or file cannot be parsed
@@ -203,9 +207,10 @@ class StorageService {
         });
       }
       
-      // Collect all unique tag values from the tags field
-      const tags = config.tags || [];
-      tags.forEach(tag => uniqueTags.add(tag));
+      // Collect all unique district tag values from visible districts.
+      if (config.isDistrict && !config.displayExcluded) {
+        getDistrictTags(config).forEach(tag => uniqueTags.add(tag));
+      }
     }
     
     // Add unique tag values as selectable items
@@ -355,8 +360,8 @@ class StorageService {
     if (isTag) {
       // Tag selection: Find all districts with this tag
       for (const [id, config] of Object.entries(configData)) {
-        if (config.isDistrict && !config.districtReportingExcluded && !config.displayExcluded) {
-          const tags = config.tags || [];
+        if (config.isDistrict && !config.displayExcluded) {
+          const tags = getDistrictTags(config);
           if (tags.includes(searchValue)) {
             districtIdsToSearch.push(id);
             console.log(`   Found district with tag: ${id} (${config.label})`);
@@ -409,7 +414,7 @@ class StorageService {
    * - Direct district: Returns all customers whose parent is the specified district
    * - Tag selection: Returns all customers from ALL districts that have the specified tag
    * 
-   * IMPORTANT: For tag selections, districtReportingExcluded is ignored because tags
+   * IMPORTANT: For tag selections, districtReportingExcluded is ignored because district tags
    * represent logical groupings that supersede individual district exclusions.
    * 
    * @param {string} districtId - District ID or tag ID (prefixed with "tag_")
@@ -436,7 +441,7 @@ class StorageService {
       districtDisplayName = searchValue; // For tags, display name is the tag itself
       for (const [id, config] of Object.entries(configData)) {
         if (config.isDistrict && !config.displayExcluded) {
-          const tags = config.tags || [];
+          const tags = getDistrictTags(config);
           if (tags.includes(searchValue)) {
             districtIdsToSearch.push(id);
           }
@@ -662,8 +667,7 @@ class StorageService {
           ...config,
           configOrderIndex: configOrder[configId]
         };
-        const tags = config.tags || [];
-        tags.forEach(tag => districtTags.add(tag));
+        getDistrictTags(config).forEach(tag => districtTags.add(tag));
       }
     }
 
@@ -672,7 +676,7 @@ class StorageService {
     for (const tag of districtTags) {
       tagToDistricts[tag] = [];
       for (const [districtId, config] of Object.entries(districtConfigs)) {
-        const tags = config.tags || [];
+        const tags = getDistrictTags(config);
         if (tags.includes(tag)) {
           tagToDistricts[tag].push(districtId);
         }
@@ -859,8 +863,7 @@ class StorageService {
       for (const [configId, config] of Object.entries(customerConfig)) {
         if (config.isDistrict && !config.displayExcluded) {
           districtConfigs[configId] = config;
-          const tags = config.tags || [];
-          tags.forEach(tag => districtTags.add(tag));
+          getDistrictTags(config).forEach(tag => districtTags.add(tag));
         }
       }
 
@@ -869,7 +872,7 @@ class StorageService {
       for (const tag of districtTags) {
         tagToDistricts[tag] = [];
         for (const [districtId, config] of Object.entries(districtConfigs)) {
-          const tags = config.tags || [];
+          const tags = getDistrictTags(config);
           if (tags.includes(tag)) {
             tagToDistricts[tag].push(districtId);
           }
