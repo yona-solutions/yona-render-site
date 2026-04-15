@@ -805,6 +805,10 @@
     .pnl-report-header {
       text-align: center;
       margin-bottom: 10px;
+      page-break-inside: avoid;
+      break-inside: avoid;
+      page-break-after: avoid;
+      break-after: avoid;
     }
 
     .pnl-title {
@@ -831,6 +835,8 @@
       gap: 6px;
       font-size: 11px;
       line-height: 1.4;
+      page-break-inside: avoid;
+      break-inside: avoid;
     }
 
     .pnl-header-row-secondary {
@@ -854,6 +860,8 @@
       border: none;
       border-top: 1px solid #ccc;
       margin: 8px 0 10px 0;
+      page-break-after: avoid;
+      break-after: avoid;
     }
 
     .pnl-report-table {
@@ -864,6 +872,8 @@
       background: #ffffff;
       padding: 0 15px;
       border: 1px solid #e0e0e0;
+      page-break-before: avoid;
+      break-before: avoid;
     }
 
     .pnl-report-table th,
@@ -1960,8 +1970,8 @@
         // Remove any explicit page-break divs; don't remove report containers
         root.querySelectorAll(".page-break:not(.pnl-report-container)").forEach(el => el.remove());
 
-        // Mark long tables as compact so they fit a single PDF page
-        const compactAccountThreshold = 65;
+        // Mark tall facility tables as compact so their header does not orphan from the table.
+        const compactAccountThreshold = 40;
         root.querySelectorAll(".pnl-report-container").forEach(container => {
           const table = container.querySelector(".pnl-report-table");
           if (!table) return;
@@ -2029,6 +2039,10 @@
       margin-bottom: 4px;
       padding: 0;
       line-height: 1.2;
+      page-break-inside: avoid;
+      break-inside: avoid;
+      page-break-after: avoid;
+      break-after: avoid;
     }
 
     .pnl-report-header .pnl-title {
@@ -2060,6 +2074,8 @@
       font-size: 8px;
       line-height: 1.2;
       margin: 0;
+      page-break-inside: avoid;
+      break-inside: avoid;
     }
 
     .pnl-header-row-secondary {
@@ -2083,6 +2099,8 @@
       border: none;
       border-top: 1px solid #ccc;
       margin: 4px 0 6px 0;
+      page-break-after: avoid;
+      break-after: avoid;
     }
 
     /* ---------------- Table Styles ---------------- */
@@ -2093,6 +2111,8 @@
       font-size: 8.5px;
       background: #ffffff;
       table-layout: auto;
+      page-break-before: avoid;
+      break-before: avoid;
     }
 
     .pnl-report-table th,

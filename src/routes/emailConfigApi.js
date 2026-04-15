@@ -1261,6 +1261,10 @@ function buildPDFHTML(content) {
       margin-bottom: 6px;
       padding: 0;
       line-height: 1.2;
+      page-break-inside: avoid;
+      break-inside: avoid;
+      page-break-after: avoid;
+      break-after: avoid;
     }
 
     .pnl-report-header .pnl-title {
@@ -1292,6 +1296,8 @@ function buildPDFHTML(content) {
       font-size: 8px;
       line-height: 1.2;
       margin: 0;
+      page-break-inside: avoid;
+      break-inside: avoid;
     }
 
     .pnl-header-row-secondary {
@@ -1315,6 +1321,8 @@ function buildPDFHTML(content) {
       border: none;
       border-top: 1px solid #ccc;
       margin: 4px 0 6px 0;
+      page-break-after: avoid;
+      break-after: avoid;
     }
 
     /* ---------------- Table Styles ---------------- */
@@ -1325,6 +1333,8 @@ function buildPDFHTML(content) {
       font-size: 7.5px;
       background: #ffffff;
       table-layout: auto;
+      page-break-before: avoid;
+      break-before: avoid;
     }
 
     .pnl-report-table th,

@@ -774,6 +774,10 @@ class EmailSchedulerService {
       margin-bottom: 6px;
       padding: 0;
       line-height: 1.2;
+      page-break-inside: avoid;
+      break-inside: avoid;
+      page-break-after: avoid;
+      break-after: avoid;
     }
     .pnl-report-header .pnl-title {
       font-weight: 700;
@@ -801,6 +805,8 @@ class EmailSchedulerService {
       font-size: 8px;
       line-height: 1.2;
       margin: 0;
+      page-break-inside: avoid;
+      break-inside: avoid;
     }
     .pnl-header-row-secondary {
       font-weight: 700;
@@ -819,12 +825,16 @@ class EmailSchedulerService {
       border: none;
       border-top: 1px solid #ccc;
       margin: 6px 0 10px 0;
+      page-break-after: avoid;
+      break-after: avoid;
     }
     .pnl-report-table {
       width: 100%;
       border-collapse: collapse;
       font-size: 8px;
       table-layout: auto;
+      page-break-before: avoid;
+      break-before: avoid;
     }
     .pnl-report-table th,
     .pnl-report-table td {
