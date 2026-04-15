@@ -95,6 +95,22 @@ function isCustomerPnlHidden(customer) {
   return Boolean(customer?.customerPnlHidden);
 }
 
+function isNoCustomer(customer) {
+  return customer?.customer_internal_id != null && Number(customer.customer_internal_id) === 0;
+}
+
+function isCustomerPnlCountExcluded(customer) {
+  return isNoCustomer(customer) || Boolean(customer?.customerPnlCountExcluded);
+}
+
+function shouldCountDistrict(district) {
+  return !district?.districtSummaryExcluded && !district?.districtPnlCountExcluded;
+}
+
+function shouldCountFacility(customer) {
+  return !isCustomerPnlCountExcluded(customer);
+}
+
 function getOrgLabelFromQuery(query) {
   const rawValue = Array.isArray(query?.orgLabel) ? query.orgLabel[0] : query?.orgLabel;
   const orgLabel = rawValue == null ? '' : String(rawValue).trim();
@@ -559,6 +575,7 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
       let totalDistrictCount = 0;
       let totalFacilityCount = 0;
       const totalFacilitySeen = new Set();
+      const totalRevenueFacilitySeen = new Set();
 
       const subsidiaryMeta = {
         typeLabel: isTag ? 'Subsidiary Tag' : 'Subsidiary',
@@ -697,7 +714,7 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
             continue;
           }
           
-          if (!district.districtSummaryExcluded) {
+          if (shouldCountDistrict(district)) {
             totalDistrictCount++;
             regionDistrictCount++;
           }
@@ -743,8 +760,11 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
             if (!isCustomerPnlHidden(customer)) {
               facilityReports.push(facilityResult.html);
             }
-            districtFacilityCount++;
-            if (!district.districtSummaryExcluded) {
+            totalRevenueFacilitySeen.add(customer.customer_internal_id);
+            if (shouldCountFacility(customer)) {
+              districtFacilityCount++;
+            }
+            if (!district.districtSummaryExcluded && shouldCountFacility(customer)) {
               if (!regionFacilitySeen.has(customer.customer_internal_id)) {
                 regionFacilitySeen.add(customer.customer_internal_id);
                 regionFacilityCount++;
@@ -797,7 +817,7 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
         for (const d of r.districts) {
           for (const c of d.customers) {
             const id = c.customer_internal_id;
-            if (id != null && !seen.has(id) && totalFacilitySeen.has(id)) {
+            if (id != null && !seen.has(id) && totalRevenueFacilitySeen.has(id)) {
               seen.add(id);
               customers.push(c.label || id);
             }
@@ -1297,7 +1317,9 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
             if (!isCustomerPnlHidden(customer)) {
               facilityReports.push(facilityResult.html);
             }
-            facilityCount++;
+            if (shouldCountFacility(customer)) {
+              facilityCount++;
+            }
           }
         }
         
@@ -1456,7 +1478,9 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
             if (!districtGroup.districtSummaryExcluded) {
               districtHtmlIndex = htmlParts.length; // Remember position for later update
               htmlParts.push(districtResult.html); // Temporary placeholder
-              totalDistrictCount++; // Count this district (visible summary)
+              if (shouldCountDistrict(districtGroup)) {
+                totalDistrictCount++; // Count this district (visible summary)
+              }
             }
             
             // 3b. Generate facility P&Ls for customers in this district (filter in memory)
@@ -1496,8 +1520,10 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
                 if (!isCustomerPnlHidden(customer)) {
                   htmlParts.push(facilityResult.html);
                 }
-                districtFacilityCount++;
-                if (!totalFacilitySeen.has(customer.customer_internal_id)) {
+                if (shouldCountFacility(customer)) {
+                  districtFacilityCount++;
+                }
+                if (shouldCountFacility(customer) && !totalFacilitySeen.has(customer.customer_internal_id)) {
                   totalFacilitySeen.add(customer.customer_internal_id);
                   totalFacilityCount++;
                 }
@@ -1804,7 +1830,7 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
             continue;
           }
           
-          if (!district.districtSummaryExcluded) {
+          if (shouldCountDistrict(district)) {
             totalDistrictCount++;
             regionDistrictCount++;
           }
@@ -1851,8 +1877,10 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
               if (!isCustomerPnlHidden(customer)) {
                 facilityReports.push(facilityResult.html);
               }
-              districtFacilityCount++;
-              if (!district.districtSummaryExcluded) {
+              if (shouldCountFacility(customer)) {
+                districtFacilityCount++;
+              }
+              if (!district.districtSummaryExcluded && shouldCountFacility(customer)) {
                 if (!regionFacilitySeen.has(customer.customer_internal_id)) {
                   regionFacilitySeen.add(customer.customer_internal_id);
                   regionFacilityCount++;

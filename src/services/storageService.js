@@ -598,7 +598,8 @@ class StorageService {
             configId: id,
             parentDistrictId: config.parent,
             start_date_est: config.start_date_est,
-            customerPnlHidden: Boolean(config.customerPnlHidden)
+            customerPnlHidden: Boolean(config.customerPnlHidden),
+            customerPnlCountExcluded: Boolean(config.customerPnlCountExcluded)
           });
         }
       }
@@ -663,7 +664,8 @@ class StorageService {
           customer_internal_id: config.customer_internal_id,
           label: config.label,
           configId: id,
-          customerPnlHidden: Boolean(config.customerPnlHidden)
+          customerPnlHidden: Boolean(config.customerPnlHidden),
+          customerPnlCountExcluded: Boolean(config.customerPnlCountExcluded)
         });
       }
     }
@@ -829,7 +831,8 @@ class StorageService {
           customers: [],
           configOrderIndex: config.configOrderIndex,
           districtRegion: config.districtRegion || config.region_label || null,
-          districtSummaryExcluded: Boolean(config.districtSummaryExcluded)
+          districtSummaryExcluded: Boolean(config.districtSummaryExcluded),
+          districtPnlCountExcluded: Boolean(config.districtPnlCountExcluded)
         });
       }
     }
@@ -870,7 +873,8 @@ class StorageService {
             configId: customerConfig.configId,
             parentDistrictId,
             configOrderIndex: customerConfig.configOrderIndex,
-            customerPnlHidden: Boolean(customerConfig.customerPnlHidden)
+            customerPnlHidden: Boolean(customerConfig.customerPnlHidden),
+            customerPnlCountExcluded: Boolean(customerConfig.customerPnlCountExcluded)
           });
         });
       } else {
@@ -1023,7 +1027,8 @@ class StorageService {
           customers: [],
           order: orderIndex++,
           districtRegion: config.districtRegion || config.region_label || null,
-          districtSummaryExcluded: Boolean(config.districtSummaryExcluded)
+          districtSummaryExcluded: Boolean(config.districtSummaryExcluded),
+          districtPnlCountExcluded: Boolean(config.districtPnlCountExcluded)
         });
       }
     }
@@ -1062,7 +1067,8 @@ class StorageService {
               configId: customerConfigEntry.configId,
               parentDistrictId,
               configOrderIndex: customerConfigEntry.configOrderIndex,
-              customerPnlHidden: Boolean(customerConfigEntry.customerPnlHidden)
+              customerPnlHidden: Boolean(customerConfigEntry.customerPnlHidden),
+              customerPnlCountExcluded: Boolean(customerConfigEntry.customerPnlCountExcluded)
             });
           });
         } else {
@@ -1125,7 +1131,8 @@ class StorageService {
           configId: noCustomerConfigEntry?.configId,
           parentDistrictId: noCustomerParentDistrictId,
           configOrderIndex: noCustomerConfigEntry?.configOrderIndex,
-          customerPnlHidden: Boolean(noCustomerConfigEntry?.customerPnlHidden)
+          customerPnlHidden: Boolean(noCustomerConfigEntry?.customerPnlHidden),
+          customerPnlCountExcluded: Boolean(noCustomerConfigEntry?.customerPnlCountExcluded)
         });
         // Re-sort so customer 0 lands in its dimension-config display position.
         const pathCache = {};
