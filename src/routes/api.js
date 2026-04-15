@@ -22,6 +22,10 @@ function normalizeCensusMonth(date) {
 
 function getCustomerCodeFromLabel(label) {
   if (!label) return null;
+  // Match uppercase letters followed by digits at the start (e.g. RED41, BAR91, FFB91)
+  const match = String(label).match(/^([A-Z]{2,5}\d{2,3})\b/);
+  if (match) return match[1];
+  // Fallback: split on ' - '
   const parts = String(label).split(' - ');
   return parts.length > 0 ? parts[0].trim() : null;
 }

@@ -582,13 +582,11 @@ class StorageService {
         if (config.customer_internal_id && !seenIds.has(config.customer_internal_id)) {
           seenIds.add(config.customer_internal_id);
           
-          // Extract customer_code from label (format: "CODE - Name")
+          // Extract customer_code from label — prefer direct field, then regex, then dash split
           let customerCode = config.customer_code;
           if (!customerCode && config.label) {
-            const parts = config.label.split(' - ');
-            if (parts.length > 0) {
-              customerCode = parts[0].trim();
-            }
+            const match = config.label.match(/^([A-Z]{2,5}\d{2,3})\b/);
+            customerCode = match ? match[1] : config.label.split(' - ')[0]?.trim();
           }
           
           customers.push({
@@ -870,6 +868,7 @@ class StorageService {
         matchingGroups.forEach(group => {
           group.customers.push({
             ...customer,
+            label: customerConfig.label || customer.label,
             configId: customerConfig.configId,
             parentDistrictId,
             configOrderIndex: customerConfig.configOrderIndex,
@@ -881,7 +880,7 @@ class StorageService {
         console.warn(`⚠ Customer ${customerId} parent district ${parentDistrictId} not in any group (likely excluded)`);
       }
       }
-    
+
     // Sort customers within each group the same way the dimension config tree displays them.
     // District tags flatten multiple districts, so they sort by parent district path first.
     const pathCache = {};
@@ -1064,6 +1063,7 @@ class StorageService {
           matchingGroups.forEach(group => {
             group.customers.push({
               ...customer,
+              label: customerConfigEntry.label || customer.label,
               configId: customerConfigEntry.configId,
               parentDistrictId,
               configOrderIndex: customerConfigEntry.configOrderIndex,

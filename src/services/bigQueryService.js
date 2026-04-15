@@ -18,7 +18,7 @@ class BigQueryService {
    */
   constructor(bigquery) {
     this.bigquery = bigquery;
-    this.dataset = 'dbt_production';
+    this.dataset = process.env.BIGQUERY_DATASET || 'dbt_production';
   }
 
   /**
