@@ -948,6 +948,7 @@
       <div class="nav-item" onclick="window.location.href='/email-config'">Email Config</div>
       <div class="nav-item" onclick="window.location.href='/run-log'">Run Log</div>
       <div class="nav-item" onclick="window.location.href='/gcs-import'">NetSuite Sync</div>
+      <div class="nav-item" onclick="window.location.href='/settings'">Settings</div>
     </nav>
   </div>
 
@@ -1489,6 +1490,13 @@
     }
 
     // Initialize searchable selects and load data
+    // Load global PDF row height setting
+    window.pdfRowHeight = 12.5;
+    authFetch('/api/app-settings/pdf_row_height')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data) window.pdfRowHeight = parseFloat(data.value); })
+      .catch(() => {});
+
     document.addEventListener('DOMContentLoaded', async () => {
       // Initialize searchable select components
       monthSelect = new SearchableSelect('monthSelectWrapper');
@@ -1996,6 +2004,10 @@
         console.log(`📊 Filtered to ${kept.length} reports with non-zero net income`);
 
         // 3) Build the complete printable HTML with styles
+        const rowH = window.pdfRowHeight || 12.5;
+        const tblFont = (rowH * 8.5 / 12.5).toFixed(2);
+        const compactRowH = (rowH * 11 / 12.5).toFixed(2);
+        const compactFont = (rowH * 7.25 / 12.5).toFixed(2);
         const debugLayout = false;
         const debugBanner = debugLayout ? '<div class="pdf-debug-top"></div>' : '';
         const fullHTML = `<!DOCTYPE html>
@@ -2108,7 +2120,7 @@
       width: 100%;
       margin: 0 auto;
       border-collapse: collapse;
-      font-size: 8.5px;
+      font-size: ${tblFont}px;
       background: #ffffff;
       table-layout: auto;
       page-break-before: avoid;
@@ -2120,20 +2132,20 @@
       padding: 2px 2px;
       border: none;
       white-space: nowrap;
-      height: 12.5px;
+      height: ${rowH}px;
       line-height: 1.22;
       vertical-align: middle;
     }
 
     .pnl-compact-table tbody td {
       padding: 1.25px 1px;
-      height: 11px;
+      height: ${compactRowH}px;
       line-height: 1.15;
-      font-size: 7.25px;
+      font-size: ${compactFont}px;
     }
 
     .pnl-compact-table tbody td:first-child {
-      font-size: 7.25px;
+      font-size: ${compactFont}px;
       max-width: 140px;
       white-space: nowrap;
     }
@@ -2148,7 +2160,7 @@
       text-align: center;
       border-bottom: 1px solid #fff;
       background: transparent;
-      font-size: 8.5px;
+      font-size: ${tblFont}px;
     }
 
     .pnl-report-table th:not(:first-child) {
@@ -2178,13 +2190,13 @@
       white-space: normal;
       word-wrap: break-word;
       max-width: 140px;
-      font-size: 8.5px;
+      font-size: ${tblFont}px;
     }
 
     .pnl-report-table td:not(:first-child),
     .pnl-report-table th:not(:first-child) {
       text-align: right;
-      font-size: 8.5px;
+      font-size: ${tblFont}px;
     }
 
     /* Centered dashes for empty values - but not for the gap column (7th column) */
@@ -2223,6 +2235,7 @@
         page-break-after: always;
       }
     }
+
   </style>
 </head>
 <body>
@@ -2236,7 +2249,11 @@
           source: fullHTML,
           landscape: false,
           use_print: true,
-          margin: { top: 0, bottom: 0, left: 20, right: 20 }
+          margin: { top: 0, bottom: 0, left: 20, right: 20 },
+          footer: {
+            source: '<div style="width:100%;text-align:center;font-size:8px;font-family:Arial,sans-serif;color:#aaa;padding-bottom:6px;">{{ page }}</div>',
+            height: '20px'
+          }
         };
         console.log('🔄 Calling PDFShift API...');
         console.log('🧪 PDFShift options:', pdfshiftOptions);

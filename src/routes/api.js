@@ -2721,6 +2721,43 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
     }
   });
 
+  // ============================================================
+  // Global App Settings
+  // ============================================================
+
+  router.get('/app-settings/:key', async (req, res) => {
+    if (!pgPool) return res.status(503).json({ error: 'Database not available' });
+    try {
+      const { rows } = await pgPool.query(
+        'SELECT value FROM global_settings WHERE key = $1',
+        [req.params.key]
+      );
+      if (!rows.length) return res.status(404).json({ error: 'Setting not found' });
+      res.json({ key: req.params.key, value: rows[0].value });
+    } catch (error) {
+      console.error('Error fetching app setting:', error);
+      res.status(500).json({ error: 'Failed to fetch setting' });
+    }
+  });
+
+  router.put('/app-settings/:key', async (req, res) => {
+    if (!pgPool) return res.status(503).json({ error: 'Database not available' });
+    const { value } = req.body;
+    if (value === undefined) return res.status(400).json({ error: 'value is required' });
+    try {
+      await pgPool.query(
+        `INSERT INTO global_settings (key, value, updated_at)
+         VALUES ($1, $2, NOW())
+         ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = NOW()`,
+        [req.params.key, String(value)]
+      );
+      res.json({ key: req.params.key, value: String(value) });
+    } catch (error) {
+      console.error('Error saving app setting:', error);
+      res.status(500).json({ error: 'Failed to save setting' });
+    }
+  });
+
   return router;
 }
 

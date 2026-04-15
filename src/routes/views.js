@@ -91,9 +91,14 @@ function createViewRoutes() {
     res.sendFile(path.join(publicPath, 'gcs-import.html'));
   });
 
-  // Future routes can be added here:
-  // router.get('/reports', ...) 
-  // router.get('/settings', ...)
+  /**
+   * Settings page
+   *
+   * GET /settings
+   */
+  router.get('/settings', (req, res) => {
+    res.sendFile(path.join(publicPath, 'settings.html'));
+  });
 
   return router;
 }

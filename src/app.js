@@ -61,6 +61,21 @@ async function createApp() {
     console.warn('⚠️  DATABASE_URL not set - email configuration features disabled');
   }
 
+  // Ensure global_settings table exists
+  if (process.env.DATABASE_URL && emailConfigService.isAvailable()) {
+    try {
+      await emailConfigService.pool.query(`
+        CREATE TABLE IF NOT EXISTS global_settings (
+          key VARCHAR(255) PRIMARY KEY,
+          value TEXT NOT NULL,
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `);
+    } catch (error) {
+      console.warn('⚠️  Could not ensure global_settings table:', error.message);
+    }
+  }
+
   // Ensure gcs_import_logs table exists (safety net)
   if (process.env.DATABASE_URL && emailConfigService.isAvailable()) {
     try {

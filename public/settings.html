@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/png" href="/yona-sphere-blue-glow.png">
+  <title>SPHERE - Settings</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+      display: flex;
+      height: 100vh;
+      background: #f8f9fa;
+      overflow: hidden;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      width: 195px;
+      background: #ffffff;
+      border-right: 1px solid #dfe3e8;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 1px 0 0 rgba(0,0,0,0.02);
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 100vh;
+      overflow-y: auto;
+      z-index: 100;
+    }
+
+    .logo {
+      padding: 18px 20px;
+      border-bottom: 1px solid #dfe3e8;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 27px;
+      font-weight: 600;
+      color: #4a7a9b;
+      letter-spacing: -0.3px;
+    }
+
+    .logo-icon {
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .logo-icon img {
+      width: 28px;
+      height: 28px;
+      object-fit: contain;
+    }
+
+    .nav-menu {
+      flex: 1;
+      padding: 8px 0;
+    }
+
+    .nav-item {
+      padding: 11px 20px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      color: #4a5568;
+      font-size: 13.5px;
+      font-weight: 400;
+      border-left: 3px solid transparent;
+    }
+
+    .nav-item:hover:not(.disabled) {
+      background: #f7fafc;
+      color: #2d3748;
+    }
+
+    .nav-item.active {
+      background: #e6f0f8;
+      color: #2d4a68;
+      font-weight: 500;
+      border-left-color: #4a7c9e;
+    }
+
+    .nav-item.disabled {
+      color: #cbd5e0;
+      cursor: not-allowed;
+    }
+
+    /* Main Content */
+    .main-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      background: #f8f9fa;
+      margin-left: 195px;
+    }
+
+    /* Header */
+    .page-header {
+      background: #ffffff;
+      padding: 20px 32px;
+      border-bottom: 1px solid #e0e0e0;
+    }
+
+    .page-header h1 {
+      font-size: 20px;
+      font-weight: 600;
+      color: #2d3748;
+    }
+
+    .page-header p {
+      font-size: 13px;
+      color: #718096;
+      margin-top: 4px;
+    }
+
+    /* Content */
+    .content {
+      padding: 28px 32px;
+      max-width: 640px;
+    }
+
+    .settings-section {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+
+    .settings-section h2 {
+      font-size: 15px;
+      font-weight: 600;
+      color: #2d3748;
+      margin-bottom: 4px;
+    }
+
+    .section-desc {
+      font-size: 12.5px;
+      color: #718096;
+      margin-bottom: 22px;
+    }
+
+    .setting-label {
+      font-size: 13px;
+      font-weight: 500;
+      color: #4a5568;
+      margin-bottom: 14px;
+    }
+
+    /* Stepper control */
+    .stepper-row {
+      display: flex;
+      align-items: center;
+      gap: 0;
+    }
+
+    .stepper-btn {
+      width: 34px;
+      height: 34px;
+      border: 1px solid #cbd5e0;
+      background: #f7fafc;
+      font-size: 18px;
+      line-height: 1;
+      color: #4a5568;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .stepper-btn:first-child {
+      border-radius: 5px 0 0 5px;
+    }
+
+    .stepper-btn:last-of-type {
+      border-radius: 0 5px 5px 0;
+    }
+
+    .stepper-btn:hover {
+      background: #edf2f7;
+      border-color: #a0aec0;
+    }
+
+    .stepper-btn:active {
+      background: #e2e8f0;
+    }
+
+    .stepper-input {
+      width: 72px;
+      height: 34px;
+      border: 1px solid #cbd5e0;
+      border-left: none;
+      border-right: none;
+      text-align: center;
+      font-size: 14px;
+      font-weight: 600;
+      color: #2d4a68;
+      font-family: inherit;
+      outline: none;
+    }
+
+    .stepper-input:focus {
+      border-color: #4a7c9e;
+      box-shadow: 0 0 0 2px rgba(74,124,158,0.15);
+      position: relative;
+      z-index: 1;
+    }
+
+    .stepper-unit {
+      font-size: 12px;
+      color: #a0aec0;
+      margin-left: 8px;
+    }
+
+    .font-preview {
+      font-size: 12px;
+      color: #718096;
+      margin-top: 10px;
+    }
+
+    /* Saved indicator */
+    .save-indicator {
+      font-size: 12px;
+      color: #48bb78;
+      font-weight: 500;
+      margin-top: 14px;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      height: 16px;
+    }
+
+    .browser-note {
+      font-size: 12px;
+      color: #a0aec0;
+      margin-top: 16px;
+    }
+  </style>
+</head>
+<body>
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="logo">
+      <div class="logo-icon"><img src="yona-sphere-blue-glow.png" alt="Sphere"></div>
+      <span>SPHERE</span>
+    </div>
+    <nav class="nav-menu">
+      <div class="nav-item" onclick="window.location.href='/'">P&amp;L View</div>
+      <div class="nav-item" onclick="window.location.href='/customer-explorer'">Customer Explorer</div>
+      <div class="nav-item" onclick="window.location.href='/pl-logic'">P&amp;L Logic</div>
+      <div class="nav-item" onclick="window.location.href='/dimension-config'">Dimension Config</div>
+      <div class="nav-item" onclick="window.location.href='/email-config'">Email Config</div>
+      <div class="nav-item" onclick="window.location.href='/run-log'">Run Log</div>
+      <div class="nav-item" onclick="window.location.href='/gcs-import'">NetSuite Sync</div>
+      <div class="nav-item active">Settings</div>
+    </nav>
+  </div>
+
+  <!-- Main Content -->
+  <div class="main-content">
+    <div class="page-header">
+      <h1>Settings</h1>
+      <p>Adjust app preferences. Settings are saved globally across all users.</p>
+    </div>
+
+    <div class="content">
+      <div class="settings-section">
+        <h2>PDF Print Size</h2>
+        <p class="section-desc">Controls the row height and text size of P&amp;L reports when downloaded as PDFs. The page margins are not affected.</p>
+
+        <div class="setting-label">Row Height</div>
+        <div class="stepper-row">
+          <button class="stepper-btn" id="decreaseBtn">−</button>
+          <input type="number" class="stepper-input" id="rowHeightInput" min="10" max="18" step="0.5" placeholder="—">
+          <button class="stepper-btn" id="increaseBtn">+</button>
+          <span class="stepper-unit">px</span>
+        </div>
+        <div class="font-preview" id="fontPreview">Font size: 8.50px</div>
+
+        <div class="save-indicator" id="saveIndicator">Saved</div>
+        <div class="browser-note">Saved globally. Changes apply to all users.</div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="/auth.js"></script>
+  <script>
+    const input = document.getElementById('rowHeightInput');
+    const decreaseBtn = document.getElementById('decreaseBtn');
+    const increaseBtn = document.getElementById('increaseBtn');
+    const fontPreview = document.getElementById('fontPreview');
+    const indicator = document.getElementById('saveIndicator');
+
+    const MIN = 10, MAX = 18, STEP = 0.5;
+    const BASE_FONT = 8.5, BASE_ROW = 12.5;
+
+    function clamp(v) {
+      return Math.min(MAX, Math.max(MIN, Math.round(v / STEP) * STEP));
+    }
+
+    function updatePreview(rowH) {
+      const font = (rowH * BASE_FONT / BASE_ROW).toFixed(2);
+      fontPreview.textContent = `Font size: ${font}px`;
+    }
+
+    function showSaved() {
+      indicator.style.opacity = '1';
+      setTimeout(() => { indicator.style.opacity = '0'; }, 1500);
+    }
+
+    async function applyValue(rowH) {
+      rowH = clamp(rowH);
+      input.value = rowH;
+      updatePreview(rowH);
+      try {
+        await authFetch('/api/app-settings/pdf_row_height', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ value: rowH })
+        });
+        showSaved();
+      } catch (e) {
+        console.error('Failed to save setting:', e);
+      }
+    }
+
+    // Disable controls until value loads
+    input.disabled = true;
+    decreaseBtn.disabled = true;
+    increaseBtn.disabled = true;
+
+    // Load saved value from server
+    (async () => {
+      try {
+        const res = await authFetch('/api/app-settings/pdf_row_height');
+        if (res.ok) {
+          const data = await res.json();
+          const val = parseFloat(data.value);
+          input.value = val;
+          updatePreview(val);
+        }
+      } catch (e) {
+        input.value = 12.5;
+        updatePreview(12.5);
+      } finally {
+        input.disabled = false;
+        decreaseBtn.disabled = false;
+        increaseBtn.disabled = false;
+      }
+    })();
+
+    decreaseBtn.addEventListener('click', () => applyValue(parseFloat(input.value) - STEP));
+    increaseBtn.addEventListener('click', () => applyValue(parseFloat(input.value) + STEP));
+
+    input.addEventListener('change', () => applyValue(parseFloat(input.value) || BASE_ROW));
+  </script>
+</body>
+</html>
