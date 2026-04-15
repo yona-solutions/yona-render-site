@@ -13,6 +13,120 @@ function getDistrictTags(config) {
   return Array.isArray(config?.districtTags) ? config.districtTags : [];
 }
 
+function getDimensionDisplayOrder(id, config) {
+  if (config?.order !== undefined && config.order !== null) {
+    return config.order;
+  }
+
+  const numericId = Number(id);
+  return Number.isNaN(numericId) ? id : numericId;
+}
+
+function compareDimensionOrderValues(a, b) {
+  if (typeof a === 'number' && typeof b === 'number') {
+    return a - b;
+  }
+
+  return String(a).localeCompare(String(b));
+}
+
+function buildConfigOrderIndex(configData) {
+  const configOrder = {};
+  let orderIdx = 0;
+  for (const configId of Object.keys(configData)) {
+    configOrder[configId] = orderIdx++;
+  }
+  return configOrder;
+}
+
+function compareConfigIdsByDisplayOrder(configData, configOrder, aId, bId) {
+  const orderCompare = compareDimensionOrderValues(
+    getDimensionDisplayOrder(aId, configData[aId]),
+    getDimensionDisplayOrder(bId, configData[bId])
+  );
+
+  if (orderCompare !== 0) {
+    return orderCompare;
+  }
+
+  const aConfigOrder = configOrder[aId] ?? Infinity;
+  const bConfigOrder = configOrder[bId] ?? Infinity;
+  if (aConfigOrder !== bConfigOrder) {
+    if (!Number.isFinite(aConfigOrder) && !Number.isFinite(bConfigOrder)) {
+      return String(aId).localeCompare(String(bId));
+    }
+    return aConfigOrder - bConfigOrder;
+  }
+
+  return 0;
+}
+
+function getConfigDisplayPath(configData, configOrder, id, cache = {}) {
+  if (cache[id]) {
+    return cache[id];
+  }
+
+  const config = configData[id];
+  if (!config) {
+    cache[id] = [{ id, order: getDimensionDisplayOrder(id, null), configOrderIndex: configOrder[id] ?? Infinity }];
+    return cache[id];
+  }
+
+  const ownPathItem = {
+    id,
+    order: getDimensionDisplayOrder(id, config),
+    configOrderIndex: configOrder[id] ?? Infinity
+  };
+
+  if (config.parent != null && configData[config.parent]) {
+    cache[id] = [...getConfigDisplayPath(configData, configOrder, config.parent, cache), ownPathItem];
+  } else {
+    cache[id] = [ownPathItem];
+  }
+
+  return cache[id];
+}
+
+function compareConfigIdsByDisplayPath(configData, configOrder, aId, bId, pathCache = {}) {
+  const aPath = getConfigDisplayPath(configData, configOrder, aId, pathCache);
+  const bPath = getConfigDisplayPath(configData, configOrder, bId, pathCache);
+  const max = Math.min(aPath.length, bPath.length);
+
+  for (let i = 0; i < max; i++) {
+    const orderCompare = compareDimensionOrderValues(aPath[i].order, bPath[i].order);
+    if (orderCompare !== 0) {
+      return orderCompare;
+    }
+
+    const aConfigOrder = aPath[i].configOrderIndex;
+    const bConfigOrder = bPath[i].configOrderIndex;
+    if (aConfigOrder !== bConfigOrder) {
+      if (!Number.isFinite(aConfigOrder) && !Number.isFinite(bConfigOrder)) {
+        return String(aPath[i].id).localeCompare(String(bPath[i].id));
+      }
+      return aConfigOrder - bConfigOrder;
+    }
+  }
+
+  return aPath.length - bPath.length;
+}
+
+function compareCustomersByDisplayOrder(configData, configOrder, a, b, { groupIsTag = false, pathCache = {} } = {}) {
+  if (groupIsTag) {
+    const aParent = a.parentDistrictId || configData[a.configId]?.parent;
+    const bParent = b.parentDistrictId || configData[b.configId]?.parent;
+
+    if (aParent && bParent && aParent !== bParent) {
+      const parentCompare = compareConfigIdsByDisplayPath(configData, configOrder, aParent, bParent, pathCache);
+      if (parentCompare !== 0) {
+        return parentCompare;
+      }
+    }
+  }
+
+  return compareConfigIdsByDisplayOrder(configData, configOrder, a.configId, b.configId);
+}
+
 /**
  * Storage Service Class
  * 
@@ -422,6 +536,7 @@ class StorageService {
    */
   async getCustomersForDistrict(districtId) {
     const configData = await this.getFileAsJson('customer_config.json');
+    const configOrder = buildConfigOrderIndex(configData);
     const customers = [];
     const seenIds = new Set(); // Avoid duplicates
     let districtDisplayName = districtId; // Default to ID if not found
@@ -481,12 +596,19 @@ class StorageService {
             customer_code: customerCode,
             label: config.label,
             configId: id,
+            parentDistrictId: config.parent,
             start_date_est: config.start_date_est,
             customerPnlHidden: Boolean(config.customerPnlHidden)
           });
         }
       }
     }
+
+    const pathCache = {};
+    customers.sort((a, b) => compareCustomersByDisplayOrder(configData, configOrder, a, b, {
+      groupIsTag: isTag,
+      pathCache
+    }));
     
     return {
       customers,
@@ -629,7 +751,7 @@ class StorageService {
    * Group customers by their parent district
    * 
    * Takes a list of customers (with customer_internal_id) and groups them by their parent district
-   * from customer_config.json. Returns districts ordered by their position in the config file.
+   * from customer_config.json. Customers inside each group follow the dimension-config display order.
    * 
    * @param {Array<Object>} customers - Array of customer objects with customer_internal_id
    * @returns {Promise<Array<Object>>} Array of district objects with {districtId, districtLabel, customers: []}
@@ -637,13 +759,7 @@ class StorageService {
    */
   async groupCustomersByDistrict(customers) {
     const configData = await this.getFileAsJson('customer_config.json');
-
-    // Build config order map (preserves JSON file order)
-    const configOrder = {};
-    let orderIdx = 0;
-    for (const configId of Object.keys(configData)) {
-      configOrder[configId] = orderIdx++;
-    }
+    const configOrder = buildConfigOrderIndex(configData);
 
     // Build reverse lookup: customer_internal_id -> config entry
     const customerIdToConfig = {};
@@ -657,7 +773,7 @@ class StorageService {
       }
     }
 
-    // Collect all unique district tags and districts (with their config order)
+    // Collect all unique district tags and districts.
     const districtTags = new Set();
     const districtConfigs = {};
 
@@ -688,9 +804,9 @@ class StorageService {
     // Build groups (tags + individual districts not in any tag)
     const groups = [];
 
-    // First, create groups for district tags (order by first district's config position)
+    // First, create groups for district tags.
     for (const [tag, districtIds] of Object.entries(tagToDistricts)) {
-      // Use the minimum config order of districts in this tag for sorting
+      // Keep the first district config position available for existing consumers/debugging.
       const minOrder = Math.min(...districtIds.map(id => districtConfigs[id]?.configOrderIndex ?? Infinity));
       groups.push({
         districtId: `tag_${tag}`,
@@ -752,6 +868,7 @@ class StorageService {
           group.customers.push({
             ...customer,
             configId: customerConfig.configId,
+            parentDistrictId,
             configOrderIndex: customerConfig.configOrderIndex,
             customerPnlHidden: Boolean(customerConfig.customerPnlHidden)
           });
@@ -761,9 +878,14 @@ class StorageService {
       }
       }
     
-    // Sort customers within each group by config file order
+    // Sort customers within each group the same way the dimension config tree displays them.
+    // District tags flatten multiple districts, so they sort by parent district path first.
+    const pathCache = {};
     for (const group of groups) {
-      group.customers.sort((a, b) => (a.configOrderIndex ?? Infinity) - (b.configOrderIndex ?? Infinity));
+      group.customers.sort((a, b) => compareCustomersByDisplayOrder(configData, configOrder, a, b, {
+        groupIsTag: group.isTag,
+        pathCache
+      }));
     }
 
     // Filter out groups with no customers and sort alphabetically by district label
@@ -790,13 +912,7 @@ class StorageService {
   async groupCustomersByRegionAndDistrict(customers) {
     const customerConfig = await this.getFileAsJson('customer_config.json');
     const regionConfig = await this.getFileAsJson('region_config.json');
-
-    // Build config order map (preserves JSON file order) — used for customer sort
-    const configOrder = {};
-    let orderIdx = 0;
-    for (const configId of Object.keys(customerConfig)) {
-      configOrder[configId] = orderIdx++;
-    }
+    const configOrder = buildConfigOrderIndex(customerConfig);
 
     // Build reverse lookup: customer_internal_id -> config entry
     const customerIdToConfig = {};
@@ -944,6 +1060,7 @@ class StorageService {
             group.customers.push({
               ...customer,
               configId: customerConfigEntry.configId,
+              parentDistrictId,
               configOrderIndex: customerConfigEntry.configOrderIndex,
               customerPnlHidden: Boolean(customerConfigEntry.customerPnlHidden)
             });
@@ -953,9 +1070,14 @@ class StorageService {
         }
       }
 
-      // Sort customers within each group by config file order (mirrors groupCustomersByDistrict)
+      // Sort customers within each group the same way the dimension config tree displays them.
+      // District tags flatten multiple districts, so they sort by parent district path first.
+      const pathCache = {};
       for (const group of groups) {
-        group.customers.sort((a, b) => (a.configOrderIndex ?? Infinity) - (b.configOrderIndex ?? Infinity));
+        group.customers.sort((a, b) => compareCustomersByDisplayOrder(customerConfig, configOrder, a, b, {
+          groupIsTag: group.isTag,
+          pathCache
+        }));
       }
 
       // Convert to array, filter out empty groups, and sort alphabetically by district label
@@ -1001,11 +1123,16 @@ class StorageService {
         targetDistrict.customers.push({
           ...noCustomer,
           configId: noCustomerConfigEntry?.configId,
+          parentDistrictId: noCustomerParentDistrictId,
           configOrderIndex: noCustomerConfigEntry?.configOrderIndex,
           customerPnlHidden: Boolean(noCustomerConfigEntry?.customerPnlHidden)
         });
-        // Re-sort so customer 0 lands in its correct config-file position
-        targetDistrict.customers.sort((a, b) => (a.configOrderIndex ?? Infinity) - (b.configOrderIndex ?? Infinity));
+        // Re-sort so customer 0 lands in its dimension-config display position.
+        const pathCache = {};
+        targetDistrict.customers.sort((a, b) => compareCustomersByDisplayOrder(customerConfig, configOrder, a, b, {
+          groupIsTag: targetDistrict.isTag,
+          pathCache
+        }));
       }
     }
 
