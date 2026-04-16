@@ -1984,7 +1984,7 @@
           const table = container.querySelector(".pnl-report-table");
           if (!table) return;
           const accountCount = table.querySelectorAll("tbody tr:not(.section-header-row)").length;
-          if (accountCount > compactAccountThreshold) {
+          if (accountCount >= compactAccountThreshold) {
             table.classList.add("pnl-compact-table");
           }
         });
