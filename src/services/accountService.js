@@ -115,9 +115,11 @@ function buildAccountTotals(data, scenario) {
  * 
  * @param {Object} data - BigQuery result data with Account, Scenario, Value, customer_internal_id arrays
  * @param {Array<number>} customerIds - Array of customer internal IDs to include
+ * @param {number|null} regionIdForNoCustomer - Optional region context for customer 0 rows
+ * @param {number|Array<number>|null} subsidiaryIdForNoCustomer - Optional subsidiary context for customer 0 rows
  * @returns {Object} Filtered data in the same array format
  */
-function filterDataByCustomers(data, customerIds, regionIdForNoCustomer = null) {
+function filterDataByCustomers(data, customerIds, regionIdForNoCustomer = null, subsidiaryIdForNoCustomer = null) {
   if (!data?.Account || !data?.customer_internal_id) {
     return {
       Account: [],
@@ -131,6 +133,9 @@ function filterDataByCustomers(data, customerIds, regionIdForNoCustomer = null) 
 
   // Convert customerIds to Set for faster lookup
   const customerIdSet = new Set(customerIds.map(id => Number(id)));
+  const subsidiaryIdSet = subsidiaryIdForNoCustomer == null
+    ? null
+    : new Set((Array.isArray(subsidiaryIdForNoCustomer) ? subsidiaryIdForNoCustomer : [subsidiaryIdForNoCustomer]).map(id => Number(id)));
 
   const filtered = {
     Account: [],
@@ -145,11 +150,12 @@ function filterDataByCustomers(data, customerIds, regionIdForNoCustomer = null) 
     const customerId = Number(data.customer_internal_id[i]);
     let include;
 
-    if (customerId === 0 && regionIdForNoCustomer != null) {
-      // Customer 0 (No Customer) spans multiple regions in fct_transactions_summary.
-      // When a region context is provided, only include its rows for that region so
-      // each region's district/facility breakdown shows only the slice that belongs there.
-      include = Number(data.region_internal_id[i]) === Number(regionIdForNoCustomer);
+    if (customerId === 0 && (regionIdForNoCustomer != null || subsidiaryIdSet)) {
+      // Customer 0 (No Customer) spans multiple regions/subsidiaries in fct_transactions_summary.
+      // When context is provided, include only the slice for the current report section.
+      const matchesRegion = regionIdForNoCustomer == null || Number(data.region_internal_id[i]) === Number(regionIdForNoCustomer);
+      const matchesSubsidiary = !subsidiaryIdSet || subsidiaryIdSet.has(Number(data.subsidiary_internal_id[i]));
+      include = customerIdSet.has(customerId) && matchesRegion && matchesSubsidiary;
     } else {
       include = customerIdSet.has(customerId);
     }
@@ -276,4 +282,3 @@ module.exports = {
   getDisplayableAccounts,
   filterDataByCustomers
 };
-

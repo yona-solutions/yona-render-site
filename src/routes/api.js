@@ -540,16 +540,22 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
       // Without service filter: always query by subsidiary_internal_id (formula accounts are wrong when summed from customer level).
       sendProgress('subsidiary-summary', 'Fetching subsidiary data...');
 
-      const subsidiaryMonthData = await bigQueryService.getPLData(
+      const subsidiaryMonthDataRaw = await bigQueryService.getPLData(
         hasServiceFilter
           ? { hierarchy: 'district', customerIds: serviceCustomerIds, date, accountConfig, ytd: false }
           : { hierarchy: 'subsidiary', subsidiaryId, date, accountConfig, ytd: false }
       );
-      const subsidiaryYtdData = await bigQueryService.getPLData(
+      const subsidiaryYtdDataRaw = await bigQueryService.getPLData(
         hasServiceFilter
           ? { hierarchy: 'district', customerIds: serviceCustomerIds, date, accountConfig, ytd: true }
           : { hierarchy: 'subsidiary', subsidiaryId, date, accountConfig, ytd: true }
       );
+      const subsidiaryMonthData = hasServiceFilter
+        ? accountService.filterDataByCustomers(subsidiaryMonthDataRaw, serviceCustomerIds, null, subsidiaryId)
+        : subsidiaryMonthDataRaw;
+      const subsidiaryYtdData = hasServiceFilter
+        ? accountService.filterDataByCustomers(subsidiaryYtdDataRaw, serviceCustomerIds, null, subsidiaryId)
+        : subsidiaryYtdDataRaw;
 
       // Fetch all customer data — ONLY used for district and facility breakdowns.
       // Do NOT use this data for subsidiary or region summaries (see header comment).
@@ -633,16 +639,25 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
         // With service filter: use only the intersection of region customers and service customers.
         // Without service filter: query by region_internal_id (formula accounts are wrong when summed from customer level).
         const serviceCustomerIdSet = hasServiceFilter ? new Set(serviceCustomerIds) : null;
-        const regionMonthData = await bigQueryService.getPLData(
+        const regionServiceCustomerIds = hasServiceFilter
+          ? regionCustomerIds.filter(id => serviceCustomerIdSet.has(id))
+          : null;
+        const regionMonthDataRaw = await bigQueryService.getPLData(
           hasServiceFilter
-            ? { hierarchy: 'district', customerIds: regionCustomerIds.filter(id => serviceCustomerIdSet.has(id)), date, accountConfig, ytd: false }
+            ? { hierarchy: 'district', customerIds: regionServiceCustomerIds, date, accountConfig, ytd: false }
             : { hierarchy: 'region', regionId: region.regionInternalId, subsidiaryId: subsidiaryId, date, accountConfig, ytd: false }
         );
-        const regionYtdData = await bigQueryService.getPLData(
+        const regionYtdDataRaw = await bigQueryService.getPLData(
           hasServiceFilter
-            ? { hierarchy: 'district', customerIds: regionCustomerIds.filter(id => serviceCustomerIdSet.has(id)), date, accountConfig, ytd: true }
+            ? { hierarchy: 'district', customerIds: regionServiceCustomerIds, date, accountConfig, ytd: true }
             : { hierarchy: 'region', regionId: region.regionInternalId, subsidiaryId: subsidiaryId, date, accountConfig, ytd: true }
         );
+        const regionMonthData = hasServiceFilter
+          ? accountService.filterDataByCustomers(regionMonthDataRaw, regionServiceCustomerIds, region.regionInternalId, subsidiaryId)
+          : regionMonthDataRaw;
+        const regionYtdData = hasServiceFilter
+          ? accountService.filterDataByCustomers(regionYtdDataRaw, regionServiceCustomerIds, region.regionInternalId, subsidiaryId)
+          : regionYtdDataRaw;
 
         const regionCustomers = uniqueCustomersById(
           region.districts.filter(d => !d.districtSummaryExcluded).flatMap(district => district.customers)
@@ -684,11 +699,12 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
 
         for (const district of region.districts) {
           const districtCustomerIds = district.customers.map(c => c.customer_internal_id);
-          // Customer 0 spans all regions in fct_transactions_summary; pass the current
-          // region so only its transactions for this region are included.
+          // Customer 0 spans all regions/subsidiaries in fct_transactions_summary;
+          // pass the current context so only this report section's slice is included.
           const noCustomerRegionId = districtCustomerIds.includes(0) ? region.regionInternalId : null;
-          const districtMonthData = accountService.filterDataByCustomers(allCustomersMonthData, districtCustomerIds, noCustomerRegionId);
-          const districtYtdData = accountService.filterDataByCustomers(allCustomersYtdData, districtCustomerIds, noCustomerRegionId);
+          const noCustomerSubsidiaryId = districtCustomerIds.includes(0) ? subsidiaryId : null;
+          const districtMonthData = accountService.filterDataByCustomers(allCustomersMonthData, districtCustomerIds, noCustomerRegionId, noCustomerSubsidiaryId);
+          const districtYtdData = accountService.filterDataByCustomers(allCustomersYtdData, districtCustomerIds, noCustomerRegionId, noCustomerSubsidiaryId);
 
         const districtCensus = sumCensusForCustomers(censusRecords, district.customers, date);
 
@@ -728,8 +744,9 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
 
           for (const customer of district.customers) {
             const facilityRegionId = customer.customer_internal_id === 0 ? region.regionInternalId : null;
-            const facilityMonthData = accountService.filterDataByCustomers(allCustomersMonthData, [customer.customer_internal_id], facilityRegionId);
-            const facilityYtdData = accountService.filterDataByCustomers(allCustomersYtdData, [customer.customer_internal_id], facilityRegionId);
+            const facilitySubsidiaryId = customer.customer_internal_id === 0 ? subsidiaryId : null;
+            const facilityMonthData = accountService.filterDataByCustomers(allCustomersMonthData, [customer.customer_internal_id], facilityRegionId, facilitySubsidiaryId);
+            const facilityYtdData = accountService.filterDataByCustomers(allCustomersYtdData, [customer.customer_internal_id], facilityRegionId, facilitySubsidiaryId);
 
             const customerCode = customer.customer_code || getCustomerCodeFromLabel(customer.label);
             const census = sumCensusForCodes(censusRecords, customerCode ? [customerCode] : [], date);
@@ -1639,16 +1656,22 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
         // With service filter: use customer IDs (intentional — summary must reflect only service customers).
         // Without service filter: always query by subsidiary_internal_id — formula accounts are wrong when summed from customer level.
         console.log('\n📊 Step 1/4: Querying BigQuery for subsidiary summary...');
-        const subsidiaryMonthData = await bigQueryService.getPLData(
+        const subsidiaryMonthDataRaw = await bigQueryService.getPLData(
           hasServiceFilter
             ? { hierarchy: 'district', customerIds: serviceCustomerIds, date, accountConfig, ytd: false }
             : { hierarchy: 'subsidiary', subsidiaryId, date, accountConfig, ytd: false }
         );
-        const subsidiaryYtdData = await bigQueryService.getPLData(
+        const subsidiaryYtdDataRaw = await bigQueryService.getPLData(
           hasServiceFilter
             ? { hierarchy: 'district', customerIds: serviceCustomerIds, date, accountConfig, ytd: true }
             : { hierarchy: 'subsidiary', subsidiaryId, date, accountConfig, ytd: true }
         );
+        const subsidiaryMonthData = hasServiceFilter
+          ? accountService.filterDataByCustomers(subsidiaryMonthDataRaw, serviceCustomerIds, null, subsidiaryId)
+          : subsidiaryMonthDataRaw;
+        const subsidiaryYtdData = hasServiceFilter
+          ? accountService.filterDataByCustomers(subsidiaryYtdDataRaw, serviceCustomerIds, null, subsidiaryId)
+          : subsidiaryYtdDataRaw;
         
         // Query 3 & 4: All customers in subsidiary (Month + YTD)
         console.log('\n📊 Step 2/4: Querying BigQuery for all customers in subsidiary...');
@@ -1741,16 +1764,25 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
           // With service filter: use only the intersection of region customers and service customers.
           // Without service filter: query by region_internal_id (formula accounts are wrong when summed from customer level).
           console.log(`      Querying BigQuery for region summary (region_internal_id=${region.regionInternalId}, subsidiary_internal_id=${Array.isArray(subsidiaryId) ? subsidiaryId.join(',') : subsidiaryId})...`);
-          const regionMonthData = await bigQueryService.getPLData(
+          const regionServiceCustomerIds = hasServiceFilter
+            ? regionCustomerIds.filter(id => serviceCustomerIdSet.has(id))
+            : null;
+          const regionMonthDataRaw = await bigQueryService.getPLData(
             hasServiceFilter
-              ? { hierarchy: 'district', customerIds: regionCustomerIds.filter(id => serviceCustomerIdSet.has(id)), date, accountConfig, ytd: false }
+              ? { hierarchy: 'district', customerIds: regionServiceCustomerIds, date, accountConfig, ytd: false }
               : { hierarchy: 'region', regionId: region.regionInternalId, subsidiaryId: subsidiaryId, date, accountConfig, ytd: false }
           );
-          const regionYtdData = await bigQueryService.getPLData(
+          const regionYtdDataRaw = await bigQueryService.getPLData(
             hasServiceFilter
-              ? { hierarchy: 'district', customerIds: regionCustomerIds.filter(id => serviceCustomerIdSet.has(id)), date, accountConfig, ytd: true }
+              ? { hierarchy: 'district', customerIds: regionServiceCustomerIds, date, accountConfig, ytd: true }
               : { hierarchy: 'region', regionId: region.regionInternalId, subsidiaryId: subsidiaryId, date, accountConfig, ytd: true }
           );
+          const regionMonthData = hasServiceFilter
+            ? accountService.filterDataByCustomers(regionMonthDataRaw, regionServiceCustomerIds, region.regionInternalId, subsidiaryId)
+            : regionMonthDataRaw;
+          const regionYtdData = hasServiceFilter
+            ? accountService.filterDataByCustomers(regionYtdDataRaw, regionServiceCustomerIds, region.regionInternalId, subsidiaryId)
+            : regionYtdDataRaw;
 
           const regionCustomers = uniqueCustomersById(
             region.districts.filter(d => !d.districtSummaryExcluded).flatMap(district => district.customers)
@@ -1798,11 +1830,12 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
             console.log(`      Processing District: ${district.districtLabel} (${district.customers.length} customers)`);
 
             const districtCustomerIds = district.customers.map(c => c.customer_internal_id);
-            // Customer 0 spans all regions; pass the current region so only its
-            // transactions for this region appear in the district/facility breakdown.
+            // Customer 0 spans all regions/subsidiaries; pass the current context so only
+            // this section's transactions appear in the district/facility breakdown.
             const noCustomerRegionId = districtCustomerIds.includes(0) ? region.regionInternalId : null;
-            const districtMonthData = accountService.filterDataByCustomers(allCustomersMonthData, districtCustomerIds, noCustomerRegionId);
-            const districtYtdData = accountService.filterDataByCustomers(allCustomersYtdData, districtCustomerIds, noCustomerRegionId);
+            const noCustomerSubsidiaryId = districtCustomerIds.includes(0) ? subsidiaryId : null;
+            const districtMonthData = accountService.filterDataByCustomers(allCustomersMonthData, districtCustomerIds, noCustomerRegionId, noCustomerSubsidiaryId);
+            const districtYtdData = accountService.filterDataByCustomers(allCustomersYtdData, districtCustomerIds, noCustomerRegionId, noCustomerSubsidiaryId);
             
             const districtCensus = sumCensusForCustomers(censusRecords, district.customers, date);
 
@@ -1845,8 +1878,9 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
             // Generate facility reports for this district
             for (const customer of district.customers) {
               const facilityRegionId = customer.customer_internal_id === 0 ? region.regionInternalId : null;
-              const facilityMonthData = accountService.filterDataByCustomers(allCustomersMonthData, [customer.customer_internal_id], facilityRegionId);
-              const facilityYtdData = accountService.filterDataByCustomers(allCustomersYtdData, [customer.customer_internal_id], facilityRegionId);
+              const facilitySubsidiaryId = customer.customer_internal_id === 0 ? subsidiaryId : null;
+              const facilityMonthData = accountService.filterDataByCustomers(allCustomersMonthData, [customer.customer_internal_id], facilityRegionId, facilitySubsidiaryId);
+              const facilityYtdData = accountService.filterDataByCustomers(allCustomersYtdData, [customer.customer_internal_id], facilityRegionId, facilitySubsidiaryId);
 
               const customerCode = customer.customer_code || getCustomerCodeFromLabel(customer.label);
               const census = sumCensusForCodes(censusRecords, customerCode ? [customerCode] : [], date);
