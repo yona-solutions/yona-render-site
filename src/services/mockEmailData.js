@@ -109,6 +109,7 @@ const mockReportSchedules = [
     template_name: 'Weekly District 101 Standard Report',
     template_type: 'district',          // district, region, or subsidiary
     process: 'standard',                // standard or operational
+    tags: ['weekly', 'district', 'standard'],
     district_id: '1971',                // Real district ID from config (District 101 - John Miller)
     district_name: 'District 101 - John Miller',
     region_id: null,
@@ -131,6 +132,7 @@ const mockReportSchedules = [
     template_name: 'Monthly R200 Region Operational Review',
     template_type: 'region',
     process: 'operational',
+    tags: ['monthly', 'region', 'operations'],
     district_id: null,
     district_name: null,
     region_id: '4',                     // Real region ID from config (R200)
@@ -153,6 +155,7 @@ const mockReportSchedules = [
     template_name: 'Executive Monthly Standard Report',
     template_type: 'subsidiary',
     process: 'standard',
+    tags: ['executive', 'monthly', 'board'],
     district_id: null,
     district_name: null,
     region_id: null,
@@ -175,6 +178,7 @@ const mockReportSchedules = [
     template_name: 'Friday District 102 Operational Summary',
     template_type: 'district',
     process: 'operational',
+    tags: ['friday', 'district', 'ops'],
     district_id: '1982',                // Real district ID (District 102 - Michelle King)
     district_name: 'District 102 - Michelle King',
     region_id: null,
@@ -197,6 +201,7 @@ const mockReportSchedules = [
     template_name: 'Finance Monthly Standard - R300',
     template_type: 'region',
     process: 'standard',
+    tags: ['finance', 'monthly', 'standard'],
     district_id: null,
     district_name: null,
     region_id: '5',                     // Real region ID (R300)
@@ -219,6 +224,7 @@ const mockReportSchedules = [
     template_name: 'R400 Region Weekly Ops (PAUSED)',
     template_type: 'region',
     process: 'operational',
+    tags: ['paused', 'weekly', 'ops'],
     district_id: null,
     district_name: null,
     region_id: '6',                     // Real region ID (R400)
@@ -241,6 +247,7 @@ const mockReportSchedules = [
     template_name: 'District 201 Monthly Report',
     template_type: 'district',
     process: 'standard',
+    tags: ['district', 'monthly', 'northeast'],
     district_id: '2006',                // Real district ID (District 201 - Vestee Garcia)
     district_name: 'District 201 - Vestee Garcia',
     region_id: null,
@@ -263,6 +270,7 @@ const mockReportSchedules = [
     template_name: 'Company-Wide Operational Review',
     template_type: 'subsidiary',
     process: 'operational',
+    tags: ['company-wide', 'operations', 'leadership'],
     district_id: null,
     district_name: null,
     region_id: null,
@@ -368,6 +376,11 @@ function createMockReportSchedule(data) {
     template_name: data.template_name,
     template_type: data.template_type,
     process: data.process,
+    tags: data.tags || [],
+    service_filter_id: data.service_filter_id || null,
+    service_filter_name: data.service_filter_name || null,
+    header_subsidiary_id: data.header_subsidiary_id || null,
+    header_subsidiary_name: data.header_subsidiary_name || null,
     district_id: data.district_id || null,
     district_name: data.district_name || null,
     region_id: data.region_id || null,

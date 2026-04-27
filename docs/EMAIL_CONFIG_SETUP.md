@@ -91,6 +91,7 @@ CREATE TABLE report_schedules (
   hierarchy VARCHAR(50) NOT NULL, -- 'district', 'region', 'subsidiary'
   entity_id VARCHAR(255) NOT NULL, -- ID from customer/region/etc config
   entity_name VARCHAR(255), -- Cached name for display
+  tags TEXT[] DEFAULT ARRAY[]::TEXT[], -- Optional tags for filtering/organization
   email_group_id INTEGER NOT NULL REFERENCES email_groups(id),
   frequency VARCHAR(50) NOT NULL, -- 'daily', 'weekly', 'monthly'
   status VARCHAR(50) DEFAULT 'active', -- 'active' or 'paused'
@@ -401,4 +402,3 @@ For issues or questions:
 2. Check application logs: `console.log` statements
 3. Review this documentation
 4. Contact development team
-

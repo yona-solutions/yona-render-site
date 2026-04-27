@@ -9,6 +9,8 @@ const emailConfigService = require('../services/emailConfigService');
 const mockEmailData = require('../services/mockEmailData');
 const emailService = require('../services/emailService');
 const emailSchedulerService = require('../services/emailSchedulerService');
+const reportBatchTaskService = require('../services/reportBatchTaskService');
+const scheduleReportService = require('../services/scheduleReportService');
 
 // Store reference to bigQueryService instance (set via createEmailConfigRoutes)
 let bigQueryServiceInstance = null;
@@ -52,6 +54,40 @@ const requireApiKey = (req, res, next) => {
 
   next();
 };
+
+function normalizeScheduleTags(tags) {
+  if (tags === undefined) {
+    return undefined;
+  }
+
+  const rawTags = Array.isArray(tags)
+    ? tags
+    : typeof tags === 'string'
+      ? tags.split(',')
+      : [];
+
+  const seen = new Set();
+  const normalized = [];
+
+  rawTags.forEach(tag => {
+    if (typeof tag !== 'string') return;
+
+    const trimmed = tag.trim();
+    if (!trimmed) return;
+
+    const key = trimmed.toLowerCase();
+    if (seen.has(key)) return;
+
+    seen.add(key);
+    normalized.push(trimmed);
+  });
+
+  return normalized;
+}
+
+function normalizeBatchMode(mode) {
+  return String(mode || '').trim().toLowerCase() === 'generate' ? 'generate' : 'send';
+}
 
 // ============================================
 // Email Groups API
@@ -402,12 +438,17 @@ router.post('/report-schedules', async (req, res) => {
       template_name,
       template_type,
       process,
+      service_filter_id,
+      service_filter_name,
+      header_subsidiary_id,
+      header_subsidiary_name,
       district_id,
       district_name,
       region_id,
       region_name,
       subsidiary_id,
       subsidiary_name,
+      tags,
       email_group_ids,  // Now an array
       frequency,
       day_of_week,
@@ -428,12 +469,17 @@ router.post('/report-schedules', async (req, res) => {
       template_name: template_name || 'New Report Schedule',
       template_type: template_type || '',
       process: process || '',
+      service_filter_id: service_filter_id || null,
+      service_filter_name: service_filter_name || null,
+      header_subsidiary_id: header_subsidiary_id || null,
+      header_subsidiary_name: header_subsidiary_name || null,
       district_id: district_id || null,
       district_name: district_name || null,
       region_id: region_id || null,
       region_name: region_name || null,
       subsidiary_id: subsidiary_id || null,
       subsidiary_name: subsidiary_name || null,
+      tags: normalizeScheduleTags(tags) || [],
       email_group_ids: Array.isArray(email_group_ids) ? email_group_ids.map(id => parseInt(id)) : [],
       frequency: frequency || 'monthly',
       day_of_week: day_of_week || null,
@@ -493,12 +539,17 @@ router.put('/report-schedules/:id', async (req, res) => {
       'template_name',
       'template_type',
       'process',
+      'service_filter_id',
+      'service_filter_name',
+      'header_subsidiary_id',
+      'header_subsidiary_name',
       'district_id',
       'district_name',
       'region_id',
       'region_name',
       'subsidiary_id',
       'subsidiary_name',
+      'tags',
       'email_group_ids',  // Now an array
       'frequency',
       'day_of_week',
@@ -524,6 +575,9 @@ router.put('/report-schedules/:id', async (req, res) => {
       updateData.email_group_ids = Array.isArray(updateData.email_group_ids) 
         ? updateData.email_group_ids.map(id => parseInt(id))
         : [];
+    }
+    if (updateData.tags !== undefined) {
+      updateData.tags = normalizeScheduleTags(updateData.tags);
     }
 
     // Use mock data if database not available
@@ -694,139 +748,22 @@ router.post('/report-schedules/:id/send-email', async (req, res) => {
       });
     }
 
-    // Get entity ID based on template type
-    let entityId, entityName;
-    if (schedule.template_type === 'district' && schedule.district_id) {
-      entityId = schedule.district_id;
-      entityName = schedule.district_name || 'District';
-    } else if (schedule.template_type === 'region' && schedule.region_id) {
-      entityId = schedule.region_id;
-      entityName = schedule.region_name || 'Region';
-    } else if (schedule.template_type === 'subsidiary' && schedule.subsidiary_id) {
-      entityId = schedule.subsidiary_id;
-      entityName = schedule.subsidiary_name || 'Subsidiary';
-    } else {
-      return res.status(400).json({
-        error: 'Invalid schedule configuration',
-        message: `Please select a ${schedule.template_type} before sending email`
-      });
-    }
-
     console.log(`📧 Generating and sending email for schedule: ${schedule.template_name}`);
-
-    // Get latest available date directly from BigQuery service
-    console.log(`   Fetching available dates...`);
-    let dates;
-    try {
-      if (!bigQueryServiceInstance) {
-        throw new Error('BigQuery service not initialized');
-      }
-      dates = await bigQueryServiceInstance.getAvailableDates();
-    } catch (err) {
-      console.error('Failed to fetch dates:', err.message);
-      return res.status(500).json({
-        error: 'Failed to fetch dates',
-        message: err.message
-      });
-    }
-
-    if (!dates || !Array.isArray(dates) || dates.length === 0) {
-      return res.status(400).json({
-        error: 'No P&L data available',
-        message: 'Cannot generate report: no data available'
-      });
-    }
-
-    // Use provided reportDate or default to latest available date
-    const latestDate = reportDate || dates[0].time || dates[0].formatted;
-    console.log(`   Using date: ${latestDate}${reportDate ? ' (user selected)' : ' (latest available)'}`);
-
-    // Headers for internal server-to-server calls (still needed for P&L data)
-    const internalHeaders = process.env.SCHEDULER_API_KEY
-      ? { 'X-API-Key': process.env.SCHEDULER_API_KEY }
-      : {};
-
-    // Fetch P&L data - use external URL in production, localhost in development
-    const baseUrl = process.env.NODE_ENV === 'production'
-      ? (process.env.RENDER_EXTERNAL_URL || 'https://yona-render-site.onrender.com')
-      : `http://127.0.0.1:${process.env.PORT || 3000}`;
-    let dataUrl = `${baseUrl}/api/pl/data?hierarchy=${schedule.template_type}&selectedId=${encodeURIComponent(entityId)}&date=${latestDate}&plType=${schedule.process}`;
-    if ((schedule.template_type === 'region' || schedule.template_type === 'district') && schedule.subsidiary_id) {
-      dataUrl += `&subsidiaryFilter=${encodeURIComponent(schedule.subsidiary_id)}`;
-    }
-    console.log(`   Fetching data from: ${dataUrl}`);
-
-    const controller2 = new AbortController();
-    const timeout2 = setTimeout(() => controller2.abort(), 600000); // 10 minutes
-
-    let dataResponse;
-    try {
-      dataResponse = await fetch(dataUrl, { headers: internalHeaders, signal: controller2.signal });
-    } catch (fetchErr) {
-      clearTimeout(timeout2);
-      console.error('Data fetch error:', fetchErr.message);
-      throw new Error(`Network error fetching P&L data: ${fetchErr.message}`);
-    }
-    clearTimeout(timeout2);
-
-    if (!dataResponse.ok) {
-      const errorText = await dataResponse.text();
-      let detail = errorText;
-      try {
-        const parsed = JSON.parse(errorText);
-        detail = parsed.message || parsed.error || errorText;
-      } catch (e) {
-        // keep raw text
-      }
-      throw new Error(`Failed to fetch P&L data: ${dataResponse.status} - ${detail}`);
-    }
-
-    const jsonData = await dataResponse.json();
-    const htmlContent = jsonData.html;
-    
-    if (!htmlContent || !htmlContent.trim()) {
-      return res.status(400).json({
-        error: 'No report data available',
-        message: 'Cannot generate PDF: no data for selected configuration'
-      });
-    }
-
-    console.log(`   HTML content length: ${htmlContent.length}`);
-
-    // Filter P&L reports to only include those with non-zero income
-    // Using regex instead of JSDOM to avoid memory issues on Render
-    console.log(`   Filtering reports with non-zero income...`);
-
-    const filteredHtmlContent = filterReportsWithIncome(htmlContent);
-    console.log(`   Filtered HTML length: ${filteredHtmlContent.length}`);
-
-    // Build complete PDF HTML (reuse from download logic)
-    console.log(`   Building PDF HTML...`);
-    const fullHTML = buildPDFHTML(filteredHtmlContent);
-    console.log(`   PDF HTML length: ${fullHTML.length}`);
-
-    console.log(`   Generating PDF via PDFShift...`);
-
-    // Convert to PDF using PDFShift
-    const pdfResponse = await fetch('https://api.pdfshift.io/v3/convert/pdf', {
-      method: 'POST',
-      headers: {
-        'X-API-Key': 'sk_3df748acf1ce265988e07e04544b6452ece1b20e',
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        source: fullHTML,
-        landscape: false,
-        use_print: true,
-        margin: { top: 10, bottom: 10, left: 10, right: 10 }
-      })
+    const {
+      entityId,
+      entityName,
+      reportDate: resolvedReportDate,
+      htmlContent,
+      pdfBuffer,
+      preparedReport
+    } = await scheduleReportService.generateSchedulePdf(schedule, {
+      reportDate,
+      bigQueryService: bigQueryServiceInstance
     });
-    
-    if (!pdfResponse.ok) {
-      throw new Error(`PDF generation failed: ${pdfResponse.status}`);
-    }
-    
-    const pdfBuffer = Buffer.from(await pdfResponse.arrayBuffer());
+
+    console.log(`   Using date: ${resolvedReportDate}${reportDate ? ' (user selected)' : ' (latest available)'}`);
+    console.log(`   HTML content length: ${htmlContent.length}`);
+    console.log(`   Filtered to ${preparedReport.keptCount} report(s) with non-zero net income`);
     console.log(`   PDF generated: ${(pdfBuffer.length / 1024).toFixed(1)} KB`);
 
     // Send email with PDF attachment (using recipient from request body)
@@ -835,7 +772,7 @@ router.post('/report-schedules/:id/send-email', async (req, res) => {
     let emailError = null;
 
     try {
-      const result = await emailService.sendPDFEmail(schedule, pdfBuffer, recipientEmail, latestDate);
+      const result = await emailService.sendPDFEmail(schedule, pdfBuffer, recipientEmail, resolvedReportDate);
       emailSuccess = true;
       console.log(`✅ Email sent successfully`);
 
@@ -848,7 +785,7 @@ router.post('/report-schedules/:id/send-email', async (req, res) => {
           process: schedule.process,
           entity_id: entityId,
           entity_name: entityName,
-          report_date: latestDate,
+          report_date: resolvedReportDate,
           status: 'success',
           emails_sent: 1,
           emails_failed: 0,
@@ -881,7 +818,7 @@ router.post('/report-schedules/:id/send-email', async (req, res) => {
           process: schedule.process,
           entity_id: entityId,
           entity_name: entityName,
-          report_date: latestDate,
+          report_date: resolvedReportDate,
           status: 'failed',
           error_message: sendError.message,
           emails_sent: 0,
@@ -955,14 +892,7 @@ router.post('/report-schedules/:id/send-to-groups', async (req, res) => {
       });
     }
 
-    // Collect all recipients from all groups
-    const allRecipients = new Set();
-    for (const groupId of emailGroupIds) {
-      const contacts = await emailConfigService.getEmailGroupContacts(groupId);
-      contacts.forEach(contact => allRecipients.add(contact.email));
-    }
-
-    const recipientList = Array.from(allRecipients);
+    const recipientList = await scheduleReportService.getScheduleRecipients(schedule);
     console.log(`   Email groups: ${emailGroupIds.length}, Total recipients: ${recipientList.length}`);
 
     if (recipientList.length === 0) {
@@ -987,105 +917,29 @@ router.post('/report-schedules/:id/send-to-groups', async (req, res) => {
       });
     }
 
-    // Get entity ID based on template type
-    let entityId, entityName;
-    if (schedule.template_type === 'district' && schedule.district_id) {
-      entityId = schedule.district_id;
-      entityName = schedule.district_name || `District ${schedule.district_id}`;
-    } else if (schedule.template_type === 'region' && schedule.region_id) {
-      entityId = schedule.region_id;
-      entityName = schedule.region_name || `Region ${schedule.region_id}`;
-    } else if (schedule.template_type === 'subsidiary' && schedule.subsidiary_id) {
-      entityId = schedule.subsidiary_id;
-      entityName = schedule.subsidiary_name || `Subsidiary ${schedule.subsidiary_id}`;
-    } else {
-      return res.status(400).json({
-        error: 'Missing entity',
-        message: `Please select a ${schedule.template_type} for this schedule`
-      });
-    }
-
-    // Determine P&L type
-    const plType = schedule.process === 'Operational' ? 'operational' : 'standard';
-
-    // Get available dates and use provided reportDate or default to latest
-    const dates = await bigQueryServiceInstance.getAvailableDates();
-    if (!dates || dates.length === 0) {
-      return res.status(500).json({
-        error: 'No dates available',
-        message: 'No P&L data dates found in BigQuery'
-      });
-    }
-    const latestDate = reportDate || dates[0].time;
-    console.log(`   Using date: ${latestDate}${reportDate ? ' (user selected)' : ' (latest available)'}`);
-
-
-    // Fetch P&L data
-    console.log(`   Fetching P&L data for ${schedule.template_type} ${entityId}...`);
-    let sendGroupDataUrl = `http://localhost:${process.env.PORT || 3000}/api/pl/data?hierarchy=${schedule.template_type}&selectedId=${encodeURIComponent(entityId)}&date=${latestDate}&plType=${plType}`;
-    if ((schedule.template_type === 'region' || schedule.template_type === 'district') && schedule.subsidiary_id) {
-      sendGroupDataUrl += `&subsidiaryFilter=${encodeURIComponent(schedule.subsidiary_id)}`;
-    }
-    const plResponse = await fetch(sendGroupDataUrl, {
-      headers: {
-        'X-API-Key': process.env.SCHEDULER_API_KEY
-      }
+    const {
+      entityId,
+      entityName,
+      reportDate: resolvedReportDate,
+      pdfBuffer,
+      preparedReport
+    } = await scheduleReportService.generateSchedulePdf(schedule, {
+      reportDate,
+      bigQueryService: bigQueryServiceInstance
     });
 
-    if (!plResponse.ok) {
-      const errorText = await plResponse.text();
-      let detail = errorText;
-      try {
-        const parsed = JSON.parse(errorText);
-        detail = parsed.message || parsed.error || errorText;
-      } catch (e) {
-        // keep raw text
-      }
-      throw new Error(`Failed to fetch P&L data: ${plResponse.status} - ${detail}`);
-    }
-
-    const plData = await plResponse.json();
-    console.log(`   P&L data received, filtering reports...`);
-
-    // Filter to only include reports with revenue
-    const filteredHtml = filterReportsWithIncome(plData.html);
-
-    // Wrap in full HTML document for PDF
-    const fullHtml = buildPDFHTML(filteredHtml);
-
-    // Generate PDF
-    console.log(`   Generating PDF...`);
-    const pdfResponse = await fetch('https://api.pdfshift.io/v3/convert/pdf', {
-      method: 'POST',
-      headers: {
-        'X-API-Key': 'sk_3df748acf1ce265988e07e04544b6452ece1b20e',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        source: fullHtml,
-        landscape: false,
-        use_print: true,
-        format: 'Letter',
-        margin: '0.25in'
-      }),
-    });
-
-    if (!pdfResponse.ok) {
-      const errorText = await pdfResponse.text();
-      throw new Error(`PDF generation failed: ${errorText}`);
-    }
-
-    const pdfBuffer = Buffer.from(await pdfResponse.arrayBuffer());
+    console.log(`   Using date: ${resolvedReportDate}${reportDate ? ' (user selected)' : ' (latest available)'}`);
+    console.log(`   Filtered to ${preparedReport.keptCount} report(s) with non-zero net income`);
     console.log(`   PDF generated: ${(pdfBuffer.length / 1024).toFixed(1)} KB`);
 
     // Format date for email subject
-    const dateObj = new Date(latestDate + 'T00:00:00');
+    const dateObj = new Date(resolvedReportDate + 'T00:00:00');
     const monthName = dateObj.toLocaleString('en-US', { month: 'long' });
     const year = dateObj.getFullYear();
 
     // Create email content
     const subject = `${schedule.template_name || entityName} - ${monthName} ${year} P&L Report`;
-    const filename = `${schedule.template_name || entityName}_${latestDate}_PnL.pdf`.replace(/[^a-zA-Z0-9_.-]/g, '_');
+    const filename = `${schedule.template_name || entityName}_${resolvedReportDate}_PnL.pdf`.replace(/[^a-zA-Z0-9_.-]/g, '_');
 
     // Send to all recipients
     console.log(`   Sending to ${recipientList.length} recipients...`);
@@ -1095,7 +949,7 @@ router.post('/report-schedules/:id/send-to-groups', async (req, res) => {
 
     for (const recipientEmail of recipientList) {
       try {
-        await emailService.sendPDFEmail(schedule, pdfBuffer, recipientEmail, latestDate);
+        await emailService.sendPDFEmail(schedule, pdfBuffer, recipientEmail, resolvedReportDate);
         emailsSent++;
         results.push({ email: recipientEmail, status: 'sent' });
         console.log(`      ✅ Sent to ${recipientEmail}`);
@@ -1118,7 +972,7 @@ router.post('/report-schedules/:id/send-to-groups', async (req, res) => {
         process: schedule.process,
         entity_id: entityId,
         entity_name: entityName,
-        report_date: latestDate,
+        report_date: resolvedReportDate,
         status: emailsFailed === 0 ? 'success' : (emailsSent > 0 ? 'partial' : 'failed'),
         error_message: emailsFailed > 0 ? `${emailsFailed} of ${recipientList.length} emails failed` : null,
         emails_sent: emailsSent,
@@ -1154,315 +1008,6 @@ router.post('/report-schedules/:id/send-to-groups', async (req, res) => {
   }
 });
 
-/**
- * Filter P&L report HTML to only include reports with non-zero net income
- * Uses regex instead of JSDOM to avoid memory issues
- * Checks Current Month Actuals OR YTD Actuals - excludes only if both are zero
- */
-function filterReportsWithIncome(htmlContent) {
-  // Match each pnl-report-container div
-  const containerRegex = /<div class="pnl-report-container[^"]*"[\s\S]*?<\/div>\s*(?=<div class="pnl-report-container|$)/g;
-  const containers = htmlContent.match(containerRegex) || [];
-
-  if (containers.length === 0) {
-    // No containers found, return original content
-    return htmlContent;
-  }
-
-  // Helper to parse accounting format to number
-  function parseValue(str) {
-    if (!str || str === '—' || str === '-' || str === '$0' || str === '$0.00') return 0;
-    let cleaned = str.trim().replace(/[$,\s]/g, '');
-    if (cleaned.startsWith('(') && cleaned.endsWith(')')) {
-      cleaned = '-' + cleaned.slice(1, -1);
-    }
-    const num = parseFloat(cleaned);
-    return isNaN(num) ? 0 : num;
-  }
-
-  // Filter to only containers with non-zero net income (Current Month Actuals OR YTD Actuals)
-  const kept = containers.filter(container => {
-    // Look for the Net Income row and capture the row contents
-    const rowMatch = container.match(/<tr[^>]*>[\s\S]*?<td[^>]*>\s*Net Income\s*<\/td>[\s\S]*?<\/tr>/i);
-    if (!rowMatch) {
-      // No net income row found, keep the report
-      return true;
-    }
-    
-    const cells = [];
-    const cellRegex = /<td[^>]*>([^<]*)<\/td>/gi;
-    let cellMatch;
-    while ((cellMatch = cellRegex.exec(rowMatch[0])) !== null) {
-      cells.push(cellMatch[1]);
-    }
-    
-    // Expected columns:
-    // 0 label, 1 current month actuals, 2 %, 3 budget, 4 %, 5 act v bud, 6 gap, 7 YTD actuals, ...
-    if (cells.length < 8) {
-      // If unexpected structure, keep the report
-      return true;
-    }
-
-    const actualsMonthValue = parseValue(cells[1]);
-    const actualsYtdValue = parseValue(cells[7]);
-
-    // Keep if EITHER Current Month Actuals OR YTD Actuals is non-zero
-    return actualsMonthValue !== 0 || actualsYtdValue !== 0;
-  });
-
-  console.log(`   Filtered: ${kept.length} of ${containers.length} reports have non-zero net income (Actuals Month or YTD)`);
-
-  if (kept.length === 0) {
-    // If all filtered out, keep at least the first one
-    return containers[0] || htmlContent;
-  }
-
-  return kept.join('\n');
-}
-
-// Helper function to build PDF HTML (matches exact styling from frontend download)
-function buildPDFHTML(content) {
-  return `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <style>
-    * {
-      box-sizing: border-box;
-    }
-
-    @page {
-      size: letter portrait;
-      margin: 0;
-    }
-
-    body {
-      margin: 0;
-      padding: 0;
-    }
-
-    .pnl-report-container {
-      background: #ffffff;
-      font-family: Arial, sans-serif;
-      color: #000000;
-      width: 100%;
-      margin: 0 auto;
-      padding: 8px 18px 10px 18px;
-      page-break-after: always;
-    }
-
-    .pnl-report-container:last-of-type {
-      page-break-after: auto !important;
-    }
-
-    /* ---------------- Header Styles ---------------- */
-    .pnl-report-header {
-      text-align: center;
-      margin-bottom: 6px;
-      padding: 0;
-      line-height: 1.2;
-      page-break-inside: avoid;
-      break-inside: avoid;
-      page-break-after: avoid;
-      break-after: avoid;
-    }
-
-    .pnl-report-header .pnl-title {
-      font-weight: 700;
-      font-size: 13px;
-      margin: 0;
-      line-height: 1.1;
-    }
-
-    .pnl-report-header .pnl-subtitle {
-      font-weight: 700;
-      font-size: 11px;
-      margin: 1px 0 0 0;
-      line-height: 1.1;
-    }
-
-    .pnl-report-header .pnl-meta,
-    .pnl-report-header .meta {
-      font-size: 8px;
-      line-height: 1.2;
-      margin: 0;
-    }
-
-    .pnl-header-row {
-      display: flex;
-      justify-content: center;
-      align-items: baseline;
-      gap: 4px;
-      font-size: 8px;
-      line-height: 1.2;
-      margin: 0;
-      page-break-inside: avoid;
-      break-inside: avoid;
-    }
-
-    .pnl-header-row-secondary {
-      font-weight: 700;
-      font-size: 9px;
-    }
-
-    .pnl-header-item {
-      white-space: nowrap;
-    }
-
-    .pnl-sep {
-      margin: 0 4px;
-    }
-
-    .pnl-italic {
-      font-style: italic;
-    }
-
-    .pnl-divider {
-      border: none;
-      border-top: 1px solid #ccc;
-      margin: 4px 0 6px 0;
-      page-break-after: avoid;
-      break-after: avoid;
-    }
-
-    /* ---------------- Table Styles ---------------- */
-    .pnl-report-table {
-      width: 100%;
-      margin: 0 auto;
-      border-collapse: collapse;
-      font-size: 7.5px;
-      background: #ffffff;
-      table-layout: auto;
-      page-break-before: avoid;
-      break-before: avoid;
-    }
-
-    .pnl-report-table th,
-    .pnl-report-table td {
-      padding: 2px 2px;
-      border: none;
-      white-space: nowrap;
-      height: 12px;
-      line-height: 1.2;
-      vertical-align: middle;
-    }
-
-    .pnl-compact {
-      padding: 4px 12px 6px 12px;
-      transform: scale(0.9);
-      transform-origin: top center;
-      width: 111%;
-      margin-left: -5.5%;
-      page-break-inside: avoid;
-    }
-
-    .pnl-compact .pnl-report-header .pnl-title {
-      font-size: 11px;
-    }
-
-    .pnl-compact .pnl-report-header .pnl-subtitle {
-      font-size: 9px;
-    }
-
-    .pnl-compact .pnl-header-row {
-      font-size: 7px;
-    }
-
-    .pnl-compact .pnl-header-row-secondary {
-      font-size: 8px;
-    }
-
-    .pnl-compact .pnl-divider {
-      margin: 3px 0 4px 0;
-    }
-
-    .pnl-compact .pnl-report-table {
-      font-size: 5.5px;
-    }
-
-    .pnl-compact .pnl-report-table th,
-    .pnl-compact .pnl-report-table td {
-      padding: 0.5px 1px;
-      height: 8px;
-      line-height: 1.0;
-    }
-
-    .pnl-compact .pnl-report-table th {
-      font-size: 5.5px;
-    }
-
-    .pnl-compact .pnl-report-table td:first-child,
-    .pnl-compact .pnl-report-table th:first-child {
-      font-size: 5.5px;
-      max-width: 140px;
-      white-space: nowrap;
-    }
-
-    .pnl-compact .pnl-report-table .section-header-row td {
-      padding-top: 4px;
-      padding-bottom: 2px;
-    }
-
-    .pnl-compact .pnl-report-table .header-group-row th {
-      font-size: 6px;
-      padding: 2px 1px;
-    }
-
-    .pnl-compact .pnl-report-table .header-label-row th {
-      font-size: 5px;
-      padding: 1px 1px;
-    }
-
-    .pnl-report-table th {
-      font-weight: 600;
-      text-align: center;
-      border-bottom: 1px solid #fff;
-      background: transparent;
-      font-size: 7.5px;
-    }
-
-    .pnl-report-table td:first-child,
-    .pnl-report-table th:first-child {
-      text-align: left;
-      white-space: normal;
-      word-wrap: break-word;
-      max-width: 140px;
-      font-size: 7.5px;
-    }
-
-    .pnl-report-table td:not(:first-child),
-    .pnl-report-table th:not(:first-child) {
-      text-align: right;
-      font-size: 7.5px;
-    }
-
-    /* Centered dashes for empty values - but not for the gap column (7th column) */
-    .pnl-report-table td:empty:not(:nth-child(7))::after {
-      content: "-";
-      display: inline-block;
-      text-align: center;
-      width: 100%;
-      color: #000;
-      opacity: 0.8;
-    }
-
-    .pnl-report-table td {
-      vertical-align: middle;
-    }
-
-    @media print {
-      .pnl-report-container {
-        page-break-after: always;
-      }
-    }
-  </style>
-</head>
-<body>
-  ${content}
-</body>
-</html>`;
-}
-
 // ============================================
 // Process Schedule API (for Cloud Function)
 // ============================================
@@ -1475,9 +1020,9 @@ function buildPDFHTML(content) {
 router.post('/report-schedules/:id/process', requireApiKey, async (req, res) => {
   const startTime = Date.now();
   const { id } = req.params;
-  const { triggerType = 'scheduled' } = req.body;
+  const { triggerType = 'scheduled', reportDate, mode = 'send' } = req.body;
 
-  console.log(`\n📧 Processing schedule ${id} (trigger: ${triggerType})`);
+  console.log(`\n📧 Processing schedule ${id} (trigger: ${triggerType}, mode: ${mode})`);
 
   try {
     // Get report schedule
@@ -1530,21 +1075,14 @@ router.post('/report-schedules/:id/process', requireApiKey, async (req, res) => 
       });
     }
 
-    // Get entity ID based on template type
-    let entityId, entityName;
-    if (schedule.template_type === 'district' && schedule.district_id) {
-      entityId = schedule.district_id;
-      entityName = schedule.district_name || 'District';
-    } else if (schedule.template_type === 'region' && schedule.region_id) {
-      entityId = schedule.region_id;
-      entityName = schedule.region_name || 'Region';
-    } else if (schedule.template_type === 'subsidiary' && schedule.subsidiary_id) {
-      entityId = schedule.subsidiary_id;
-      entityName = schedule.subsidiary_name || 'Subsidiary';
-    } else {
+    let entityId;
+    let entityName;
+    try {
+      ({ entityId, entityName } = scheduleReportService.getScheduleEntity(schedule));
+    } catch (error) {
       return res.status(400).json({
         error: 'Invalid schedule configuration',
-        message: `Please select a ${schedule.template_type} before sending email`,
+        message: error.message,
         scheduleId: parseInt(id),
         scheduleName: schedule.template_name,
         status: 'skipped',
@@ -1552,10 +1090,9 @@ router.post('/report-schedules/:id/process', requireApiKey, async (req, res) => 
       });
     }
 
-    // Get all email groups for this schedule
-    const emailGroupIds = schedule.email_group_ids || [schedule.email_group_id].filter(Boolean);
+    const emailGroupIds = scheduleReportService.getScheduleEmailGroupIds(schedule);
 
-    if (emailGroupIds.length === 0) {
+    if (mode === 'send' && emailGroupIds.length === 0) {
       return res.status(400).json({
         error: 'No email groups assigned',
         scheduleId: parseInt(id),
@@ -1565,8 +1102,7 @@ router.post('/report-schedules/:id/process', requireApiKey, async (req, res) => 
       });
     }
 
-    // Check if email service is available
-    if (!emailService.isAvailable()) {
+    if (mode === 'send' && !emailService.isAvailable()) {
       return res.status(503).json({
         error: 'Email service not configured',
         message: 'SendGrid API key not configured',
@@ -1576,14 +1112,11 @@ router.post('/report-schedules/:id/process', requireApiKey, async (req, res) => 
       });
     }
 
-    // Get all recipients from all email groups
-    const allRecipients = new Set();
-    for (const groupId of emailGroupIds) {
-      const contacts = await emailConfigService.getEmailGroupContacts(groupId);
-      contacts.forEach(contact => allRecipients.add(contact.email));
-    }
+    const recipientList = mode === 'send'
+      ? await scheduleReportService.getScheduleRecipients(schedule)
+      : [];
 
-    if (allRecipients.size === 0) {
+    if (mode === 'send' && recipientList.length === 0) {
       return res.status(400).json({
         error: 'No recipients in email groups',
         scheduleId: parseInt(id),
@@ -1596,191 +1129,50 @@ router.post('/report-schedules/:id/process', requireApiKey, async (req, res) => 
     console.log(`   Schedule: ${schedule.template_name}`);
     console.log(`   Type: ${schedule.template_type} - ${entityName}`);
     console.log(`   Process: ${schedule.process}`);
-    console.log(`   Recipients: ${allRecipients.size}`);
-
-    // Get latest available date directly from BigQuery service
-    console.log(`   Fetching available dates...`);
-    let dates;
-    try {
-      if (!bigQueryServiceInstance) {
-        throw new Error('BigQuery service not initialized');
-      }
-      dates = await bigQueryServiceInstance.getAvailableDates();
-    } catch (err) {
-      console.error('Failed to fetch dates:', err.message);
-      return res.status(500).json({
-        error: 'Failed to fetch dates',
-        message: err.message,
-        scheduleId: parseInt(id),
-        scheduleName: schedule.template_name,
-        status: 'error'
-      });
+    if (mode === 'send') {
+      console.log(`   Recipients: ${recipientList.length}`);
     }
 
-    if (!dates || !Array.isArray(dates) || dates.length === 0) {
-      return res.status(400).json({
-        error: 'No P&L data available',
-        message: 'Cannot generate report: no data available',
-        scheduleId: parseInt(id),
-        scheduleName: schedule.template_name,
-        status: 'error'
-      });
-    }
-
-    const latestDate = dates[0].time || dates[0].formatted;
-    console.log(`   Using date: ${latestDate}`);
-
-    // Headers for internal server-to-server calls (still needed for P&L data)
-    const internalHeaders = process.env.SCHEDULER_API_KEY
-      ? { 'X-API-Key': process.env.SCHEDULER_API_KEY }
-      : {};
-
-    // Fetch P&L data - use external URL in production, localhost in development
-    const baseUrl = process.env.NODE_ENV === 'production'
-      ? (process.env.RENDER_EXTERNAL_URL || 'https://yona-render-site.onrender.com')
-      : `http://127.0.0.1:${process.env.PORT || 3000}`;
-    const dataUrl = `${baseUrl}/api/pl/data?hierarchy=${schedule.template_type}&selectedId=${encodeURIComponent(entityId)}&date=${latestDate}&plType=${schedule.process}`;
-    console.log(`   Fetching data...`);
-
-    const dataResponse = await fetch(dataUrl, { headers: internalHeaders });
-
-    if (!dataResponse.ok) {
-      const errorText = await dataResponse.text();
-      let detail = errorText;
-      try {
-        const parsed = JSON.parse(errorText);
-        detail = parsed.message || parsed.error || errorText;
-      } catch (e) {
-        // keep raw text
-      }
-      throw new Error(`Failed to fetch P&L data: ${dataResponse.status} - ${detail}`);
-    }
-
-    const jsonData = await dataResponse.json();
-    const htmlContent = jsonData.html;
-
-    if (!htmlContent || !htmlContent.trim()) {
-      return res.status(400).json({
-        error: 'No report data available',
-        message: 'Cannot generate PDF: no data for selected configuration',
-        scheduleId: parseInt(id),
-        scheduleName: schedule.template_name,
-        status: 'error'
-      });
-    }
-
-    // Parse and filter HTML
-    const parser = new (require('jsdom').JSDOM)(htmlContent).window.DOMParser;
-    const doc = new parser().parseFromString(`<div id="root">${htmlContent}</div>`, "text/html");
-    const root = doc.getElementById("root");
-
-    // Mark long tables as compact so they fit a single PDF page
-    const compactRowThreshold = 30;
-    root.querySelectorAll(".pnl-report-container").forEach(container => {
-      const table = container.querySelector(".pnl-report-table");
-      if (!table) return;
-      const bodyRows = table.querySelectorAll("tbody tr");
-      const allRows = table.querySelectorAll("tr");
-      const headerRows = table.querySelectorAll("thead tr");
-      const rowCount = bodyRows.length > 0 ? bodyRows.length : Math.max(0, allRows.length - headerRows.length);
-      if (rowCount > compactRowThreshold) {
-        container.classList.add("pnl-compact");
-      }
+    const {
+      reportDate: resolvedReportDate,
+      pdfBuffer,
+      preparedReport
+    } = await scheduleReportService.generateSchedulePdf(schedule, {
+      reportDate,
+      bigQueryService: bigQueryServiceInstance
     });
 
-    // Helper function to check if a report has non-zero net income
-    function hasNonZeroIncome(container) {
-      const table = container.querySelector("table");
-      if (!table) return false;
-
-      const rows = Array.from(table.querySelectorAll("tr"));
-      for (const row of rows) {
-        const cells = Array.from(row.querySelectorAll("td"));
-        if (cells.length > 0 && cells[0].textContent.trim() === "Net Income") {
-          if (cells.length > 1) {
-            const valueText = cells[1].textContent.trim();
-            const numValue = parseAccountingToNumber(valueText);
-            return numValue !== 0;
-          }
-        }
-      }
-      return false;
-    }
-
-    function parseAccountingToNumber(str) {
-      if (!str || str === "—" || str === "-") return 0;
-      let cleaned = str.replace(/[$,\s]/g, "");
-      if (cleaned.startsWith("(") && cleaned.endsWith(")")) {
-        cleaned = "-" + cleaned.slice(1, -1);
-      }
-      const num = parseFloat(cleaned);
-      return isNaN(num) ? 0 : num;
-    }
-
-    // Filter pages
-    const kept = [];
-    root.querySelectorAll(".pnl-report-container").forEach(container => {
-      if (hasNonZeroIncome(container)) {
-        kept.push(container.outerHTML);
-      }
-    });
-
-    const filteredHtmlContent = kept.length ? kept.join("\n") :
-      (root.querySelector(".pnl-report-container")?.outerHTML || htmlContent);
-
-    console.log(`   Filtered to ${kept.length} reports with non-zero net income`);
-
-    // Build complete PDF HTML
-    const fullHTML = buildPDFHTML(filteredHtmlContent);
-
-    console.log(`   Generating PDF...`);
-
-    // Convert to PDF using PDFShift
-    const pdfResponse = await fetch('https://api.pdfshift.io/v3/convert/pdf', {
-      method: 'POST',
-      headers: {
-        'X-API-Key': 'sk_3df748acf1ce265988e07e04544b6452ece1b20e',
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        source: fullHTML,
-        landscape: false,
-        use_print: true,
-        margin: { top: 10, bottom: 10, left: 10, right: 10 }
-      })
-    });
-
-    if (!pdfResponse.ok) {
-      throw new Error(`PDF generation failed: ${pdfResponse.status}`);
-    }
-
-    const pdfBuffer = Buffer.from(await pdfResponse.arrayBuffer());
+    console.log(`   Using date: ${resolvedReportDate}${reportDate ? ' (user selected)' : ' (latest available)'}`);
+    console.log(`   Filtered to ${preparedReport.keptCount} report(s) with non-zero net income`);
     console.log(`   PDF generated: ${(pdfBuffer.length / 1024).toFixed(1)} KB`);
 
-    // Send to all recipients
     let successCount = 0;
     let failCount = 0;
     const recipientResults = [];
 
-    console.log(`   Sending emails to ${allRecipients.size} recipient(s)...`);
+    if (mode === 'send') {
+      console.log(`   Sending emails to ${recipientList.length} recipient(s)...`);
 
-    for (const recipientEmail of allRecipients) {
-      try {
-        await emailService.sendPDFEmail(schedule, pdfBuffer, recipientEmail, latestDate);
-        successCount++;
-        recipientResults.push({ email: recipientEmail, status: 'sent' });
-        console.log(`      ✓ Sent to ${recipientEmail}`);
-      } catch (error) {
-        failCount++;
-        recipientResults.push({ email: recipientEmail, status: 'failed', error: error.message });
-        console.log(`      ✗ Failed: ${recipientEmail} - ${error.message}`);
+      for (const recipientEmail of recipientList) {
+        try {
+          await emailService.sendPDFEmail(schedule, pdfBuffer, recipientEmail, resolvedReportDate);
+          successCount++;
+          recipientResults.push({ email: recipientEmail, status: 'sent' });
+          console.log(`      ✓ Sent to ${recipientEmail}`);
+        } catch (error) {
+          failCount++;
+          recipientResults.push({ email: recipientEmail, status: 'failed', error: error.message });
+          console.log(`      ✗ Failed: ${recipientEmail} - ${error.message}`);
+        }
       }
     }
 
     // Determine status
     let status;
     let errorMessage = null;
-    if (successCount === 0) {
+    if (mode === 'generate') {
+      status = 'success';
+    } else if (successCount === 0) {
       status = 'failed';
       errorMessage = `All ${failCount} email(s) failed to send`;
     } else if (failCount > 0) {
@@ -1798,33 +1190,38 @@ router.post('/report-schedules/:id/process', requireApiKey, async (req, res) => 
         process: schedule.process,
         entity_id: entityId,
         entity_name: entityName,
-        report_date: latestDate,
+        report_date: resolvedReportDate,
         status: status,
         error_message: errorMessage,
         emails_sent: successCount,
         emails_failed: failCount,
-        recipient_emails: Array.from(allRecipients),
+        recipient_emails: recipientList,
         trigger_type: triggerType,
         pdf_size_bytes: pdfBuffer.length
       });
 
       // Update schedule timestamps
-      if (successCount > 0) {
+      if (mode === 'send' && successCount > 0) {
         await emailConfigService.updateScheduleSendTimestamps(schedule.id, new Date(), null, triggerType);
       }
     }
 
     const durationMs = Date.now() - startTime;
-    console.log(`   ✅ Complete: ${successCount} sent, ${failCount} failed (${durationMs}ms)`);
+    if (mode === 'generate') {
+      console.log(`   ✅ Complete: PDF generated (${durationMs}ms)`);
+    } else {
+      console.log(`   ✅ Complete: ${successCount} sent, ${failCount} failed (${durationMs}ms)`);
+    }
 
     res.json({
       success: status !== 'failed',
       scheduleId: parseInt(id),
       scheduleName: schedule.template_name,
       status,
+      mode,
       emailsSent: successCount,
       emailsFailed: failCount,
-      reportDate: latestDate,
+      reportDate: resolvedReportDate,
       pdfSizeBytes: pdfBuffer.length,
       durationMs,
       error: errorMessage,
@@ -1838,6 +1235,318 @@ router.post('/report-schedules/:id/process', requireApiKey, async (req, res) => 
       message: error.message,
       scheduleId: parseInt(id),
       status: 'error'
+    });
+  }
+});
+
+// ============================================
+// Report Batch Runs API
+// ============================================
+
+router.get('/report-batches/latest', async (req, res) => {
+  try {
+    if (!emailConfigService.isAvailable()) {
+      return res.status(503).json({
+        error: 'Database not available',
+        message: 'Batch runs require the email configuration database'
+      });
+    }
+
+    const batchRun = await emailConfigService.getLatestReportBatchRun();
+    if (!batchRun) {
+      return res.status(404).json({
+        error: 'No batch runs found'
+      });
+    }
+
+    res.json(batchRun);
+  } catch (error) {
+    console.error('Error fetching latest batch run:', error);
+    res.status(500).json({
+      error: 'Failed to fetch latest batch run',
+      message: error.message
+    });
+  }
+});
+
+router.get('/report-batches/:id', async (req, res) => {
+  try {
+    if (!emailConfigService.isAvailable()) {
+      return res.status(503).json({
+        error: 'Database not available',
+        message: 'Batch runs require the email configuration database'
+      });
+    }
+
+    const batchRun = await emailConfigService.getReportBatchRunWithItems(parseInt(req.params.id));
+    if (!batchRun) {
+      return res.status(404).json({
+        error: 'Batch run not found'
+      });
+    }
+
+    res.json(batchRun);
+  } catch (error) {
+    console.error('Error fetching batch run:', error);
+    res.status(500).json({
+      error: 'Failed to fetch batch run',
+      message: error.message
+    });
+  }
+});
+
+router.post('/report-batches', async (req, res) => {
+  try {
+    if (!emailConfigService.isAvailable()) {
+      return res.status(503).json({
+        error: 'Database not available',
+        message: 'Batch runs require the email configuration database'
+      });
+    }
+
+    const tag = String(req.body?.tag || '').trim();
+    const reportDate = scheduleReportService.normalizeReportDateValue(req.body?.reportDate);
+    const runMode = normalizeBatchMode(req.body?.mode);
+
+    if (!tag) {
+      return res.status(400).json({
+        error: 'Validation failed',
+        message: 'Please choose a tag'
+      });
+    }
+
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(reportDate)) {
+      return res.status(400).json({
+        error: 'Validation failed',
+        message: 'Please choose a valid report month'
+      });
+    }
+
+    const existingBatch = await emailConfigService.findActiveReportBatchRun({
+      tag,
+      report_date: reportDate,
+      run_mode: runMode
+    });
+
+    if (existingBatch) {
+      const existingWithItems = await emailConfigService.getReportBatchRunWithItems(existingBatch.id);
+      return res.json({
+        success: true,
+        reusedExisting: true,
+        dispatchType: reportBatchTaskService.shouldUseLocalDispatch() ? 'local' : 'cloud-tasks',
+        batchRun: existingWithItems
+      });
+    }
+
+    const schedules = await emailConfigService.getEnabledReportSchedulesByTag(tag);
+    if (!schedules.length) {
+      return res.status(400).json({
+        error: 'No matching schedules',
+        message: `No enabled report schedules were found for the tag "${tag}".`
+      });
+    }
+
+    const batchRun = await emailConfigService.createReportBatchRun({
+      tag,
+      report_date: reportDate,
+      run_mode: runMode,
+      requested_by_email: req.user?.email || null,
+      total_schedules: schedules.length,
+      status: 'queued'
+    });
+
+    const batchItems = await emailConfigService.createReportBatchRunItems(batchRun.id, schedules, {
+      report_date: reportDate,
+      run_mode: runMode
+    });
+
+    try {
+      const dispatchResults = await reportBatchTaskService.enqueueBatchItems(batchItems);
+
+      await Promise.all(dispatchResults.map(result =>
+        emailConfigService.updateReportBatchRunItem(result.itemId, {
+          task_name: result.taskName
+        })
+      ));
+
+      const hydratedBatchRun = await emailConfigService.getReportBatchRunWithItems(batchRun.id);
+
+      res.status(201).json({
+        success: true,
+        reusedExisting: false,
+        dispatchType: dispatchResults[0]?.dispatchType || (reportBatchTaskService.shouldUseLocalDispatch() ? 'local' : 'cloud-tasks'),
+        batchRun: hydratedBatchRun
+      });
+    } catch (dispatchError) {
+      await emailConfigService.updateReportBatchRun(batchRun.id, {
+        status: 'failed',
+        error_message: dispatchError.message,
+        completed_at: new Date()
+      });
+
+      throw dispatchError;
+    }
+  } catch (error) {
+    console.error('Error creating report batch run:', error);
+    res.status(500).json({
+      error: 'Failed to create report batch run',
+      message: error.message
+    });
+  }
+});
+
+router.post('/report-batches/items/:itemId/execute', requireApiKey, async (req, res) => {
+  try {
+    if (!emailConfigService.isAvailable()) {
+      return res.status(503).json({
+        error: 'Database not available',
+        message: 'Batch runs require the email configuration database'
+      });
+    }
+
+    const itemId = parseInt(req.params.itemId);
+    const item = await emailConfigService.getReportBatchRunItem(itemId);
+
+    if (!item) {
+      return res.status(404).json({
+        error: 'Batch run item not found'
+      });
+    }
+
+    if (!item.schedule_id) {
+      await emailConfigService.updateReportBatchRunItem(itemId, {
+        status: 'skipped',
+        completed_at: new Date(),
+        error_message: 'Schedule was deleted before the batch run executed'
+      });
+      const batchRun = await emailConfigService.recalculateReportBatchRun(item.batch_run_id);
+      return res.json({
+        success: true,
+        status: 'skipped',
+        batchStatus: batchRun?.status || 'partial'
+      });
+    }
+
+    if (['success', 'partial', 'skipped'].includes(item.status)) {
+      const batchRun = await emailConfigService.recalculateReportBatchRun(item.batch_run_id);
+      return res.json({
+        success: true,
+        alreadyProcessed: true,
+        status: item.status,
+        batchStatus: batchRun?.status || item.batch_status
+      });
+    }
+
+    if (item.status === 'running' && item.last_attempt_at) {
+      const lastAttemptAgeMs = Date.now() - new Date(item.last_attempt_at).getTime();
+      if (lastAttemptAgeMs < 30 * 60 * 1000) {
+        return res.status(202).json({
+          success: true,
+          alreadyProcessing: true,
+          status: 'running'
+        });
+      }
+    }
+
+    await emailConfigService.markReportBatchRunStarted(item.batch_run_id);
+    await emailConfigService.updateReportBatchRunItem(itemId, {
+      status: 'running',
+      attempt_count: (item.attempt_count || 0) + 1,
+      last_attempt_at: new Date(),
+      completed_at: null,
+      error_message: null
+    });
+
+    const headers = {
+      'Content-Type': 'application/json',
+      ...scheduleReportService.getInternalApiHeaders()
+    };
+    const targetUrl = `${scheduleReportService.getApplicationBaseUrl()}/api/report-schedules/${item.schedule_id}/process`;
+    const processResponse = await fetch(targetUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        triggerType: 'manual-batch',
+        reportDate: scheduleReportService.normalizeReportDateValue(item.report_date),
+        mode: item.run_mode
+      })
+    });
+
+    const processPayload = await processResponse.json().catch(() => ({}));
+
+    if (!processResponse.ok) {
+      const skippedStatus = processPayload.status === 'skipped';
+      await emailConfigService.updateReportBatchRunItem(itemId, {
+        status: skippedStatus ? 'skipped' : 'failed',
+        completed_at: new Date(),
+        emails_sent: processPayload.emailsSent || 0,
+        emails_failed: processPayload.emailsFailed || 0,
+        pdf_size_bytes: processPayload.pdfSizeBytes || null,
+        error_message: processPayload.message || processPayload.error || 'Failed to execute batch item',
+        result_payload: processPayload
+      });
+
+      const batchRun = await emailConfigService.recalculateReportBatchRun(item.batch_run_id);
+
+      if (skippedStatus) {
+        return res.json({
+          success: true,
+          status: 'skipped',
+          batchStatus: batchRun?.status || 'partial',
+          result: processPayload
+        });
+      }
+
+      return res.status(500).json({
+        error: 'Failed to execute batch item',
+        message: processPayload.message || processPayload.error || 'Report processing failed',
+        status: 'failed',
+        batchStatus: batchRun?.status || 'failed'
+      });
+    }
+
+    const itemStatus = processPayload.status === 'partial'
+      ? 'partial'
+      : (processPayload.status === 'skipped' ? 'skipped' : 'success');
+
+    await emailConfigService.updateReportBatchRunItem(itemId, {
+      status: itemStatus,
+      completed_at: new Date(),
+      emails_sent: processPayload.emailsSent || 0,
+      emails_failed: processPayload.emailsFailed || 0,
+      pdf_size_bytes: processPayload.pdfSizeBytes || null,
+      error_message: processPayload.error || null,
+      result_payload: processPayload
+    });
+
+    const batchRun = await emailConfigService.recalculateReportBatchRun(item.batch_run_id);
+
+    res.json({
+      success: true,
+      status: itemStatus,
+      batchStatus: batchRun?.status || 'running',
+      result: processPayload
+    });
+  } catch (error) {
+    console.error('Error executing batch run item:', error);
+
+    if (emailConfigService.isAvailable()) {
+      const itemId = parseInt(req.params.itemId);
+      const item = await emailConfigService.getReportBatchRunItem(itemId).catch(() => null);
+      if (item) {
+        await emailConfigService.updateReportBatchRunItem(itemId, {
+          status: 'failed',
+          completed_at: new Date(),
+          error_message: error.message,
+          result_payload: { error: error.message }
+        }).catch(() => null);
+        await emailConfigService.recalculateReportBatchRun(item.batch_run_id).catch(() => null);
+      }
+    }
+
+    res.status(500).json({
+      error: 'Failed to execute batch run item',
+      message: error.message
     });
   }
 });
@@ -1858,131 +1567,6 @@ router.get('/email-scheduler/status', (req, res) => {
     console.error('Error fetching scheduler status:', error);
     res.status(500).json({
       error: 'Failed to fetch scheduler status',
-      message: error.message
-    });
-  }
-});
-
-/**
- * GET /api/email-scheduler/job-status
- * Get current job status (for persistent progress tracking)
- */
-router.get('/email-scheduler/job-status', (req, res) => {
-  try {
-    const jobStatus = emailSchedulerService.getJobStatus();
-    res.json(jobStatus);
-  } catch (error) {
-    console.error('Error fetching job status:', error);
-    res.status(500).json({
-      error: 'Failed to fetch job status',
-      message: error.message
-    });
-  }
-});
-
-/**
- * POST /api/email-scheduler/clear-job
- * Clear completed/failed job to allow starting a new one
- */
-router.post('/email-scheduler/clear-job', (req, res) => {
-  try {
-    const result = emailSchedulerService.clearJob();
-    res.json(result);
-  } catch (error) {
-    console.error('Error clearing job:', error);
-    res.status(500).json({
-      error: 'Failed to clear job',
-      message: error.message
-    });
-  }
-});
-
-/**
- * POST /api/email-scheduler/run-now
- * Start a new manual scheduler run (async - returns immediately)
- */
-router.post('/email-scheduler/run-now', async (req, res) => {
-  try {
-    console.log('📧 Manual scheduler trigger requested via API');
-
-    // Start the job (async - returns immediately)
-    const result = await emailSchedulerService.startManualRun();
-
-    if (!result.success) {
-      return res.status(409).json({
-        success: false,
-        error: result.error,
-        existingJob: result.existingJob
-      });
-    }
-
-    res.json({
-      success: true,
-      jobId: result.jobId,
-      message: 'Job started - poll /api/email-scheduler/job-status for progress'
-    });
-
-  } catch (error) {
-    console.error('Error starting scheduler:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to start scheduler',
-      message: error.message
-    });
-  }
-});
-
-/**
- * POST /api/email-scheduler/run-now-sync (LEGACY)
- * Manually trigger scheduler and wait for completion
- */
-router.post('/email-scheduler/run-now-sync', async (req, res) => {
-  try {
-    console.log('📧 Legacy sync scheduler trigger requested via API');
-
-    // Get stats before running
-    const statsBefore = emailSchedulerService.getStats();
-    const schedulesProcessedBefore = statsBefore.schedulesProcessed || 0;
-    const successBefore = statsBefore.successfulSends;
-    const failBefore = statsBefore.failedSends;
-    
-    // Run scheduler and wait for it to complete (returns array of results)
-    const scheduleResults = await emailSchedulerService.runNow();
-    
-    // Get stats after running
-    const statsAfter = emailSchedulerService.getStats();
-    const schedulesProcessed = (statsAfter.schedulesProcessed || 0) - schedulesProcessedBefore;
-    const successCount = statsAfter.successfulSends - successBefore;
-    const failCount = statsAfter.failedSends - failBefore;
-    
-    console.log(`✅ Manual scheduler run complete: ${schedulesProcessed} schedules, ${successCount} sent, ${failCount} failed`);
-    
-    // Build errors array from schedule results
-    const errors = [];
-    const skipped = [];
-    scheduleResults.forEach(r => {
-      if (r.status === 'error') {
-        errors.push(`${r.scheduleName}: ${r.error}`);
-      } else if (r.status === 'skipped') {
-        skipped.push(`${r.scheduleName}: ${r.skipReason}`);
-      }
-    });
-    
-    res.json({
-      success: true,
-      message: 'Scheduler run completed successfully',
-      schedulesProcessed,
-      emailsSent: successCount,
-      emailsFailed: failCount,
-      scheduleResults: scheduleResults, // Detailed per-schedule results
-      errors: errors.length > 0 ? errors : (statsAfter.lastError ? [statsAfter.lastError] : []),
-      skipped: skipped
-    });
-  } catch (error) {
-    console.error('Error triggering scheduler:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to trigger scheduler',
       message: error.message
     });
   }

@@ -33,6 +33,11 @@ CREATE TABLE IF NOT EXISTS report_schedules (
   template_name VARCHAR(255) NOT NULL,
   template_type VARCHAR(50) NOT NULL,
   process VARCHAR(50) NOT NULL,
+  tags TEXT[] DEFAULT ARRAY[]::TEXT[],
+  service_filter_id VARCHAR(255),
+  service_filter_name VARCHAR(255),
+  header_subsidiary_id VARCHAR(255),
+  header_subsidiary_name VARCHAR(255),
   district_id VARCHAR(255),
   district_name VARCHAR(255),
   region_id VARCHAR(255),
@@ -91,6 +96,62 @@ CREATE TABLE IF NOT EXISTS run_logs (
 );
 
 -- ============================================
+-- Report Batch Runs Table
+-- ============================================
+CREATE TABLE IF NOT EXISTS report_batch_runs (
+  id SERIAL PRIMARY KEY,
+  tag TEXT NOT NULL,
+  report_date DATE NOT NULL,
+  run_mode VARCHAR(20) NOT NULL DEFAULT 'send',
+  status VARCHAR(20) NOT NULL DEFAULT 'queued',
+  requested_by_email TEXT,
+  total_schedules INTEGER NOT NULL DEFAULT 0,
+  processed_schedules INTEGER NOT NULL DEFAULT 0,
+  successful_schedules INTEGER NOT NULL DEFAULT 0,
+  partial_schedules INTEGER NOT NULL DEFAULT 0,
+  failed_schedules INTEGER NOT NULL DEFAULT 0,
+  skipped_schedules INTEGER NOT NULL DEFAULT 0,
+  emails_sent INTEGER NOT NULL DEFAULT 0,
+  emails_failed INTEGER NOT NULL DEFAULT 0,
+  error_message TEXT,
+  started_at TIMESTAMP,
+  completed_at TIMESTAMP,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+  CONSTRAINT chk_report_batch_runs_mode CHECK (run_mode IN ('generate', 'send')),
+  CONSTRAINT chk_report_batch_runs_status CHECK (status IN ('queued', 'running', 'completed', 'partial', 'failed', 'cancelled'))
+);
+
+-- ============================================
+-- Report Batch Run Items Table
+-- ============================================
+CREATE TABLE IF NOT EXISTS report_batch_run_items (
+  id SERIAL PRIMARY KEY,
+  batch_run_id INTEGER NOT NULL REFERENCES report_batch_runs(id) ON DELETE CASCADE,
+  schedule_id INTEGER REFERENCES report_schedules(id) ON DELETE SET NULL,
+  schedule_name VARCHAR(255) NOT NULL,
+  report_date DATE NOT NULL,
+  run_mode VARCHAR(20) NOT NULL DEFAULT 'send',
+  status VARCHAR(20) NOT NULL DEFAULT 'queued',
+  attempt_count INTEGER NOT NULL DEFAULT 0,
+  last_attempt_at TIMESTAMP,
+  completed_at TIMESTAMP,
+  emails_sent INTEGER NOT NULL DEFAULT 0,
+  emails_failed INTEGER NOT NULL DEFAULT 0,
+  pdf_size_bytes INTEGER,
+  error_message TEXT,
+  task_name VARCHAR(255),
+  result_payload JSONB,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+  CONSTRAINT chk_report_batch_run_items_mode CHECK (run_mode IN ('generate', 'send')),
+  CONSTRAINT chk_report_batch_run_items_status CHECK (status IN ('queued', 'running', 'success', 'partial', 'skipped', 'failed')),
+  CONSTRAINT uq_report_batch_run_item_schedule UNIQUE (batch_run_id, schedule_id)
+);
+
+-- ============================================
 -- Indexes for Performance
 -- ============================================
 CREATE INDEX IF NOT EXISTS idx_email_group_contacts_group_id
@@ -116,6 +177,18 @@ CREATE INDEX IF NOT EXISTS idx_run_logs_status
 
 CREATE INDEX IF NOT EXISTS idx_run_logs_template_name
   ON run_logs(template_name);
+
+CREATE INDEX IF NOT EXISTS idx_report_batch_runs_status
+  ON report_batch_runs(status);
+
+CREATE INDEX IF NOT EXISTS idx_report_batch_runs_tag_date
+  ON report_batch_runs(tag, report_date DESC);
+
+CREATE INDEX IF NOT EXISTS idx_report_batch_run_items_batch_id
+  ON report_batch_run_items(batch_run_id);
+
+CREATE INDEX IF NOT EXISTS idx_report_batch_run_items_status
+  ON report_batch_run_items(status);
 
 -- ============================================
 -- Auto-Update Timestamp Triggers

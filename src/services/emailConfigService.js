@@ -335,6 +335,11 @@ class EmailConfigService {
       template_name,
       template_type,
       process,
+      tags,
+      service_filter_id,
+      service_filter_name,
+      header_subsidiary_id,
+      header_subsidiary_name,
       district_id,
       district_name,
       region_id,
@@ -365,12 +370,15 @@ class EmailConfigService {
     const query = `
       INSERT INTO report_schedules (
         template_name, template_type, process,
+        tags,
+        service_filter_id, service_filter_name,
+        header_subsidiary_id, header_subsidiary_name,
         district_id, district_name, region_id, region_name,
         subsidiary_id, subsidiary_name,
         email_group_id, email_group_ids, frequency,
         day_of_week, day_of_month, time_of_day, enabled
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
       RETURNING *
     `;
 
@@ -378,6 +386,11 @@ class EmailConfigService {
       finalTemplateName,
       finalTemplateType,
       finalProcess,
+      tags || [],
+      service_filter_id || null,
+      service_filter_name || null,
+      header_subsidiary_id || null,
+      header_subsidiary_name || null,
       district_id || (finalTemplateType === 'district' ? entity_id : null),
       district_name || (finalTemplateType === 'district' ? entity_name : null),
       region_id || (finalTemplateType === 'region' ? entity_id : null),
@@ -411,6 +424,11 @@ class EmailConfigService {
       template_name,
       template_type,
       process,
+      tags,
+      service_filter_id,
+      service_filter_name,
+      header_subsidiary_id,
+      header_subsidiary_name,
       district_id,
       district_name,
       region_id,
@@ -454,6 +472,26 @@ class EmailConfigService {
     if (finalProcess !== undefined) {
       setClauses.push(`process = $${paramIndex++}`);
       values.push(finalProcess);
+    }
+    if (tags !== undefined) {
+      setClauses.push(`tags = $${paramIndex++}`);
+      values.push(tags);
+    }
+    if (service_filter_id !== undefined) {
+      setClauses.push(`service_filter_id = $${paramIndex++}`);
+      values.push(service_filter_id);
+    }
+    if (service_filter_name !== undefined) {
+      setClauses.push(`service_filter_name = $${paramIndex++}`);
+      values.push(service_filter_name);
+    }
+    if (header_subsidiary_id !== undefined) {
+      setClauses.push(`header_subsidiary_id = $${paramIndex++}`);
+      values.push(header_subsidiary_id);
+    }
+    if (header_subsidiary_name !== undefined) {
+      setClauses.push(`header_subsidiary_name = $${paramIndex++}`);
+      values.push(header_subsidiary_name);
     }
     // Entity fields - only update if explicitly provided
     if (district_id !== undefined || (finalTemplateType === 'district' && entity_id !== undefined)) {
@@ -794,6 +832,431 @@ class EmailConfigService {
   }
 
   // ============================================
+  // Report Batch Runs
+  // ============================================
+
+  async getEnabledReportSchedulesByTag(tag) {
+    if (!this.isAvailable()) {
+      throw new Error('Database not initialized');
+    }
+
+    const query = `
+      SELECT
+        rs.*,
+        eg.name as email_group_name
+      FROM report_schedules rs
+      LEFT JOIN email_groups eg ON rs.email_group_id = eg.id
+      WHERE rs.enabled = true
+        AND EXISTS (
+          SELECT 1
+          FROM unnest(COALESCE(rs.tags, ARRAY[]::TEXT[])) AS tag_value
+          WHERE LOWER(tag_value) = LOWER($1)
+        )
+      ORDER BY rs.created_at DESC
+    `;
+
+    const result = await this.pool.query(query, [tag]);
+    return result.rows;
+  }
+
+  async getDistinctScheduleTags() {
+    if (!this.isAvailable()) {
+      throw new Error('Database not initialized');
+    }
+
+    const query = `
+      SELECT DISTINCT tag_value AS tag
+      FROM report_schedules rs,
+      LATERAL unnest(COALESCE(rs.tags, ARRAY[]::TEXT[])) AS tag_value
+      WHERE NULLIF(TRIM(tag_value), '') IS NOT NULL
+      ORDER BY tag_value ASC
+    `;
+
+    const result = await this.pool.query(query);
+    return result.rows.map(row => row.tag);
+  }
+
+  async findActiveReportBatchRun({ tag, report_date, run_mode }) {
+    if (!this.isAvailable()) {
+      throw new Error('Database not initialized');
+    }
+
+    const query = `
+      SELECT *
+      FROM report_batch_runs
+      WHERE LOWER(tag) = LOWER($1)
+        AND report_date = $2
+        AND run_mode = $3
+        AND status IN ('queued', 'running')
+      ORDER BY created_at DESC
+      LIMIT 1
+    `;
+
+    const result = await this.pool.query(query, [tag, report_date, run_mode]);
+    return result.rows[0] || null;
+  }
+
+  async createReportBatchRun(data) {
+    if (!this.isAvailable()) {
+      throw new Error('Database not initialized');
+    }
+
+    const {
+      tag,
+      report_date,
+      run_mode = 'send',
+      requested_by_email = null,
+      total_schedules = 0,
+      status = 'queued'
+    } = data;
+
+    const query = `
+      INSERT INTO report_batch_runs (
+        tag,
+        report_date,
+        run_mode,
+        requested_by_email,
+        total_schedules,
+        status
+      )
+      VALUES ($1, $2, $3, $4, $5, $6)
+      RETURNING *
+    `;
+
+    const result = await this.pool.query(query, [
+      tag,
+      report_date,
+      run_mode,
+      requested_by_email,
+      total_schedules,
+      status
+    ]);
+
+    return result.rows[0];
+  }
+
+  async createReportBatchRunItems(batchRunId, schedules, { report_date, run_mode }) {
+    if (!this.isAvailable()) {
+      throw new Error('Database not initialized');
+    }
+
+    const client = await this.pool.connect();
+
+    try {
+      await client.query('BEGIN');
+
+      const createdItems = [];
+      const query = `
+        INSERT INTO report_batch_run_items (
+          batch_run_id,
+          schedule_id,
+          schedule_name,
+          report_date,
+          run_mode,
+          status
+        )
+        VALUES ($1, $2, $3, $4, $5, 'queued')
+        RETURNING *
+      `;
+
+      for (const schedule of schedules) {
+        const result = await client.query(query, [
+          batchRunId,
+          schedule.id,
+          schedule.template_name,
+          report_date,
+          run_mode
+        ]);
+        createdItems.push(result.rows[0]);
+      }
+
+      await client.query('COMMIT');
+      return createdItems;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async getReportBatchRun(id) {
+    if (!this.isAvailable()) {
+      throw new Error('Database not initialized');
+    }
+
+    const query = `
+      SELECT *
+      FROM report_batch_runs
+      WHERE id = $1
+    `;
+
+    const result = await this.pool.query(query, [id]);
+    return result.rows[0] || null;
+  }
+
+  async getLatestReportBatchRun() {
+    if (!this.isAvailable()) {
+      throw new Error('Database not initialized');
+    }
+
+    const query = `
+      SELECT *
+      FROM report_batch_runs
+      ORDER BY created_at DESC
+      LIMIT 1
+    `;
+
+    const result = await this.pool.query(query);
+    return result.rows[0] || null;
+  }
+
+  async getLatestActiveReportBatchRun() {
+    if (!this.isAvailable()) {
+      throw new Error('Database not initialized');
+    }
+
+    const query = `
+      SELECT *
+      FROM report_batch_runs
+      WHERE status IN ('queued', 'running')
+      ORDER BY created_at DESC
+      LIMIT 1
+    `;
+
+    const result = await this.pool.query(query);
+    return result.rows[0] || null;
+  }
+
+  async getReportBatchRunItems(batchRunId) {
+    if (!this.isAvailable()) {
+      throw new Error('Database not initialized');
+    }
+
+    const query = `
+      SELECT *
+      FROM report_batch_run_items
+      WHERE batch_run_id = $1
+      ORDER BY id ASC
+    `;
+
+    const result = await this.pool.query(query, [batchRunId]);
+    return result.rows;
+  }
+
+  async getReportBatchRunWithItems(id) {
+    const batchRun = await this.getReportBatchRun(id);
+    if (!batchRun) {
+      return null;
+    }
+
+    const items = await this.getReportBatchRunItems(id);
+    return {
+      ...batchRun,
+      items
+    };
+  }
+
+  async getReportBatchRunItem(id) {
+    if (!this.isAvailable()) {
+      throw new Error('Database not initialized');
+    }
+
+    const query = `
+      SELECT
+        item.*,
+        batch.tag AS batch_tag,
+        batch.report_date AS batch_report_date,
+        batch.run_mode AS batch_run_mode,
+        batch.status AS batch_status,
+        batch.requested_by_email,
+        rs.enabled AS schedule_enabled
+      FROM report_batch_run_items item
+      INNER JOIN report_batch_runs batch ON batch.id = item.batch_run_id
+      LEFT JOIN report_schedules rs ON rs.id = item.schedule_id
+      WHERE item.id = $1
+    `;
+
+    const result = await this.pool.query(query, [id]);
+    return result.rows[0] || null;
+  }
+
+  async updateReportBatchRun(id, data) {
+    if (!this.isAvailable()) {
+      throw new Error('Database not initialized');
+    }
+
+    const allowedFields = [
+      'status',
+      'requested_by_email',
+      'total_schedules',
+      'processed_schedules',
+      'successful_schedules',
+      'partial_schedules',
+      'failed_schedules',
+      'skipped_schedules',
+      'emails_sent',
+      'emails_failed',
+      'error_message',
+      'started_at',
+      'completed_at'
+    ];
+
+    const setClauses = [];
+    const values = [];
+    let paramIndex = 1;
+
+    allowedFields.forEach(field => {
+      if (data[field] !== undefined) {
+        setClauses.push(`${field} = $${paramIndex++}`);
+        values.push(data[field]);
+      }
+    });
+
+    if (setClauses.length === 0) {
+      return this.getReportBatchRun(id);
+    }
+
+    setClauses.push('updated_at = CURRENT_TIMESTAMP');
+    values.push(id);
+
+    const query = `
+      UPDATE report_batch_runs
+      SET ${setClauses.join(', ')}
+      WHERE id = $${paramIndex}
+      RETURNING *
+    `;
+
+    const result = await this.pool.query(query, values);
+    return result.rows[0] || null;
+  }
+
+  async markReportBatchRunStarted(id) {
+    if (!this.isAvailable()) {
+      throw new Error('Database not initialized');
+    }
+
+    const query = `
+      UPDATE report_batch_runs
+      SET
+        status = 'running',
+        started_at = COALESCE(started_at, CURRENT_TIMESTAMP),
+        updated_at = CURRENT_TIMESTAMP
+      WHERE id = $1
+      RETURNING *
+    `;
+
+    const result = await this.pool.query(query, [id]);
+    return result.rows[0] || null;
+  }
+
+  async updateReportBatchRunItem(id, data) {
+    if (!this.isAvailable()) {
+      throw new Error('Database not initialized');
+    }
+
+    const allowedFields = [
+      'status',
+      'attempt_count',
+      'last_attempt_at',
+      'completed_at',
+      'emails_sent',
+      'emails_failed',
+      'pdf_size_bytes',
+      'error_message',
+      'task_name',
+      'result_payload'
+    ];
+
+    const setClauses = [];
+    const values = [];
+    let paramIndex = 1;
+
+    allowedFields.forEach(field => {
+      if (data[field] !== undefined) {
+        setClauses.push(`${field} = $${paramIndex++}`);
+        values.push(data[field]);
+      }
+    });
+
+    if (setClauses.length === 0) {
+      return this.getReportBatchRunItem(id);
+    }
+
+    setClauses.push('updated_at = CURRENT_TIMESTAMP');
+    values.push(id);
+
+    const query = `
+      UPDATE report_batch_run_items
+      SET ${setClauses.join(', ')}
+      WHERE id = $${paramIndex}
+      RETURNING *
+    `;
+
+    const result = await this.pool.query(query, values);
+    return result.rows[0] || null;
+  }
+
+  async recalculateReportBatchRun(id) {
+    if (!this.isAvailable()) {
+      throw new Error('Database not initialized');
+    }
+
+    const query = `
+      WITH summary AS (
+        SELECT
+          COUNT(*) AS total_schedules,
+          COUNT(*) FILTER (WHERE status IN ('success', 'partial', 'failed', 'skipped')) AS processed_schedules,
+          COUNT(*) FILTER (WHERE status = 'success') AS successful_schedules,
+          COUNT(*) FILTER (WHERE status = 'partial') AS partial_schedules,
+          COUNT(*) FILTER (WHERE status = 'failed') AS failed_schedules,
+          COUNT(*) FILTER (WHERE status = 'skipped') AS skipped_schedules,
+          COALESCE(SUM(emails_sent), 0) AS emails_sent,
+          COALESCE(SUM(emails_failed), 0) AS emails_failed,
+          COUNT(*) FILTER (WHERE status = 'running') AS running_count,
+          COUNT(*) FILTER (WHERE status = 'queued') AS queued_count
+        FROM report_batch_run_items
+        WHERE batch_run_id = $1
+      )
+      UPDATE report_batch_runs batch
+      SET
+        total_schedules = summary.total_schedules,
+        processed_schedules = summary.processed_schedules,
+        successful_schedules = summary.successful_schedules,
+        partial_schedules = summary.partial_schedules,
+        failed_schedules = summary.failed_schedules,
+        skipped_schedules = summary.skipped_schedules,
+        emails_sent = summary.emails_sent,
+        emails_failed = summary.emails_failed,
+        status = CASE
+          WHEN summary.running_count > 0 THEN 'running'
+          WHEN summary.queued_count > 0 AND summary.processed_schedules = 0 THEN 'queued'
+          WHEN summary.queued_count > 0 THEN 'running'
+          WHEN summary.failed_schedules > 0 AND summary.successful_schedules = 0 AND summary.partial_schedules = 0 THEN 'failed'
+          WHEN summary.failed_schedules > 0 OR summary.partial_schedules > 0 THEN 'partial'
+          ELSE 'completed'
+        END,
+        started_at = CASE
+          WHEN summary.processed_schedules > 0 OR summary.running_count > 0
+            THEN COALESCE(batch.started_at, CURRENT_TIMESTAMP)
+          ELSE batch.started_at
+        END,
+        completed_at = CASE
+          WHEN summary.running_count = 0 AND summary.queued_count = 0
+            THEN COALESCE(batch.completed_at, CURRENT_TIMESTAMP)
+          ELSE NULL
+        END,
+        updated_at = CURRENT_TIMESTAMP
+      FROM summary
+      WHERE batch.id = $1
+      RETURNING batch.*
+    `;
+
+    const result = await this.pool.query(query, [id]);
+    return result.rows[0] || null;
+  }
+
+  // ============================================
   // Utility Methods
   // ============================================
 
@@ -825,4 +1288,3 @@ class EmailConfigService {
 
 // Export singleton instance
 module.exports = new EmailConfigService();
-

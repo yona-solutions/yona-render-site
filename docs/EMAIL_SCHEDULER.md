@@ -103,13 +103,11 @@ GET /api/email-scheduler/status
 }
 ```
 
-### Manually Trigger Scheduler
+### Ad Hoc Runs
 
-```bash
-POST /api/email-scheduler/run-now
-```
+Use the `Run Reports` flow in `/email-config` for on-demand execution.
 
-Useful for testing without waiting for the next scheduled run.
+That path creates a tagged batch run for a selected report month and tracks progress in the database, instead of using the legacy in-memory manual scheduler trigger.
 
 **Response:**
 ```json
@@ -229,13 +227,12 @@ curl http://localhost:3000/api/email-scheduler/status
    - Set `next_send_at` to a past date (forces immediate send)
    - Or manually trigger with API
 
-### 3. Manually Trigger
+### 3. Run an Ad Hoc Batch
 
-```bash
-curl -X POST http://localhost:3000/api/email-scheduler/run-now
-```
-
-Check server logs for detailed progress.
+1. Go to `/email-config`
+2. Click `Run Reports`
+3. Choose a tag, report month, and action
+4. Watch progress in the run status modal
 
 ### 4. Verify Email Sent
 
@@ -342,10 +339,9 @@ For high volume:
    - Verify `time_of_day` in schedule
    - Verify `day_of_month` or `day_of_week`
 
-3. **Manual trigger to test**
-   ```bash
-   POST /api/email-scheduler/run-now
-   ```
+3. **Run an ad hoc batch to test**
+   - Go to `/email-config`
+   - Use `Run Reports` for the tag and month you want to validate
 
 ### Duplicate Emails
 
@@ -363,6 +359,6 @@ The Email Scheduler provides fully automated P&L report delivery:
 ✅ **Scalable** - Handles multiple schedules and recipients  
 ✅ **Reliable** - Tracks success/failure, updates timestamps  
 ✅ **Monitorable** - Status API and detailed logging  
-✅ **Testable** - Manual trigger for immediate testing  
+✅ **Testable** - Ad hoc tagged runs from Email Config  
 
 Once configured, schedules run automatically forever until paused or deleted.

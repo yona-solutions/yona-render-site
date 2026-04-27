@@ -1013,6 +1013,147 @@
       margin-bottom: 2px;
     }
 
+    .schedule-tags-inline {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+
+    .schedule-tag-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 7px;
+      background: #ebf8ff;
+      color: #1e40af;
+      border: 1px solid #bfdbfe;
+      border-radius: 999px;
+      font-size: 10px;
+      font-weight: 600;
+      line-height: 1.2;
+      white-space: nowrap;
+    }
+
+    .tag-editor-control {
+      position: relative;
+    }
+
+    .tag-input-shell {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      min-height: 44px;
+      padding: 7px 10px;
+      background: #f7fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+      cursor: text;
+    }
+
+    .tag-input-shell:focus-within,
+    .tag-input-shell.focused {
+      background: #fff;
+      border-color: #5a6fd8;
+      box-shadow: 0 0 0 3px rgba(90, 111, 216, 0.12);
+    }
+
+    .tag-editor-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .tag-input-inline {
+      flex: 1 0 160px;
+      min-width: 140px;
+      width: auto;
+      border: none;
+      box-shadow: none;
+      outline: none;
+      background: transparent;
+      padding: 4px 0;
+      font-size: 13px;
+      color: #2d3748;
+      font-family: inherit;
+      border-radius: 0;
+      appearance: none;
+    }
+
+    .tag-input-inline::placeholder {
+      color: #a0aec0;
+    }
+
+    .form-group .tag-input-inline,
+    .form-group .tag-input-inline:focus {
+      width: auto;
+      padding: 4px 0;
+      border: none;
+      box-shadow: none;
+      background: transparent;
+      border-radius: 0;
+    }
+
+    .tag-suggestions-panel {
+      position: absolute;
+      top: calc(100% + 8px);
+      left: 0;
+      right: 0;
+      display: none;
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      box-shadow: 0 16px 36px rgba(15, 23, 42, 0.12);
+      padding: 10px;
+      z-index: 40;
+    }
+
+    .tag-suggestions-panel.visible {
+      display: block;
+    }
+
+    .tag-suggestions-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: #718096;
+      margin-bottom: 8px;
+    }
+
+    .tag-suggestion-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .tag-suggestion-item {
+      appearance: none;
+      border: 1px solid #dbeafe;
+      background: #eff6ff;
+      color: #1d4ed8;
+      border-radius: 999px;
+      padding: 5px 10px;
+      font-size: 12px;
+      font-weight: 600;
+      line-height: 1.2;
+      cursor: pointer;
+      transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+    }
+
+    .tag-suggestion-item:hover {
+      background: #dbeafe;
+      border-color: #93c5fd;
+      transform: translateY(-1px);
+    }
+
+    .tag-suggestion-empty {
+      font-size: 12px;
+      color: #94a3b8;
+      padding: 2px 2px 0 2px;
+    }
+
     /* Modal Email Group Tags */
     .modal-email-tag {
       display: inline-flex;
@@ -1036,6 +1177,34 @@
     }
 
     .modal-email-tag button:hover {
+      color: #e53e3e;
+    }
+
+    .modal-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 8px;
+      background: #ebf8ff;
+      color: #1e40af;
+      border: 1px solid #bfdbfe;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 600;
+      line-height: 1.2;
+    }
+
+    .modal-tag button {
+      background: none;
+      border: none;
+      color: #1e40af;
+      cursor: pointer;
+      font-size: 14px;
+      padding: 0;
+      line-height: 1;
+    }
+
+    .modal-tag button:hover {
       color: #e53e3e;
     }
 
@@ -1230,11 +1399,14 @@
   <div id="schedulerProgressModal" class="loading-modal">
     <div class="loading-content" style="max-width: 700px; max-height: 80vh; overflow-y: auto;">
       <div class="loading-spinner" id="schedulerSpinner"></div>
-      <div class="loading-message" id="schedulerTitle" style="font-size: 18px; margin-bottom: 20px;">⚙️ Running All Schedules...</div>
+      <div class="loading-message" id="schedulerTitle" style="font-size: 18px; margin-bottom: 8px;">⚙️ Running Reports...</div>
+      <div id="schedulerMetaText" style="color: #718096; font-size: 13px; text-align: center; margin-bottom: 20px;">
+        Preparing batch run...
+      </div>
       
       <div style="background: #f7fafc; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
         <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
-          <span style="color: #4a5568; font-weight: 500;">📊 Schedules Processed:</span>
+          <span style="color: #4a5568; font-weight: 500;">📊 Reports Processed:</span>
           <span style="color: #2d3748; font-weight: 600;" id="schedulesProcessedCount">0 / 0</span>
         </div>
         <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
@@ -1242,13 +1414,13 @@
           <span style="color: #48bb78; font-weight: 600;" id="emailsSentCount">0</span>
         </div>
         <div style="display: flex; justify-content: space-between;">
-          <span style="color: #4a5568; font-weight: 500;">⚠️ Errors:</span>
+          <span style="color: #4a5568; font-weight: 500;">⚠️ Issues:</span>
           <span style="color: #f56565; font-weight: 600;" id="errorsCount">0</span>
         </div>
       </div>
 
       <div id="schedulerStatusText" style="color: #718096; font-size: 13px; text-align: center; margin-bottom: 16px;">
-        Starting scheduler...
+        Starting report run...
       </div>
 
       <!-- Schedule List -->
@@ -1260,9 +1432,6 @@
       <div style="margin-top: 20px; display: flex; justify-content: center; gap: 12px;">
         <button class="btn btn-secondary" onclick="hideSchedulerProgress(false)" style="padding: 10px 24px;">
           Close
-        </button>
-        <button id="clearJobBtn" class="btn btn-danger" onclick="hideSchedulerProgress(true)" style="padding: 10px 24px; display: none;">
-          Clear Job
         </button>
       </div>
     </div>
@@ -1299,8 +1468,8 @@
         <div id="jobStatusIndicator" style="display: none; padding: 8px 14px; background: #fef3c7; border: 1px solid #f59e0b; border-radius: 6px; font-size: 13px; cursor: pointer;" onclick="showJobProgress()">
           <span id="jobStatusText">⏳ Job running...</span>
         </div>
-        <button class="btn btn-success" id="runAllSchedulesBtn" onclick="runAllSchedulesNow()">
-          ▶️ Run All Schedules Now
+        <button class="btn btn-success" id="runAllSchedulesBtn" onclick="openRunReportsModal()">
+          ▶️ Run Reports
         </button>
       </div>
     </div>
@@ -1363,14 +1532,11 @@
             <thead>
               <tr>
                 <th class="resizable" style="width: 170px;">Template Name<span class="resize-handle"></span></th>
+                <th class="resizable" style="width: 160px;">Tags<span class="resize-handle"></span></th>
                 <th class="resizable" style="width: 100px;">Type<span class="resize-handle"></span></th>
                 <th class="resizable" style="width: 110px;">Process<span class="resize-handle"></span></th>
                 <th class="resizable" style="width: 190px;">Entity<span class="resize-handle"></span></th>
-                <th class="resizable" style="width: 110px;">Schedule<span class="resize-handle"></span></th>
                 <th class="resizable" style="width: 130px;">Email Groups<span class="resize-handle"></span></th>
-                <th class="resizable" style="width: 80px;">Status<span class="resize-handle"></span></th>
-                <th class="resizable" style="width: 130px;">Last Manual<span class="resize-handle"></span></th>
-                <th class="resizable" style="width: 130px;">Last Automated<span class="resize-handle"></span></th>
                 <th style="width: 85px; text-align: center;">Edit</th>
                 <th style="width: 135px; text-align: center;">Download</th>
                 <th style="width: 125px; text-align: center;">Email</th>
@@ -1378,6 +1544,7 @@
               </tr>
               <tr class="column-filter-row">
                 <th><input type="text" class="column-filter" id="filterTemplateName" placeholder="Filter..." onkeyup="applyColumnFilters()"></th>
+                <th><input type="text" class="column-filter" id="filterTags" placeholder="Filter..." onkeyup="applyColumnFilters()"></th>
                 <th>
                   <select class="column-filter" id="filterType" onchange="applyColumnFilters()">
                     <option value="">All</option>
@@ -1394,17 +1561,7 @@
                   </select>
                 </th>
                 <th><input type="text" class="column-filter" id="filterEntity" placeholder="Filter..." onkeyup="applyColumnFilters()"></th>
-                <th></th>
                 <th><input type="text" class="column-filter" id="filterEmailGroup" placeholder="Filter..." onkeyup="applyColumnFilters()"></th>
-                <th>
-                  <select class="column-filter" id="filterStatus" onchange="applyColumnFilters()">
-                    <option value="">All</option>
-                    <option value="enabled">Active</option>
-                    <option value="disabled">Disabled</option>
-                  </select>
-                </th>
-                <th></th>
-                <th></th>
                 <th></th>
                 <th></th>
                 <th></th>
@@ -1413,7 +1570,7 @@
             </thead>
             <tbody id="reportSchedulesBody">
               <tr>
-                <td colspan="9">
+                <td colspan="10">
                   <div class="loading">
                     <div class="loading-spinner"></div>
                     <p>Loading report schedules...</p>
@@ -1489,6 +1646,46 @@
           <button type="button" class="btn btn-secondary" onclick="closeSendEmailModal()">Cancel</button>
           <button type="button" class="btn btn-primary" onclick="confirmSendEmail()" id="sendEmailBtn">
             📧 Send Email
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Run Reports Modal -->
+  <div class="modal" id="runReportsModal">
+    <div class="modal-content" style="max-width: 460px;">
+      <div class="modal-header">
+        <h3>Run Reports</h3>
+        <button class="modal-close" onclick="closeRunReportsModal()">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="runReportsTag" style="font-weight: 600; margin-bottom: 8px; display: block;">Tag:</label>
+          <select id="runReportsTag" onchange="updateRunReportsSelectionHelp()" style="width: 100%; padding: 10px; font-size: 14px; border: 1px solid #e2e8f0; border-radius: 6px;">
+            <option value="">Select a tag</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin-top: 16px;">
+          <label for="runReportsMonth" style="font-weight: 600; margin-bottom: 8px; display: block;">Report Month:</label>
+          <select id="runReportsMonth" style="width: 100%; padding: 10px; font-size: 14px; border: 1px solid #e2e8f0; border-radius: 6px;">
+            <option value="">Loading months...</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin-top: 16px;">
+          <label for="runReportsMode" style="font-weight: 600; margin-bottom: 8px; display: block;">Action:</label>
+          <select id="runReportsMode" onchange="updateRunReportsSelectionHelp()" style="width: 100%; padding: 10px; font-size: 14px; border: 1px solid #e2e8f0; border-radius: 6px;">
+            <option value="send">Generate and send reports</option>
+            <option value="generate">Generate reports only</option>
+          </select>
+        </div>
+        <div id="runReportsSelectionHelp" style="margin-top: 14px; padding: 12px; background: #f7fafc; border-radius: 6px; font-size: 13px; color: #4a5568;">
+          Choose a tag to see how many schedules will run.
+        </div>
+        <div class="form-actions" style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 20px;">
+          <button type="button" class="btn btn-secondary" onclick="closeRunReportsModal()">Cancel</button>
+          <button type="button" class="btn btn-primary" onclick="confirmRunReports()" id="confirmRunReportsBtn">
+            ▶️ Start Run
           </button>
         </div>
       </div>
@@ -1605,6 +1802,22 @@
                 </select>
               </div>
             </div>
+
+            <div class="form-group" style="margin-top: 16px;">
+              <label for="editScheduleTagInput">Tags</label>
+              <div id="editScheduleTagControl" class="tag-editor-control">
+                <div id="editScheduleTagField" class="tag-input-shell" onclick="focusScheduleTagInput()">
+                  <div id="editScheduleTagsContainer" class="tag-editor-chips">
+                    <!-- Tags will be inserted here -->
+                  </div>
+                  <input type="text" id="editScheduleTagInput" class="tag-input-inline" placeholder="Search or add a tag">
+                </div>
+                <div id="scheduleTagSuggestions" class="tag-suggestions-panel">
+                  <!-- Suggestions will be inserted here -->
+                </div>
+              </div>
+              <div class="form-help">Use tags to organize schedules and filter the table quickly. Press Enter or comma to add, or click a suggestion to reuse an existing tag.</div>
+            </div>
           </div>
 
           <!-- Entity Selection Section -->
@@ -1612,24 +1825,41 @@
             <h4 style="font-size: 14px; color: #4a5568; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0;">Entity Selection</h4>
 
             <div class="form-group" id="editDistrictGroup">
-              <label for="editDistrictId">District</label>
+              <label for="editDistrictId" id="editDistrictLabel">District <span style="color: #e53e3e;">*</span></label>
               <select id="editDistrictId" onchange="onEditEntityChange('district')">
                 <option value="">Select district...</option>
               </select>
             </div>
 
             <div class="form-group" id="editRegionGroup">
-              <label for="editRegionId">Region</label>
+              <label for="editRegionId" id="editRegionLabel">Region <span style="color: #e53e3e;">*</span></label>
               <select id="editRegionId" onchange="onEditEntityChange('region')">
                 <option value="">Select region...</option>
               </select>
             </div>
 
             <div class="form-group" id="editSubsidiaryGroup">
-              <label for="editSubsidiaryId">Subsidiary</label>
+              <label for="editSubsidiaryId" id="editSubsidiaryLabel">Subsidiary</label>
               <select id="editSubsidiaryId" onchange="onEditEntityChange('subsidiary')">
                 <option value="">Select subsidiary...</option>
               </select>
+              <div class="form-help" id="editSubsidiaryHelp">Optional: filter by subsidiary, matching the P&L page.</div>
+            </div>
+
+            <div class="form-group" id="editServiceFilterGroup" style="display: none;">
+              <label for="editServiceFilterId">Service</label>
+              <select id="editServiceFilterId">
+                <option value="">No service filter</option>
+              </select>
+              <div class="form-help">Optional: filter subsidiary reports by service, matching the P&L page.</div>
+            </div>
+
+            <div class="form-group" id="editHeaderSubsidiaryGroup">
+              <label for="editHeaderSubsidiaryId">Subsidiary Header <span style="color: #e53e3e;">*</span></label>
+              <select id="editHeaderSubsidiaryId">
+                <option value="">Select subsidiary header...</option>
+              </select>
+              <div class="form-help">Required: choose the subsidiary header label that should appear on the report.</div>
             </div>
           </div>
 
@@ -1648,21 +1878,6 @@
             </div>
           </div>
 
-          <!-- Status Section -->
-          <div style="margin-bottom: 16px;">
-            <h4 style="font-size: 14px; color: #4a5568; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0;">Status</h4>
-
-            <div style="display: flex; align-items: center; gap: 16px;">
-              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                <input type="checkbox" id="editEnabled" checked style="width: 18px; height: 18px;">
-                <span style="font-size: 14px; color: #2d3748;">Schedule Enabled</span>
-              </label>
-            </div>
-
-            <div id="editScheduleStatus" style="margin-top: 12px; padding: 12px; background: #f7fafc; border-radius: 6px; font-size: 12px; color: #718096;">
-              <!-- Status info will be shown here -->
-            </div>
-          </div>
         </form>
       </div>
       <div class="modal-footer">
@@ -1674,6 +1889,7 @@
 
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="/pnl-pdf.js"></script>
   <script src="/auth.js"></script>
 
   <script>
@@ -1685,11 +1901,16 @@
     let currentEmailList = [];
     let editingEmailGroupId = null;
     let editingScheduleId = null;
+    let modalScheduleTags = [];
+    let isScheduleTagInputFocused = false;
+    let isScheduleTagPickerOpen = false;
+    let scheduleTagBlurTimeout = null;
     
     // Hierarchy options
     let districtOptions = [];
     let regionOptions = [];
     let subsidiaryOptions = [];
+    let serviceOptions = [];
     
     // Track unsaved changes
     let unsavedChanges = new Map(); // scheduleId -> changes object
@@ -1717,6 +1938,66 @@
           e.preventDefault();
           addEmailToList();
         }
+      });
+
+      const scheduleTagInput = document.getElementById('editScheduleTagInput');
+      if (scheduleTagInput) {
+        scheduleTagInput.addEventListener('keydown', (e) => {
+          if ((e.key === 'Enter' || e.key === ',') && scheduleTagInput.value.trim()) {
+            e.preventDefault();
+            addScheduleTagsFromModalInput();
+            return;
+          }
+
+          if (e.key === 'Backspace' && !scheduleTagInput.value.trim() && modalScheduleTags.length > 0) {
+            e.preventDefault();
+            removeScheduleTagInModal(modalScheduleTags[modalScheduleTags.length - 1]);
+            return;
+          }
+
+          if (e.key === 'Escape') {
+            isScheduleTagInputFocused = false;
+            isScheduleTagPickerOpen = false;
+            renderScheduleTagSuggestions();
+            scheduleTagInput.blur();
+          }
+        });
+        scheduleTagInput.addEventListener('input', () => {
+          isScheduleTagPickerOpen = true;
+          renderScheduleTagSuggestions();
+        });
+        scheduleTagInput.addEventListener('focus', () => {
+          if (scheduleTagBlurTimeout) {
+            clearTimeout(scheduleTagBlurTimeout);
+            scheduleTagBlurTimeout = null;
+          }
+          isScheduleTagInputFocused = true;
+          isScheduleTagPickerOpen = true;
+          syncScheduleTagInputShell();
+          renderScheduleTagSuggestions();
+        });
+        scheduleTagInput.addEventListener('blur', () => {
+          scheduleTagBlurTimeout = window.setTimeout(() => {
+            isScheduleTagInputFocused = false;
+            syncScheduleTagInputShell();
+            const tagControl = document.getElementById('editScheduleTagControl');
+            const activeInsideTagControl = tagControl && tagControl.contains(document.activeElement);
+            if (!activeInsideTagControl && !isScheduleTagPickerOpen) {
+              renderScheduleTagSuggestions();
+            }
+            scheduleTagBlurTimeout = null;
+          }, 120);
+        });
+      }
+
+      document.addEventListener('click', (e) => {
+        const tagControl = document.getElementById('editScheduleTagControl');
+        if (!tagControl || tagControl.contains(e.target)) return;
+
+        isScheduleTagInputFocused = false;
+        isScheduleTagPickerOpen = false;
+        syncScheduleTagInputShell();
+        renderScheduleTagSuggestions();
       });
 
       // Check for running jobs on page load
@@ -1747,6 +2028,7 @@
         
         reportSchedules = await response.json();
         filteredSchedules = [...reportSchedules];
+        renderScheduleTagSuggestions();
         renderReportSchedulesTable();
       } catch (error) {
         console.error('Error loading report schedules:', error);
@@ -1757,10 +2039,11 @@
     async function loadHierarchyOptions() {
       try {
         // Load districts, regions, and subsidiaries in parallel
-        const [districtsData, regionsData, subsidiariesData] = await Promise.all([
+        const [districtsData, regionsData, subsidiariesData, servicesData] = await Promise.all([
           authFetch('/api/storage/districts').then(r => r.json()),
           authFetch('/api/storage/regions').then(r => r.json()),
-          authFetch('/api/storage/departments').then(r => r.json())
+          authFetch('/api/storage/departments').then(r => r.json()),
+          authFetch('/api/storage/services').then(r => r.json())
         ]);
 
         console.log('📊 Raw data loaded:');
@@ -1816,10 +2099,19 @@
           // Already sorted by API
         }
 
+        serviceOptions = [];
+        if (Array.isArray(servicesData)) {
+          serviceOptions = servicesData.map(item => ({
+            id: item.id,
+            label: item.label || item.id
+          }));
+        }
+
         console.log('📊 Loaded hierarchy options:');
         console.log('  Districts:', districtOptions.length);
         console.log('  Regions:', regionOptions.length);
         console.log('  Subsidiaries:', subsidiaryOptions.length);
+        console.log('  Services:', serviceOptions.length);
 
         if (districtOptions.length > 0) {
           console.log('📊 Sample district options:', districtOptions.slice(0, 3));
@@ -1829,6 +2121,9 @@
         }
         if (subsidiaryOptions.length > 0) {
           console.log('📊 Sample subsidiary options:', subsidiaryOptions.slice(0, 3).map(o => o.label));
+        }
+        if (serviceOptions.length > 0) {
+          console.log('📊 Sample service options:', serviceOptions.slice(0, 3).map(o => o.label));
         }
       } catch (error) {
         console.error('Error loading hierarchy options:', error);
@@ -2008,11 +2303,11 @@
       // Check if any column filter is active
       const hasActiveFilter =
         document.getElementById('filterTemplateName')?.value ||
+        document.getElementById('filterTags')?.value ||
         document.getElementById('filterType')?.value ||
         document.getElementById('filterProcess')?.value ||
         document.getElementById('filterEntity')?.value ||
-        document.getElementById('filterEmailGroup')?.value ||
-        document.getElementById('filterStatus')?.value;
+        document.getElementById('filterEmailGroup')?.value;
 
       if (schedulesToRender.length === 0) {
         const message = hasActiveFilter
@@ -2051,39 +2346,19 @@
           entityTooltip = `Subsidiary: ${schedule.subsidiary_name}`;
         }
 
-        // Format schedule info
-        let scheduleDisplay = '—';
-        if (schedule.frequency) {
-          const freq = schedule.frequency.charAt(0).toUpperCase() + schedule.frequency.slice(1);
-          const time = schedule.time_of_day ? schedule.time_of_day.substring(0, 5) : '08:00';
-          if (schedule.frequency === 'monthly' && schedule.day_of_month) {
-            scheduleDisplay = `${freq} (${schedule.day_of_month}${getOrdinalSuffix(schedule.day_of_month)}) @ ${time}`;
-          } else if (schedule.frequency === 'weekly' && schedule.day_of_week) {
-            scheduleDisplay = `${freq} (${schedule.day_of_week.substring(0, 3)}) @ ${time}`;
-          } else if (schedule.frequency === 'daily') {
-            scheduleDisplay = `${freq} @ ${time}`;
-          } else {
-            scheduleDisplay = `${freq} @ ${time}`;
-          }
-        }
-
         // Get email group names
         const groupNames = (schedule.email_group_ids || []).map(gid => {
           const group = emailGroups.find(g => g.id === gid);
           return group ? group.name : null;
         }).filter(Boolean);
+        const scheduleTags = getScheduleTags(schedule);
 
         const groupsDisplay = groupNames.length > 0
           ? groupNames.map(n => `<span class="mini-tag">${escapeHtml(n)}</span>`).join(' ')
           : '<span style="color: #a0aec0;">None</span>';
-
-        // Status toggle
-        const statusToggle = `
-          <label class="toggle-switch" title="Click to ${schedule.enabled ? 'disable' : 'enable'}">
-            <input type="checkbox" ${schedule.enabled ? 'checked' : ''} onchange="toggleScheduleStatus(${schedule.id}, this.checked)">
-            <span class="toggle-slider"></span>
-          </label>
-        `;
+        const tagsDisplay = scheduleTags.length > 0
+          ? `<div class="schedule-tags-inline">${scheduleTags.map(tag => `<span class="schedule-tag-pill">${escapeHtml(tag)}</span>`).join('')}</div>`
+          : '<span style="color: #a0aec0;">—</span>';
 
         // Process badge
         const processBadge = schedule.process
@@ -2096,6 +2371,9 @@
               <strong>${escapeHtml(schedule.template_name || 'Untitled')}</strong>
             </td>
             <td>
+              ${tagsDisplay}
+            </td>
+            <td>
               <span class="type-badge ${schedule.template_type || ''}">${schedule.template_type ? (schedule.template_type.charAt(0).toUpperCase() + schedule.template_type.slice(1)) : '—'}</span>
             </td>
             <td>
@@ -2104,20 +2382,8 @@
             <td style="max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(entityTooltip || entityDisplay)}">
               ${escapeHtml(entityDisplay)}
             </td>
-            <td style="font-size: 11px;">
-              ${scheduleDisplay}
-            </td>
             <td>
               ${groupsDisplay}
-            </td>
-            <td style="text-align: center;">
-              ${statusToggle}
-            </td>
-            <td style="font-size: 10px; color: #666;">
-              ${schedule.last_run_manual ? formatDate(schedule.last_run_manual) : '<span style="color: #a0aec0;">Never</span>'}
-            </td>
-            <td style="font-size: 10px; color: #666;">
-              ${schedule.last_run_automated ? formatDate(schedule.last_run_automated) : '<span style="color: #a0aec0;">Never</span>'}
             </td>
             <td style="text-align: center;">
               <button class="btn btn-small btn-secondary" onclick="openScheduleEditModal(${schedule.id})" style="font-size: 11px; padding: 4px 8px;">✏️ Edit</button>
@@ -2168,16 +2434,22 @@
 
     function applyColumnFilters() {
       const templateNameFilter = document.getElementById('filterTemplateName').value.toLowerCase();
+      const tagsFilter = document.getElementById('filterTags').value.toLowerCase();
       const typeFilter = document.getElementById('filterType').value;
       const processFilter = document.getElementById('filterProcess').value;
       const entityFilter = document.getElementById('filterEntity').value.toLowerCase();
       const emailGroupFilter = document.getElementById('filterEmailGroup').value.toLowerCase();
-      const statusFilter = document.getElementById('filterStatus').value;
 
       filteredSchedules = reportSchedules.filter(schedule => {
         // Template name filter
         if (templateNameFilter && !(schedule.template_name || '').toLowerCase().includes(templateNameFilter)) {
           return false;
+        }
+
+        // Tags filter
+        if (tagsFilter) {
+          const tagMatch = getScheduleTags(schedule).some(tag => tag.toLowerCase().includes(tagsFilter));
+          if (!tagMatch) return false;
         }
 
         // Type filter
@@ -2209,13 +2481,6 @@
           if (!groupMatch) return false;
         }
 
-        // Status filter
-        if (statusFilter) {
-          const isEnabled = schedule.enabled !== false;
-          if (statusFilter === 'enabled' && !isEnabled) return false;
-          if (statusFilter === 'disabled' && isEnabled) return false;
-        }
-
         return true;
       });
 
@@ -2224,11 +2489,11 @@
 
     function clearColumnFilters() {
       document.getElementById('filterTemplateName').value = '';
+      document.getElementById('filterTags').value = '';
       document.getElementById('filterType').value = '';
       document.getElementById('filterProcess').value = '';
       document.getElementById('filterEntity').value = '';
       document.getElementById('filterEmailGroup').value = '';
-      document.getElementById('filterStatus').value = '';
 
       filteredSchedules = [...reportSchedules];
       renderReportSchedulesTable();
@@ -2450,12 +2715,191 @@
     let currentEditingSchedule = null;
     let modalEmailGroupIds = [];
 
+    function normalizeScheduleTags(tags) {
+      const rawTags = Array.isArray(tags)
+        ? tags
+        : typeof tags === 'string'
+          ? tags.replace(/^\{|\}$/g, '').split(',')
+          : [];
+
+      const seen = new Set();
+      const normalized = [];
+
+      rawTags.forEach(tag => {
+        if (typeof tag !== 'string') return;
+
+        const trimmed = tag.trim();
+        if (!trimmed) return;
+
+        const key = trimmed.toLowerCase();
+        if (seen.has(key)) return;
+
+        seen.add(key);
+        normalized.push(trimmed);
+      });
+
+      return normalized;
+    }
+
+    function getScheduleTags(schedule) {
+      return normalizeScheduleTags(schedule?.tags || []);
+    }
+
+    function getAllExistingScheduleTags() {
+      const allTags = reportSchedules.flatMap(schedule => getScheduleTags(schedule));
+      const availableTags = allTags.filter(tag => !modalScheduleTags.some(selected => selected.toLowerCase() === tag.toLowerCase()));
+      return normalizeScheduleTags(availableTags).sort((a, b) => a.localeCompare(b));
+    }
+
+    function getFilteredScheduleTagSuggestions(query = '') {
+      const normalizedQuery = query.trim().toLowerCase();
+      const availableTags = getAllExistingScheduleTags();
+
+      if (!normalizedQuery) {
+        return availableTags.slice(0, 8);
+      }
+
+      return availableTags
+        .filter(tag => tag.toLowerCase().includes(normalizedQuery))
+        .slice(0, 8);
+    }
+
+    function parseScheduleTagInput(inputValue) {
+      return normalizeScheduleTags((inputValue || '').split(/[\n,]+/));
+    }
+
+    function escapeForSingleQuotedJs(value) {
+      return String(value)
+        .replace(/\\/g, '\\\\')
+        .replace(/'/g, "\\'");
+    }
+
+    function focusScheduleTagInput() {
+      const input = document.getElementById('editScheduleTagInput');
+      if (input) {
+        if (scheduleTagBlurTimeout) {
+          clearTimeout(scheduleTagBlurTimeout);
+          scheduleTagBlurTimeout = null;
+        }
+        isScheduleTagPickerOpen = true;
+        input.focus();
+      }
+    }
+
+    function keepScheduleTagInputActive() {
+      isScheduleTagInputFocused = true;
+      isScheduleTagPickerOpen = true;
+      syncScheduleTagInputShell();
+      renderScheduleTagSuggestions();
+      focusScheduleTagInput();
+    }
+
+    function syncScheduleTagInputShell() {
+      const shell = document.getElementById('editScheduleTagField');
+      if (!shell) return;
+
+      shell.classList.toggle('focused', isScheduleTagInputFocused);
+    }
+
+    function renderModalScheduleTags() {
+      const container = document.getElementById('editScheduleTagsContainer');
+
+      if (modalScheduleTags.length === 0) {
+        container.innerHTML = '';
+        return;
+      }
+
+      container.innerHTML = modalScheduleTags.map(tag => `
+        <span class="modal-tag">
+          ${escapeHtml(tag)}
+          <button type="button" onclick="removeScheduleTagInModal('${escapeForSingleQuotedJs(tag)}')" title="Remove">&times;</button>
+        </span>
+      `).join('');
+    }
+
+    function renderScheduleTagSuggestions() {
+      const panel = document.getElementById('scheduleTagSuggestions');
+      const input = document.getElementById('editScheduleTagInput');
+      if (!panel || !input) return;
+
+      const suggestions = getFilteredScheduleTagSuggestions(input.value);
+      const shouldShow = isScheduleTagPickerOpen && (suggestions.length > 0 || input.value.trim());
+
+      if (!shouldShow) {
+        panel.classList.remove('visible');
+        panel.innerHTML = '';
+        return;
+      }
+
+      panel.classList.add('visible');
+
+      if (suggestions.length === 0) {
+        panel.innerHTML = `
+          <div class="tag-suggestions-label">Suggestions</div>
+          <div class="tag-suggestion-empty">No matching existing tags. Press Enter to create a new one.</div>
+        `;
+        return;
+      }
+
+      panel.innerHTML = `
+        <div class="tag-suggestions-label">Suggestions</div>
+        <div class="tag-suggestion-list">
+          ${suggestions.map(tag => `
+            <button
+              type="button"
+              class="tag-suggestion-item"
+              onmousedown="event.preventDefault()"
+              onclick="selectScheduleTagSuggestion('${escapeForSingleQuotedJs(tag)}')"
+            >
+              ${escapeHtml(tag)}
+            </button>
+          `).join('')}
+        </div>
+      `;
+    }
+
+    function selectScheduleTagSuggestion(tag) {
+      modalScheduleTags = normalizeScheduleTags([...modalScheduleTags, tag]);
+
+      const input = document.getElementById('editScheduleTagInput');
+      if (input) {
+        input.value = '';
+      }
+
+      renderModalScheduleTags();
+      renderScheduleTagSuggestions();
+      keepScheduleTagInputActive();
+    }
+
+    function addScheduleTagsFromModalInput() {
+      const input = document.getElementById('editScheduleTagInput');
+      const newTags = parseScheduleTagInput(input.value);
+
+      if (newTags.length === 0) {
+        input.value = '';
+        keepScheduleTagInputActive();
+        return;
+      }
+
+      modalScheduleTags = normalizeScheduleTags([...modalScheduleTags, ...newTags]);
+      input.value = '';
+      renderModalScheduleTags();
+      keepScheduleTagInputActive();
+    }
+
+    function removeScheduleTagInModal(tagToRemove) {
+      modalScheduleTags = modalScheduleTags.filter(tag => tag !== tagToRemove);
+      renderModalScheduleTags();
+      renderScheduleTagSuggestions();
+    }
+
     function openScheduleEditModal(scheduleId) {
       const schedule = reportSchedules.find(s => s.id === scheduleId);
       if (!schedule) return;
 
       currentEditingSchedule = schedule;
       modalEmailGroupIds = [...(schedule.email_group_ids || [])];
+      modalScheduleTags = getScheduleTags(schedule);
 
       document.getElementById('scheduleEditModalTitle').textContent = 'Edit Report Schedule';
       document.getElementById('editScheduleId').value = schedule.id;
@@ -2463,36 +2907,26 @@
       // Populate basic info
       document.getElementById('editTemplateName').value = schedule.template_name || '';
       document.getElementById('editTemplateType').value = schedule.template_type || '';
-      document.getElementById('editProcess').value = schedule.process || '';
+      document.getElementById('editProcess').value = getScheduleProcessValue(schedule.process);
+      document.getElementById('editScheduleTagInput').value = '';
+      isScheduleTagPickerOpen = false;
+      renderModalScheduleTags();
+      renderScheduleTagSuggestions();
 
       // Populate entity dropdowns
       populateEntityDropdowns();
       document.getElementById('editDistrictId').value = schedule.district_id || '';
       document.getElementById('editRegionId').value = schedule.region_id || '';
       document.getElementById('editSubsidiaryId').value = schedule.subsidiary_id || '';
+      document.getElementById('editServiceFilterId').value = schedule.service_filter_id || '';
+      document.getElementById('editHeaderSubsidiaryId').value = schedule.header_subsidiary_id || '';
 
       // Update entity visibility
-      onEditTemplateTypeChange();
+      onEditTemplateTypeChange(true);
 
       // Populate email groups
       renderModalEmailGroups();
       populateEmailGroupSelect();
-
-      // Populate status
-      document.getElementById('editEnabled').checked = schedule.enabled !== false;
-
-      // Show status info
-      let statusHtml = '';
-      if (schedule.last_sent_at) {
-        statusHtml += `<div><strong>Last sent:</strong> ${formatDate(schedule.last_sent_at)}</div>`;
-      }
-      if (schedule.next_send_at) {
-        statusHtml += `<div><strong>Next send:</strong> ${formatDate(schedule.next_send_at)}</div>`;
-      }
-      if (!statusHtml) {
-        statusHtml = '<div>This schedule has not been run yet.</div>';
-      }
-      document.getElementById('editScheduleStatus').innerHTML = statusHtml;
 
       document.getElementById('scheduleEditModal').classList.add('active');
     }
@@ -2500,6 +2934,7 @@
     function openNewScheduleModal() {
       currentEditingSchedule = null;
       modalEmailGroupIds = [];
+      modalScheduleTags = [];
 
       document.getElementById('scheduleEditModalTitle').textContent = 'Create New Schedule';
       document.getElementById('editScheduleId').value = '';
@@ -2508,23 +2943,25 @@
       document.getElementById('editTemplateName').value = '';
       document.getElementById('editTemplateType').value = '';
       document.getElementById('editProcess').value = '';
+      document.getElementById('editScheduleTagInput').value = '';
+      isScheduleTagPickerOpen = false;
+      renderModalScheduleTags();
+      renderScheduleTagSuggestions();
 
       // Populate entity dropdowns
       populateEntityDropdowns();
       document.getElementById('editDistrictId').value = '';
       document.getElementById('editRegionId').value = '';
       document.getElementById('editSubsidiaryId').value = '';
+      document.getElementById('editServiceFilterId').value = '';
+      document.getElementById('editHeaderSubsidiaryId').value = '';
 
       // Update entity visibility
-      onEditTemplateTypeChange();
+      onEditTemplateTypeChange(true);
 
       // Reset email groups
       renderModalEmailGroups();
       populateEmailGroupSelect();
-
-      // Reset status
-      document.getElementById('editEnabled').checked = true;
-      document.getElementById('editScheduleStatus').innerHTML = '<div>New schedule - not yet saved.</div>';
 
       document.getElementById('scheduleEditModal').classList.add('active');
     }
@@ -2533,61 +2970,166 @@
       document.getElementById('scheduleEditModal').classList.remove('active');
       currentEditingSchedule = null;
       modalEmailGroupIds = [];
+      modalScheduleTags = [];
+      const tagInput = document.getElementById('editScheduleTagInput');
+      if (tagInput) {
+        tagInput.value = '';
+      }
+      const serviceFilterInput = document.getElementById('editServiceFilterId');
+      const headerInput = document.getElementById('editHeaderSubsidiaryId');
+      if (serviceFilterInput) {
+        serviceFilterInput.value = '';
+      }
+      if (headerInput) {
+        headerInput.value = '';
+      }
+      isScheduleTagInputFocused = false;
+      isScheduleTagPickerOpen = false;
+      syncScheduleTagInputShell();
+      renderScheduleTagSuggestions();
+    }
+
+    function populateSelectOptions(selectElement, options, placeholder) {
+      if (!selectElement) return;
+
+      const currentValue = selectElement.value;
+      selectElement.innerHTML = `<option value="">${escapeHtml(placeholder)}</option>` +
+        options.map(option => `<option value="${escapeHtml(option.id)}">${escapeHtml(option.label)}</option>`).join('');
+
+      if (currentValue && options.some(option => String(option.id) === String(currentValue))) {
+        selectElement.value = currentValue;
+      }
+    }
+
+    function getOptionById(options, id) {
+      return options.find(option => String(option.id) === String(id)) || null;
+    }
+
+    function getScheduleProcessValue(process) {
+      return String(process || '').trim().toLowerCase() === 'operational' ? 'operational' : 'standard';
+    }
+
+    function buildScheduleDataUrl(schedule, entityId, reportDate) {
+      const params = new URLSearchParams({
+        hierarchy: schedule.template_type,
+        selectedId: entityId,
+        date: reportDate,
+        plType: getScheduleProcessValue(schedule.process)
+      });
+
+      if (schedule.header_subsidiary_name) {
+        params.set('orgLabel', schedule.header_subsidiary_name);
+      }
+
+      if ((schedule.template_type === 'region' || schedule.template_type === 'district') && schedule.subsidiary_id) {
+        params.set('subsidiaryFilter', schedule.subsidiary_id);
+      }
+
+      if (schedule.template_type === 'subsidiary' && schedule.service_filter_id) {
+        params.set('serviceFilter', schedule.service_filter_id);
+      }
+
+      return `/api/pl/data?${params.toString()}`;
     }
 
     function populateEntityDropdowns() {
-      // Populate district dropdown
-      const districtSelect = document.getElementById('editDistrictId');
-      districtSelect.innerHTML = '<option value="">Select district...</option>' +
-        districtOptions.map(d => `<option value="${escapeHtml(d.id)}">${escapeHtml(d.label)}</option>`).join('');
+      const templateType = document.getElementById('editTemplateType')?.value || '';
 
-      // Populate region dropdown
-      const regionSelect = document.getElementById('editRegionId');
-      regionSelect.innerHTML = '<option value="">Select region...</option>' +
-        regionOptions.map(r => `<option value="${escapeHtml(r.id)}">${escapeHtml(r.label)}</option>`).join('');
-
-      // Populate subsidiary dropdown
-      const subsidiarySelect = document.getElementById('editSubsidiaryId');
-      subsidiarySelect.innerHTML = '<option value="">Select subsidiary...</option>' +
-        subsidiaryOptions.map(s => `<option value="${escapeHtml(s.id)}">${escapeHtml(s.label)}</option>`).join('');
+      populateSelectOptions(
+        document.getElementById('editDistrictId'),
+        districtOptions,
+        'Select district...'
+      );
+      populateSelectOptions(
+        document.getElementById('editRegionId'),
+        regionOptions,
+        'Select region...'
+      );
+      populateSelectOptions(
+        document.getElementById('editSubsidiaryId'),
+        subsidiaryOptions,
+        templateType === 'subsidiary' ? 'Select subsidiary...' : 'No subsidiary filter'
+      );
+      populateSelectOptions(
+        document.getElementById('editServiceFilterId'),
+        serviceOptions,
+        'No service filter'
+      );
+      populateSelectOptions(
+        document.getElementById('editHeaderSubsidiaryId'),
+        subsidiaryOptions,
+        'Select subsidiary header...'
+      );
     }
 
-    function onEditTemplateTypeChange() {
-      const type = document.getElementById('editTemplateType').value;
+    function onEditTemplateTypeChange(preserveSelections = false) {
+      const typeSelect = document.getElementById('editTemplateType');
+      const type = typeSelect.value;
+      const previousType = typeSelect.dataset.previousType || '';
 
-      // Get entity select elements
       const districtSelect = document.getElementById('editDistrictId');
       const regionSelect = document.getElementById('editRegionId');
       const subsidiarySelect = document.getElementById('editSubsidiaryId');
+      const serviceFilterSelect = document.getElementById('editServiceFilterId');
+      const headerSubsidiarySelect = document.getElementById('editHeaderSubsidiaryId');
 
-      // Get entity group containers for styling
       const districtGroup = document.getElementById('editDistrictGroup');
       const regionGroup = document.getElementById('editRegionGroup');
       const subsidiaryGroup = document.getElementById('editSubsidiaryGroup');
+      const serviceFilterGroup = document.getElementById('editServiceFilterGroup');
+      const headerSubsidiaryGroup = document.getElementById('editHeaderSubsidiaryGroup');
 
-      // Enable/disable based on template type:
-      // - District: only district editable
-      // - Region: region and subsidiary editable
-      // - Subsidiary: only subsidiary editable
+      const subsidiaryLabel = document.getElementById('editSubsidiaryLabel');
+      const subsidiaryHelp = document.getElementById('editSubsidiaryHelp');
+
+      populateEntityDropdowns();
 
       const isDistrict = type === 'district';
       const isRegion = type === 'region';
       const isSubsidiary = type === 'subsidiary';
 
-      // District: enabled only for district type
+      districtGroup.style.display = isDistrict ? 'block' : 'none';
+      regionGroup.style.display = isRegion ? 'block' : 'none';
+      subsidiaryGroup.style.display = type ? 'block' : 'none';
+      serviceFilterGroup.style.display = isSubsidiary ? 'block' : 'none';
+      headerSubsidiaryGroup.style.display = type ? 'block' : 'none';
+
       districtSelect.disabled = !isDistrict;
-      districtGroup.style.opacity = isDistrict ? '1' : '0.5';
-      if (!isDistrict) districtSelect.value = '';
-
-      // Region: enabled for region type
       regionSelect.disabled = !isRegion;
-      regionGroup.style.opacity = isRegion ? '1' : '0.5';
-      if (!isRegion) regionSelect.value = '';
+      subsidiarySelect.disabled = !type;
+      serviceFilterSelect.disabled = !isSubsidiary;
+      headerSubsidiarySelect.disabled = !type;
 
-      // Subsidiary: enabled for district, region, or subsidiary type
-      subsidiarySelect.disabled = !(isDistrict || isRegion || isSubsidiary);
-      subsidiaryGroup.style.opacity = (isDistrict || isRegion || isSubsidiary) ? '1' : '0.5';
-      if (!(isDistrict || isRegion || isSubsidiary)) subsidiarySelect.value = '';
+      districtSelect.required = isDistrict;
+      regionSelect.required = isRegion;
+      subsidiarySelect.required = isSubsidiary;
+      headerSubsidiarySelect.required = Boolean(type);
+
+      if (isSubsidiary) {
+        subsidiaryLabel.innerHTML = 'Subsidiary <span style="color: #e53e3e;">*</span>';
+        subsidiaryHelp.textContent = 'Required: select the same subsidiary you would choose on the P&L page.';
+      } else if (isDistrict || isRegion) {
+        subsidiaryLabel.textContent = 'Subsidiary Filter';
+        subsidiaryHelp.textContent = 'Optional: filter by subsidiary, matching the P&L page.';
+      } else {
+        subsidiaryLabel.textContent = 'Subsidiary';
+        subsidiaryHelp.textContent = 'Optional: filter by subsidiary, matching the P&L page.';
+      }
+
+      if (!preserveSelections) {
+        if (!isDistrict) districtSelect.value = '';
+        if (!isRegion) regionSelect.value = '';
+        if (!isSubsidiary) serviceFilterSelect.value = '';
+        if ((previousType === 'subsidiary') !== isSubsidiary) {
+          subsidiarySelect.value = '';
+        }
+        if (!type) {
+          subsidiarySelect.value = '';
+          headerSubsidiarySelect.value = '';
+        }
+      }
+
+      typeSelect.dataset.previousType = type;
     }
 
     function onEditEntityChange(entityType) {
@@ -2646,7 +3188,13 @@
     async function saveScheduleFromModal() {
       const templateName = document.getElementById('editTemplateName').value.trim();
       const templateType = document.getElementById('editTemplateType').value;
-      const process = document.getElementById('editProcess').value;
+      const rawProcess = document.getElementById('editProcess').value;
+      const process = getScheduleProcessValue(rawProcess);
+      const districtSelect = document.getElementById('editDistrictId');
+      const regionSelect = document.getElementById('editRegionId');
+      const subsidiarySelect = document.getElementById('editSubsidiaryId');
+      const serviceFilterSelect = document.getElementById('editServiceFilterId');
+      const headerSubsidiarySelect = document.getElementById('editHeaderSubsidiaryId');
 
       // Validation
       if (!templateName) {
@@ -2657,58 +3205,85 @@
         alert('Please select a report type');
         return;
       }
-      if (!process) {
+      if (!rawProcess) {
         alert('Please select a P&L process');
         return;
       }
 
-      // Get entity values and names
       let districtId = null, districtName = null;
       let regionId = null, regionName = null;
       let subsidiaryId = null, subsidiaryName = null;
+      let serviceFilterId = null, serviceFilterName = null;
+      let headerSubsidiaryId = null, headerSubsidiaryName = null;
 
       if (templateType === 'district') {
-        // District type: district and subsidiary fields are editable
-        const select = document.getElementById('editDistrictId');
-        districtId = select.value || null;
+        districtId = districtSelect.value || null;
         if (districtId) {
-          const opt = districtOptions.find(d => d.id === districtId);
+          const opt = getOptionById(districtOptions, districtId);
           districtName = opt ? opt.label : null;
         }
-        const subsidiarySelect = document.getElementById('editSubsidiaryId');
         subsidiaryId = subsidiarySelect.value || null;
         if (subsidiaryId) {
-          const opt = subsidiaryOptions.find(s => s.id === subsidiaryId);
+          const opt = getOptionById(subsidiaryOptions, subsidiaryId);
           subsidiaryName = opt ? opt.label : null;
         }
       } else if (templateType === 'region') {
-        // Region type: region and subsidiary fields are editable
-        const regionSelect = document.getElementById('editRegionId');
         regionId = regionSelect.value || null;
         if (regionId) {
-          const opt = regionOptions.find(r => r.id === regionId);
+          const opt = getOptionById(regionOptions, regionId);
           regionName = opt ? opt.label : null;
         }
-        const subsidiarySelect = document.getElementById('editSubsidiaryId');
         subsidiaryId = subsidiarySelect.value || null;
         if (subsidiaryId) {
-          const opt = subsidiaryOptions.find(s => s.id === subsidiaryId);
+          const opt = getOptionById(subsidiaryOptions, subsidiaryId);
           subsidiaryName = opt ? opt.label : null;
         }
       } else if (templateType === 'subsidiary') {
-        // Subsidiary type: only subsidiary field is editable
-        const select = document.getElementById('editSubsidiaryId');
-        subsidiaryId = select.value || null;
+        subsidiaryId = subsidiarySelect.value || null;
         if (subsidiaryId) {
-          const opt = subsidiaryOptions.find(s => s.id === subsidiaryId);
+          const opt = getOptionById(subsidiaryOptions, subsidiaryId);
           subsidiaryName = opt ? opt.label : null;
         }
+
+        serviceFilterId = serviceFilterSelect.value || null;
+        if (serviceFilterId) {
+          const opt = getOptionById(serviceOptions, serviceFilterId);
+          serviceFilterName = opt ? opt.label : null;
+        }
+      }
+
+      headerSubsidiaryId = headerSubsidiarySelect.value || null;
+      if (headerSubsidiaryId) {
+        const opt = getOptionById(subsidiaryOptions, headerSubsidiaryId);
+        headerSubsidiaryName = opt ? opt.label : null;
+      }
+
+      if (templateType === 'district' && !districtId) {
+        alert('Please select a district');
+        return;
+      }
+      if (templateType === 'region' && !regionId) {
+        alert('Please select a region');
+        return;
+      }
+      if (templateType === 'subsidiary' && !subsidiaryId) {
+        alert('Please select a subsidiary');
+        return;
+      }
+      if (!headerSubsidiaryId) {
+        alert('Please select a subsidiary header');
+        return;
       }
 
       const data = {
         template_name: templateName,
         template_type: templateType,
         process: process,
+        tags: modalScheduleTags,
+        service_filter_id: serviceFilterId,
+        service_filter_name: serviceFilterName,
+        header_subsidiary_id: headerSubsidiaryId,
+        header_subsidiary_name: headerSubsidiaryName,
         district_id: districtId,
         district_name: districtName,
         region_id: regionId,
@@ -2716,7 +3291,7 @@
         subsidiary_id: subsidiaryId,
         subsidiary_name: subsidiaryName,
         email_group_ids: modalEmailGroupIds,
-        enabled: document.getElementById('editEnabled').checked
+        enabled: currentEditingSchedule ? currentEditingSchedule.enabled !== false : true
       };
 
       try {
@@ -2757,6 +3332,11 @@
         template_name: 'New Report Schedule',
         template_type: '',
         process: '',
+        tags: [],
+        service_filter_id: null,
+        service_filter_name: null,
+        header_subsidiary_id: null,
+        header_subsidiary_name: null,
         district_id: null,
         region_id: null,
         subsidiary_id: null,
@@ -3083,6 +3663,11 @@
         template_name: '',
         template_type: '',
         process: '',
+        tags: [],
+        service_filter_id: null,
+        service_filter_name: null,
+        header_subsidiary_id: null,
+        header_subsidiary_name: null,
         district_id: null,
         district_name: null,
         region_id: null,
@@ -3290,10 +3875,25 @@
         console.warn('Could not load dates:', error);
       }
 
+      const detailParts = [
+        schedule.template_type,
+        entityName,
+        getScheduleProcessValue(schedule.process)
+      ];
+      if ((schedule.template_type === 'district' || schedule.template_type === 'region') && schedule.subsidiary_name) {
+        detailParts.push(`subsidiary filter: ${schedule.subsidiary_name}`);
+      }
+      if (schedule.template_type === 'subsidiary' && schedule.service_filter_name) {
+        detailParts.push(`service: ${schedule.service_filter_name}`);
+      }
+      if (schedule.header_subsidiary_name) {
+        detailParts.push(`header: ${schedule.header_subsidiary_name}`);
+      }
+
       // Show schedule info
       document.getElementById('downloadScheduleInfo').innerHTML = `
         <div><strong>${schedule.template_name || 'Unnamed Schedule'}</strong></div>
-        <div style="color: #666; margin-top: 4px;">${schedule.template_type} • ${entityName} • ${schedule.process || 'Standard'}</div>
+        <div style="color: #666; margin-top: 4px;">${escapeHtml(detailParts.join(' • '))}</div>
       `;
 
       // Open modal
@@ -3363,10 +3963,7 @@
         console.log('   Date:', latestDate);
         
         // Fetch P&L data
-        let dataUrl = `/api/pl/data?hierarchy=${schedule.template_type}&selectedId=${encodeURIComponent(entityId)}&date=${latestDate}`;
-        if ((schedule.template_type === 'region' || schedule.template_type === 'district') && schedule.subsidiary_id) {
-          dataUrl += `&subsidiaryFilter=${encodeURIComponent(schedule.subsidiary_id)}`;
-        }
+        const dataUrl = buildScheduleDataUrl(schedule, entityId, latestDate);
         console.log('   URL:', dataUrl);
         const dataResponse = await authFetch(dataUrl);
         
@@ -3386,73 +3983,31 @@
           alert('No report data available for the selected configuration');
           return;
         }
+
+        if (!window.pnlPdf) {
+          throw new Error('Shared P&L PDF helper is unavailable');
+        }
         
         // Step 3: Process report
         updateLoadingStep(3);
-        console.log('🔨 Processing HTML for PDF...');
-        
-        // Parse and filter the HTML (keep only non-zero income reports)
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(`<div id="root">${htmlContent}</div>`, "text/html");
-        const root = doc.getElementById("root");
-        
-        // Remove any explicit page-break divs
-        root.querySelectorAll(".page-break").forEach(el => el.remove());
-        
-        // Collect only report pages with non-zero Income
-        const kept = [];
-        root.querySelectorAll(".pnl-report-container").forEach(container => {
-          if (hasNonZeroIncome(container)) {
-            kept.push(container.outerHTML);
-          }
+        console.log('🔨 Preparing report HTML using the P&L PDF pipeline...');
+        const preparedReport = window.pnlPdf.prepareReportHtml(htmlContent);
+        console.log(`📊 Filtered to ${preparedReport.keptCount} reports with non-zero net income`);
+        const fullHTML = window.pnlPdf.buildPdfHtml(preparedReport.html, {
+          pdfRowHeight: window.pdfRowHeight
         });
-        
-        const filteredHtmlContent = kept.length ? kept.join("\n") : 
-          (root.querySelector(".pnl-report-container")?.outerHTML || htmlContent);
-        
-        console.log(`📊 Filtered to ${kept.length} reports with non-zero income`);
-        
-        // Build complete PDF HTML with styles
-        const fullHTML = buildPDFHTML(filteredHtmlContent);
-        
-        // Step 4: Convert to PDF using PDFShift
+
+        // Step 4: Convert to PDF using the same PDFShift settings as the P&L page
         updateLoadingStep(4);
         console.log('🔄 Generating PDF...');
-        const pdfResponse = await fetch('https://api.pdfshift.io/v3/convert/pdf', {
-          method: 'POST',
-          headers: {
-            'X-API-Key': 'sk_3df748acf1ce265988e07e04544b6452ece1b20e',
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            source: fullHTML,
-            landscape: false,
-            use_print: true,
-            margin: { top: 10, bottom: 10, left: 10, right: 10 }
-          })
-        });
-        
-        if (!pdfResponse.ok) {
-          const errorText = await pdfResponse.text();
-          hideLoadingModal();
-          throw new Error("PDF generation failed: " + pdfResponse.status);
-        }
+        const blob = await window.pnlPdf.requestPdfBlob(fullHTML);
         
         // Step 5: Download the PDF
         updateLoadingStep(5);
-        const blob = await pdfResponse.blob();
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `PNL_${schedule.template_type}_${entityName.replace(/[^a-zA-Z0-9]/g, '_')}_${latestDate}.pdf`;
-        link.style.display = 'none';
-        document.body.appendChild(link);
-        link.click();
-        
-        setTimeout(() => {
-          document.body.removeChild(link);
-          URL.revokeObjectURL(url);
-        }, 100);
+        window.pnlPdf.downloadBlob(
+          blob,
+          `PNL_${schedule.template_type}_${entityName.replace(/[^a-zA-Z0-9]/g, '_')}_${latestDate}.pdf`
+        );
         
         // Complete all steps and briefly show success
         completeAllSteps();
@@ -3472,209 +4027,6 @@
       }
     }
     
-    // Helper function to check if a report has non-zero income
-    function hasNonZeroIncome(container) {
-      const table = container.querySelector("table");
-      if (!table) return false;
-      
-      const rows = Array.from(table.querySelectorAll("tr"));
-      for (const row of rows) {
-        const firstCell = row.querySelector("td, th");
-        if (firstCell && firstCell.textContent.trim().toLowerCase() === "income") {
-          const cells = Array.from(row.querySelectorAll("td, th"));
-          if (cells.length < 2) return false;
-          
-          const currentMonthCell = cells[1];
-          const value = parseAccountingToNumber(currentMonthCell?.textContent || "");
-          return Math.abs(value) > 0.0001;
-        }
-      }
-      return false;
-    }
-    
-    // Helper function to parse accounting format numbers
-    function parseAccountingToNumber(text) {
-      if (!text) return 0;
-      let cleaned = text.replace(/[$,\s]/g, "");
-      if (cleaned.startsWith("(") && cleaned.endsWith(")")) {
-        cleaned = "-" + cleaned.slice(1, -1);
-      }
-      const num = parseFloat(cleaned);
-      return isNaN(num) ? 0 : num;
-    }
-    
-    // Helper function to build PDF HTML with all styles (matches pl-view.html exactly)
-    function buildPDFHTML(content) {
-      return `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <style>
-    * {
-      box-sizing: border-box;
-    }
-
-    body {
-      margin: 0;
-      padding: 0;
-    }
-
-    .pnl-report-container {
-      background: #ffffff;
-      font-family: Arial, sans-serif;
-      color: #000000;
-      width: 100%;
-      margin: 0 auto;
-      padding: 8px 24px 12px 24px;
-      page-break-after: always;
-    }
-
-    .pnl-report-container:last-of-type {
-      page-break-after: auto !important;
-    }
-
-    /* ---------------- Header Styles ---------------- */
-    .pnl-report-header {
-      text-align: center;
-      margin-bottom: 6px;
-      padding: 0;
-      line-height: 1.2;
-      page-break-inside: avoid;
-      break-inside: avoid;
-      page-break-after: avoid;
-      break-after: avoid;
-    }
-
-    .pnl-report-header .pnl-title {
-      font-weight: 700;
-      font-size: 13px;
-      margin: 0;
-      line-height: 1.1;
-    }
-
-    .pnl-report-header .pnl-subtitle {
-      font-weight: 700;
-      font-size: 11px;
-      margin: 1px 0 0 0;
-      line-height: 1.1;
-    }
-
-    .pnl-report-header .pnl-meta,
-    .pnl-report-header .meta {
-      font-size: 8px;
-      line-height: 1.2;
-      margin: 0;
-    }
-
-    .pnl-header-row {
-      display: flex;
-      justify-content: center;
-      align-items: baseline;
-      gap: 4px;
-      font-size: 8px;
-      line-height: 1.2;
-      margin: 0;
-      page-break-inside: avoid;
-      break-inside: avoid;
-    }
-
-    .pnl-header-row-secondary {
-      font-weight: 700;
-      font-size: 9px;
-    }
-
-    .pnl-header-item {
-      white-space: nowrap;
-    }
-
-    .pnl-sep {
-      margin: 0 4px;
-    }
-
-    .pnl-italic {
-      font-style: italic;
-    }
-
-    .pnl-divider {
-      border: none;
-      border-top: 1px solid #ccc;
-      margin: 4px 0 6px 0;
-      page-break-after: avoid;
-      break-after: avoid;
-    }
-
-    /* ---------------- Table Styles ---------------- */
-    .pnl-report-table {
-      width: 100%;
-      margin: 0 auto;
-      border-collapse: collapse;
-      font-size: 7.5px;
-      background: #ffffff;
-      table-layout: auto;
-      page-break-before: avoid;
-      break-before: avoid;
-    }
-
-    .pnl-report-table th,
-    .pnl-report-table td {
-      padding: 2px 2px;
-      border: none;
-      white-space: nowrap;
-      height: 12px;
-      line-height: 1.2;
-      vertical-align: middle;
-    }
-
-    .pnl-report-table th {
-      font-weight: 600;
-      text-align: center;
-      border-bottom: 1px solid #fff;
-      background: transparent;
-      font-size: 7.5px;
-    }
-
-    .pnl-report-table td:first-child,
-    .pnl-report-table th:first-child {
-      text-align: left;
-      white-space: normal;
-      word-wrap: break-word;
-      max-width: 140px;
-      font-size: 7.5px;
-    }
-
-    .pnl-report-table td:not(:first-child),
-    .pnl-report-table th:not(:first-child) {
-      text-align: right;
-      font-size: 7.5px;
-    }
-
-    /* Centered dashes for empty values - but not for the gap column (7th column) */
-    .pnl-report-table td:empty:not(:nth-child(7))::after {
-      content: "-";
-      display: inline-block;
-      text-align: center;
-      width: 100%;
-      color: #000;
-      opacity: 0.8;
-    }
-
-    .pnl-report-table td {
-      vertical-align: middle;
-    }
-
-    @media print {
-      .pnl-report-container {
-        page-break-after: always;
-      }
-    }
-  </style>
-</head>
-<body>
-  ${content}
-</body>
-</html>`;
-    }
-
     // ============================================
     // Filtering Functions
     // ============================================
@@ -4112,615 +4464,425 @@
     // Scheduler Functions
     // ============================================
     
-    let schedulerPollingInterval = null;
     let schedulesToProcess = [];
-    let currentJobPollingInterval = null;
+    let currentBatchPollingInterval = null;
+    let currentBatchRunId = null;
 
-    // Check for running job on page load
+    function formatReportMonth(dateValue) {
+      if (!dateValue) return '-';
+      const normalizedValue = String(dateValue).slice(0, 10);
+      const date = new Date(`${normalizedValue}T00:00:00`);
+      return date.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+    }
+
+    function getPreferredBatchMonthValue() {
+      const now = new Date();
+      const previousMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const year = previousMonth.getFullYear();
+      const month = String(previousMonth.getMonth() + 1).padStart(2, '0');
+      return `${year}-${month}-01`;
+    }
+
+    function getAvailableScheduleTags() {
+      const tagsByKey = new Map();
+
+      reportSchedules.forEach(schedule => {
+        (schedule.tags || []).forEach(tag => {
+          const trimmed = String(tag || '').trim();
+          if (!trimmed) return;
+
+          const key = trimmed.toLowerCase();
+          if (!tagsByKey.has(key)) {
+            tagsByKey.set(key, trimmed);
+          }
+        });
+      });
+
+      return Array.from(tagsByKey.values()).sort((a, b) => a.localeCompare(b));
+    }
+
+    function populateRunReportsTagOptions() {
+      const tagSelect = document.getElementById('runReportsTag');
+      const currentValue = tagSelect.value;
+      const tags = getAvailableScheduleTags();
+
+      tagSelect.innerHTML = `
+        <option value="">Select a tag</option>
+        ${tags.map(tag => `<option value="${escapeHtml(tag)}">${escapeHtml(tag)}</option>`).join('')}
+      `;
+
+      if (currentValue && tags.some(tag => tag.toLowerCase() === currentValue.toLowerCase())) {
+        tagSelect.value = tags.find(tag => tag.toLowerCase() === currentValue.toLowerCase());
+      } else if (tags.length === 1) {
+        tagSelect.value = tags[0];
+      }
+
+      updateRunReportsSelectionHelp();
+    }
+
+    async function populateRunReportsMonthOptions() {
+      const monthSelect = document.getElementById('runReportsMonth');
+
+      try {
+        const response = await authFetch('/api/pl/dates');
+        if (!response.ok) {
+          throw new Error('Failed to load months');
+        }
+
+        const dates = await response.json();
+        const preferredValue = getPreferredBatchMonthValue();
+        const fallbackValue = dates[0]?.time || dates[0]?.formatted || preferredValue;
+        const selectedValue = dates.some(date => (date.time || date.formatted) === preferredValue)
+          ? preferredValue
+          : fallbackValue;
+
+        monthSelect.innerHTML = dates.map(dateOption => {
+          const value = dateOption.time || dateOption.formatted;
+          return `<option value="${value}">${escapeHtml(formatReportMonth(value))}</option>`;
+        }).join('');
+        monthSelect.value = selectedValue;
+      } catch (error) {
+        const fallbackValue = getPreferredBatchMonthValue();
+        monthSelect.innerHTML = `<option value="${fallbackValue}">${escapeHtml(formatReportMonth(fallbackValue))}</option>`;
+        monthSelect.value = fallbackValue;
+      }
+    }
+
+    function updateRunReportsSelectionHelp() {
+      const helpEl = document.getElementById('runReportsSelectionHelp');
+      const selectedTag = document.getElementById('runReportsTag').value.trim();
+      const selectedMode = document.getElementById('runReportsMode').value;
+
+      if (!selectedTag) {
+        helpEl.textContent = 'Choose a tag to see how many schedules will run.';
+        return;
+      }
+
+      const matchingSchedules = reportSchedules.filter(schedule =>
+        schedule.enabled !== false
+        && (schedule.tags || []).some(tag => String(tag || '').trim().toLowerCase() === selectedTag.toLowerCase())
+      );
+
+      if (!matchingSchedules.length) {
+        helpEl.textContent = `No enabled schedules currently use the "${selectedTag}" tag.`;
+        return;
+      }
+
+      const actionLabel = selectedMode === 'generate'
+        ? 'generated'
+        : 'generated and emailed';
+      helpEl.textContent = `${matchingSchedules.length} schedule${matchingSchedules.length === 1 ? '' : 's'} will be ${actionLabel} for ${selectedTag}.`;
+    }
+
+    async function openRunReportsModal() {
+      populateRunReportsTagOptions();
+      await populateRunReportsMonthOptions();
+      document.getElementById('runReportsMode').value = 'send';
+      updateRunReportsSelectionHelp();
+      document.getElementById('runReportsModal').classList.add('active');
+    }
+
+    function closeRunReportsModal() {
+      document.getElementById('runReportsModal').classList.remove('active');
+    }
+
+    async function confirmRunReports() {
+      const tag = document.getElementById('runReportsTag').value.trim();
+      const reportDate = document.getElementById('runReportsMonth').value;
+      const mode = document.getElementById('runReportsMode').value;
+      const button = document.getElementById('confirmRunReportsBtn');
+      const originalLabel = button.textContent;
+
+      if (!tag) {
+        alert('Please choose a tag first.');
+        return;
+      }
+
+      if (!reportDate) {
+        alert('Please choose a report month first.');
+        return;
+      }
+
+      try {
+        button.disabled = true;
+        button.textContent = 'Starting...';
+
+        const response = await authFetch('/api/report-batches', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tag, reportDate, mode })
+        });
+
+        const result = await response.json();
+        if (!response.ok) {
+          throw new Error(result.message || result.error || 'Failed to start report run');
+        }
+
+        currentBatchRunId = result.batchRun?.id || null;
+        closeRunReportsModal();
+        showJobIndicator(result.batchRun);
+        await showJobProgress(currentBatchRunId);
+        startJobPolling(currentBatchRunId);
+      } catch (error) {
+        console.error('❌ Error starting report batch:', error);
+        alert('Failed to start report run: ' + error.message);
+      } finally {
+        button.disabled = false;
+        button.textContent = originalLabel;
+      }
+    }
+
     async function checkForRunningJob() {
       try {
-        const response = await authFetch('/api/email-scheduler/job-status');
-        if (!response.ok) return;
+        const response = await authFetch('/api/report-batches/latest');
+        if (response.status === 404 || !response.ok) return;
 
-        const jobStatus = await response.json();
+        const batchRun = await response.json();
+        currentBatchRunId = batchRun.id;
 
-        if (jobStatus.running) {
-          // Show the job indicator
-          showJobIndicator(jobStatus);
-          // Start polling for updates
-          startJobPolling();
-        } else if (jobStatus.status === 'completed' || jobStatus.status === 'error') {
-          // Only show completed indicator if job finished within last 2 minutes
-          const endTime = jobStatus.endTime ? new Date(jobStatus.endTime).getTime() : 0;
-          const twoMinutesAgo = Date.now() - (2 * 60 * 1000);
+        const terminalStatuses = ['completed', 'partial', 'failed'];
+        const completedAt = batchRun.completed_at || batchRun.updated_at || batchRun.created_at;
+        const isRecentTerminal = terminalStatuses.includes(batchRun.status)
+          && completedAt
+          && (Date.now() - new Date(completedAt).getTime()) < (15 * 60 * 1000);
 
-          if (endTime > twoMinutesAgo) {
-            showJobIndicator(jobStatus);
-          } else {
-            // Auto-clear old completed jobs
-            await clearCompletedJob();
-          }
+        if (batchRun.status === 'queued' || batchRun.status === 'running' || isRecentTerminal) {
+          showJobIndicator(batchRun);
+        }
+
+        if (batchRun.status === 'queued' || batchRun.status === 'running') {
+          startJobPolling(batchRun.id);
         }
       } catch (error) {
         console.error('Error checking for running job:', error);
       }
     }
 
-    function showJobIndicator(jobStatus) {
+    function showJobIndicator(batchRun) {
       const indicator = document.getElementById('jobStatusIndicator');
       const statusText = document.getElementById('jobStatusText');
 
-      if (jobStatus.running) {
-        indicator.style.display = 'block';
+      if (!batchRun) {
+        hideJobIndicator();
+        return;
+      }
+
+      currentBatchRunId = batchRun.id;
+      indicator.style.display = 'block';
+
+      const processed = batchRun.processed_schedules || 0;
+      const total = batchRun.total_schedules || 0;
+      const monthLabel = formatReportMonth(batchRun.report_date);
+
+      if (batchRun.status === 'queued' || batchRun.status === 'running') {
         indicator.style.background = '#fef3c7';
         indicator.style.borderColor = '#f59e0b';
-        const processed = jobStatus.processedSchedules || 0;
-        const total = jobStatus.totalSchedules || 0;
-        statusText.textContent = `⏳ Running... (${processed}/${total})`;
-      } else if (jobStatus.status === 'completed') {
-        indicator.style.display = 'block';
+        statusText.textContent = `⏳ ${batchRun.tag} · ${monthLabel} (${processed}/${total})`;
+        return;
+      }
+
+      if (batchRun.status === 'completed') {
         indicator.style.background = '#d1fae5';
         indicator.style.borderColor = '#10b981';
-        statusText.textContent = `✅ Completed (${jobStatus.emailsSent} sent)`;
-      } else if (jobStatus.status === 'error') {
-        indicator.style.display = 'block';
+        statusText.textContent = `✅ ${batchRun.tag} complete`;
+        return;
+      }
+
+      if (batchRun.status === 'partial') {
+        indicator.style.background = '#feebc8';
+        indicator.style.borderColor = '#dd6b20';
+        statusText.textContent = `⚠️ ${batchRun.tag} finished with issues`;
+        return;
+      }
+
+      if (batchRun.status === 'failed') {
         indicator.style.background = '#fee2e2';
         indicator.style.borderColor = '#ef4444';
-        statusText.textContent = `❌ Failed`;
-      } else {
-        indicator.style.display = 'none';
+        statusText.textContent = `❌ ${batchRun.tag} failed`;
+        return;
       }
+
+      hideJobIndicator();
     }
 
     function hideJobIndicator() {
       document.getElementById('jobStatusIndicator').style.display = 'none';
     }
 
-    function startJobPolling() {
-      // Stop any existing polling
-      if (currentJobPollingInterval) {
-        clearInterval(currentJobPollingInterval);
+    function stopBatchPolling() {
+      if (currentBatchPollingInterval) {
+        clearInterval(currentBatchPollingInterval);
+        currentBatchPollingInterval = null;
       }
+    }
 
-      currentJobPollingInterval = setInterval(async () => {
+    function startJobPolling(batchRunId = currentBatchRunId) {
+      if (!batchRunId) return;
+
+      stopBatchPolling();
+      currentBatchRunId = batchRunId;
+
+      currentBatchPollingInterval = setInterval(async () => {
         try {
-          const response = await authFetch('/api/email-scheduler/job-status');
+          const response = await authFetch(`/api/report-batches/${batchRunId}`);
           if (!response.ok) return;
 
-          const jobStatus = await response.json();
-          showJobIndicator(jobStatus);
+          const batchRun = await response.json();
+          showJobIndicator(batchRun);
 
-          // If job is no longer running, stop polling
-          if (!jobStatus.running) {
-            clearInterval(currentJobPollingInterval);
-            currentJobPollingInterval = null;
-
-            // Auto-hide completed indicator after 10 seconds
-            if (jobStatus.status === 'completed' || jobStatus.status === 'error') {
-              setTimeout(() => {
-                hideJobIndicator();
-              }, 10000);
-            }
+          if (document.getElementById('schedulerProgressModal').classList.contains('active')) {
+            updateSchedulerProgressFromJob(batchRun);
           }
 
-          // Update modal if it's open
-          if (document.getElementById('schedulerProgressModal').classList.contains('active')) {
-            updateSchedulerProgressFromJob(jobStatus);
+          if (!['queued', 'running'].includes(batchRun.status)) {
+            stopBatchPolling();
+            await loadReportSchedules();
           }
         } catch (error) {
-          console.error('Error polling job status:', error);
+          console.error('Error polling batch run status:', error);
         }
       }, 2000);
     }
 
-    function updateSchedulerProgressFromJob(jobStatus) {
-      // Update counts
-      document.getElementById('schedulesProcessedCount').textContent =
-        `${jobStatus.processedSchedules || 0} / ${jobStatus.totalSchedules || 0}`;
-      document.getElementById('emailsSentCount').textContent = jobStatus.emailsSent || 0;
-      document.getElementById('errorsCount').textContent = jobStatus.emailsFailed || 0;
+    function updateSchedulerProgressFromJob(batchRun) {
+      currentBatchRunId = batchRun.id;
+      schedulesToProcess = (batchRun.items || []).map(item => ({
+        id: item.id,
+        name: item.schedule_name,
+        status: item.status,
+        mode: item.run_mode,
+        emailsSent: item.emails_sent || 0,
+        emailsFailed: item.emails_failed || 0,
+        error: item.error_message
+      }));
 
-      // Update status text, spinner, and title
+      document.getElementById('schedulesProcessedCount').textContent =
+        `${batchRun.processed_schedules || 0} / ${batchRun.total_schedules || 0}`;
+      document.getElementById('emailsSentCount').textContent = batchRun.emails_sent || 0;
+      document.getElementById('errorsCount').textContent =
+        (batchRun.failed_schedules || 0) + (batchRun.partial_schedules || 0);
+
       const spinner = document.getElementById('schedulerSpinner');
       const title = document.getElementById('schedulerTitle');
+      const meta = document.getElementById('schedulerMetaText');
+      const modeLabel = batchRun.run_mode === 'generate' ? 'Generate only' : 'Generate and send';
 
-      if (jobStatus.running) {
-        // Show spinner, running title
+      meta.textContent = `${batchRun.tag} · ${formatReportMonth(batchRun.report_date)} · ${modeLabel}`;
+
+      if (batchRun.status === 'queued' || batchRun.status === 'running') {
         if (spinner) spinner.style.display = 'inline-block';
-        if (title) title.textContent = '⚙️ Running All Schedules...';
-
-        const current = jobStatus.currentSchedule;
-        if (current) {
-          document.getElementById('schedulerStatusText').textContent =
-            `Processing: ${current.template_name || current.name || 'Schedule ' + current.id}`;
-        } else {
-          document.getElementById('schedulerStatusText').textContent = 'Processing schedules...';
-        }
-      } else if (jobStatus.status === 'completed') {
-        // Hide spinner, show completed title
-        if (spinner) spinner.style.display = 'none';
-        if (title) title.textContent = '✅ All Schedules Complete';
-
+        if (title) title.textContent = '⚙️ Running Reports...';
         document.getElementById('schedulerStatusText').textContent =
-          `${jobStatus.emailsSent} emails sent successfully.`;
-      } else if (jobStatus.status === 'error') {
-        // Hide spinner, show error title
+          `Processing ${batchRun.processed_schedules || 0} of ${batchRun.total_schedules || 0} schedules...`;
+      } else if (batchRun.status === 'completed') {
         if (spinner) spinner.style.display = 'none';
-        if (title) title.textContent = '❌ Job Failed';
-
+        if (title) title.textContent = '✅ Report Run Complete';
         document.getElementById('schedulerStatusText').textContent =
-          `Error: ${jobStatus.error || 'Unknown error'}`;
-      }
-
-      // Show/hide Clear Job button based on job status
-      const clearJobBtn = document.getElementById('clearJobBtn');
-      if (clearJobBtn) {
-        clearJobBtn.style.display = (!jobStatus.running && jobStatus.jobId) ? 'inline-block' : 'none';
-      }
-
-      // Update individual schedule statuses based on results
-      // First, mark current schedule as processing
-      if (jobStatus.running && jobStatus.currentSchedule) {
-        const currentId = jobStatus.currentSchedule.id;
-        schedulesToProcess.forEach(s => {
-          if (s.id === currentId && s.status === 'pending') {
-            s.status = 'processing';
-          }
-        });
-      }
-
-      // Update completed schedules from results
-      if (jobStatus.results && jobStatus.results.length > 0) {
-        jobStatus.results.forEach(result => {
-          const schedule = schedulesToProcess.find(s => s.id === result.scheduleId);
-          if (schedule) {
-            schedule.status = result.status || 'success';
-            schedule.emailsSent = result.emailsSent;
-            schedule.skipReason = result.skipReason;
-            schedule.error = result.error;
-          }
-        });
+          `Completed ${batchRun.total_schedules || 0} schedules successfully.`;
+      } else if (batchRun.status === 'partial') {
+        if (spinner) spinner.style.display = 'none';
+        if (title) title.textContent = '⚠️ Report Run Complete With Issues';
+        document.getElementById('schedulerStatusText').textContent =
+          `${batchRun.failed_schedules || 0} failed and ${batchRun.partial_schedules || 0} completed with partial delivery.`;
+      } else if (batchRun.status === 'failed') {
+        if (spinner) spinner.style.display = 'none';
+        if (title) title.textContent = '❌ Report Run Failed';
+        document.getElementById('schedulerStatusText').textContent =
+          batchRun.error_message || 'The report run failed before completion.';
       }
 
       renderScheduleProgressList();
     }
 
-    // Show job progress modal (called when clicking indicator)
-    async function showJobProgress() {
-      // First check job status
-      try {
-        const response = await authFetch('/api/email-scheduler/job-status');
-        if (!response.ok) {
-          alert('Unable to fetch job status');
-          return;
-        }
-
-        const jobStatus = await response.json();
-
-        if (!jobStatus.jobId) {
-          // No job exists
-          hideJobIndicator();
-          return;
-        }
-
-        // Open the modal
-        const modal = document.getElementById('schedulerProgressModal');
-        modal.classList.add('active');
-
-        // Reset spinner and title based on status
-        const spinner = document.getElementById('schedulerSpinner');
-        const title = document.getElementById('schedulerTitle');
-        if (jobStatus.running) {
-          if (spinner) spinner.style.display = 'inline-block';
-          if (title) title.textContent = '⚙️ Running All Schedules...';
-        } else {
-          if (spinner) spinner.style.display = 'none';
-          if (title) title.textContent = jobStatus.status === 'completed'
-            ? '✅ All Schedules Complete'
-            : '❌ Job Failed';
-        }
-
-        // Always populate from ALL enabled schedules first, then update with results
-        const enabledSchedules = reportSchedules.filter(s => s.enabled);
-        schedulesToProcess = enabledSchedules.map(schedule => ({
-          id: schedule.id,
-          name: schedule.template_name,
-          entity: schedule.district_name || schedule.region_name || schedule.subsidiary_name || 'Unknown',
-          emailGroupName: schedule.email_group_name || 'Multiple Groups',
-          recipients: [],
-          status: 'pending'
-        }));
-
-        // Update with results from job (completed/skipped/error schedules)
-        if (jobStatus.results && jobStatus.results.length > 0) {
-          jobStatus.results.forEach(result => {
-            const schedule = schedulesToProcess.find(s => s.id === result.scheduleId);
-            if (schedule) {
-              schedule.status = result.status || 'success';
-              schedule.emailsSent = result.emailsSent;
-              schedule.skipReason = result.skipReason;
-              schedule.error = result.error;
-            }
-          });
-        }
-
-        // Mark current schedule as processing
-        if (jobStatus.running && jobStatus.currentSchedule) {
-          const currentSchedule = schedulesToProcess.find(s => s.id === jobStatus.currentSchedule.id);
-          if (currentSchedule && currentSchedule.status === 'pending') {
-            currentSchedule.status = 'processing';
-          }
-        }
-
-        // Populate with job data
-        updateSchedulerProgressFromJob(jobStatus);
-      } catch (error) {
-        console.error('Error showing job progress:', error);
-        alert('Failed to load job progress');
-      }
-    }
-
-    async function clearCompletedJob() {
-      try {
-        await authFetch('/api/email-scheduler/clear-job', { method: 'POST' });
+    async function showJobProgress(batchRunId = currentBatchRunId) {
+      if (!batchRunId) {
         hideJobIndicator();
-      } catch (error) {
-        console.error('Error clearing job:', error);
-      }
-    }
-
-    async function showSchedulerProgress() {
-      const modal = document.getElementById('schedulerProgressModal');
-      modal.classList.add('active');
-
-      // Reset counts
-      document.getElementById('schedulesProcessedCount').textContent = '0 / 0';
-      document.getElementById('emailsSentCount').textContent = '0';
-      document.getElementById('errorsCount').textContent = '0';
-      document.getElementById('schedulerStatusText').textContent = 'Loading schedules...';
-
-      // Reset spinner and title
-      const spinner = document.getElementById('schedulerSpinner');
-      const title = document.getElementById('schedulerTitle');
-      if (spinner) spinner.style.display = 'inline-block';
-      if (title) title.textContent = '⚙️ Running All Schedules...';
-
-      // Hide Clear Job button (will show when job completes)
-      const clearJobBtn = document.getElementById('clearJobBtn');
-      if (clearJobBtn) clearJobBtn.style.display = 'none';
-      
-      // Fetch all enabled schedules that will be processed
-      try {
-        const schedules = reportSchedules.filter(s => s.enabled);
-        schedulesToProcess = [];
-        
-        // Get email group details for each schedule
-        for (const schedule of schedules) {
-          const emailGroupIds = schedule.email_group_ids || 
-                               (schedule.email_group_id ? [schedule.email_group_id] : []);
-          
-          let recipients = [];
-          for (const groupId of emailGroupIds) {
-            try {
-              const response = await authFetch(`/api/email-groups/${groupId}/contacts`);
-              if (response.ok) {
-                const contacts = await response.json();
-                recipients.push(...contacts.map(c => c.email));
-              }
-            } catch (err) {
-              console.error(`Failed to fetch contacts for group ${groupId}:`, err);
-            }
-          }
-          
-          // Remove duplicates
-          recipients = [...new Set(recipients)];
-          
-          schedulesToProcess.push({
-            id: schedule.id,
-            name: schedule.template_name,
-            entity: schedule.district_name || schedule.region_name || schedule.subsidiary_name || 'Unknown',
-            emailGroupName: schedule.email_group_name || 'Multiple Groups',
-            recipients: recipients,
-            status: 'pending'  // pending, processing, complete, error
-          });
-        }
-        
-        // Update count
-        document.getElementById('schedulesProcessedCount').textContent = `0 / ${schedulesToProcess.length}`;
-        document.getElementById('schedulerStatusText').textContent = 
-          `Ready to process ${schedulesToProcess.length} schedule(s)`;
-        
-        // Render schedule list
-        renderScheduleProgressList();
-      } catch (error) {
-        console.error('Error loading schedules:', error);
-        document.getElementById('schedulerStatusText').textContent = 'Error loading schedules';
-      }
-    }
-    
-    function renderScheduleProgressList() {
-      const container = document.getElementById('scheduleProgressList');
-      
-      if (schedulesToProcess.length === 0) {
-        container.innerHTML = '<div style="padding: 20px; text-align: center; color: #718096;">No schedules to process</div>';
         return;
       }
-      
+
+      try {
+        const response = await authFetch(`/api/report-batches/${batchRunId}`);
+        if (!response.ok) {
+          alert('Unable to fetch report run progress');
+          return;
+        }
+
+        const batchRun = await response.json();
+        currentBatchRunId = batchRun.id;
+        document.getElementById('schedulerProgressModal').classList.add('active');
+        updateSchedulerProgressFromJob(batchRun);
+      } catch (error) {
+        console.error('Error showing batch run progress:', error);
+        alert('Failed to load report run progress');
+      }
+    }
+
+    function renderScheduleProgressList() {
+      const container = document.getElementById('scheduleProgressList');
+
+      if (!schedulesToProcess.length) {
+        container.innerHTML = '<div style="padding: 20px; text-align: center; color: #718096;">No schedules in this run</div>';
+        return;
+      }
+
       container.innerHTML = schedulesToProcess.map(schedule => {
         const statusIcon = {
-          'pending': '⏳',
-          'processing': '⚙️',
-          'success': '✅',
-          'skipped': '⚠️',
-          'error': '❌'
+          queued: '⏳',
+          running: '⚙️',
+          success: '✅',
+          partial: '⚠️',
+          skipped: '⏭️',
+          failed: '❌'
         }[schedule.status] || '⏳';
-        
+
         const statusColor = {
-          'pending': '#cbd5e0',
-          'processing': '#5a6fd8',
-          'success': '#48bb78',
-          'skipped': '#ed8936',
-          'error': '#f56565'
+          queued: '#cbd5e0',
+          running: '#5a6fd8',
+          success: '#48bb78',
+          partial: '#dd6b20',
+          skipped: '#718096',
+          failed: '#f56565'
         }[schedule.status] || '#cbd5e0';
-        
-        let statusText = '';
-        if (schedule.status === 'success') {
-          statusText = `Complete (${schedule.emailsSent || schedule.recipients.length} sent)`;
+
+        let statusText = 'Queued';
+        if (schedule.status === 'running') {
+          statusText = 'Running...';
+        } else if (schedule.status === 'success') {
+          statusText = schedule.mode === 'generate'
+            ? 'PDF generated successfully'
+            : `Sent ${schedule.emailsSent || 0} email${(schedule.emailsSent || 0) === 1 ? '' : 's'}`;
+        } else if (schedule.status === 'partial') {
+          statusText = `Partial delivery: ${schedule.emailsSent || 0} sent, ${schedule.emailsFailed || 0} failed`;
         } else if (schedule.status === 'skipped') {
-          statusText = `Skipped: ${schedule.skipReason || 'Configuration incomplete'}`;
-        } else if (schedule.status === 'error') {
-          statusText = `Error: ${schedule.error || 'Failed to process'}`;
-        } else if (schedule.status === 'processing') {
-          statusText = 'Sending emails...';
-        } else {
-          statusText = 'Pending';
+          statusText = schedule.error || 'Skipped';
+        } else if (schedule.status === 'failed') {
+          statusText = schedule.error || 'Failed to process';
         }
-        
+
         return `
-          <div class="schedule-progress-item" data-schedule-id="${schedule.id}" style="padding: 16px; border-bottom: 1px solid #e2e8f0;">
+          <div style="padding: 16px; border-bottom: 1px solid #e2e8f0;">
             <div style="display: flex; align-items: start; gap: 12px;">
               <div style="font-size: 24px; line-height: 1;">${statusIcon}</div>
               <div style="flex: 1;">
                 <div style="font-weight: 600; color: #2d3748; margin-bottom: 4px;">
                   ${escapeHtml(schedule.name)}
                 </div>
-                <div style="font-size: 13px; color: #718096; margin-bottom: 8px;">
-                  📊 ${escapeHtml(schedule.entity)} · 📧 ${escapeHtml(schedule.emailGroupName)}
+                <div style="font-size: 12px; font-weight: 500; color: ${statusColor};">
+                  ${escapeHtml(statusText)}
                 </div>
-                <div style="font-size: 12px; font-weight: 500; color: ${statusColor}; margin-bottom: 8px;">
-                  ${statusText}
-                </div>
-                ${schedule.status !== 'skipped' ? `
-                  <details style="font-size: 12px; color: #4a5568;">
-                    <summary style="cursor: pointer; user-select: none; padding: 4px 0;">
-                      Recipients (${schedule.recipients.length})
-                    </summary>
-                    <div style="padding: 8px 0 4px 16px; color: #718096;">
-                      ${schedule.recipients.length > 0 
-                        ? schedule.recipients.map(email => `• ${escapeHtml(email)}`).join('<br>')
-                        : 'No recipients configured'}
-                    </div>
-                  </details>
-                ` : ''}
               </div>
             </div>
           </div>
         `;
       }).join('');
     }
-    
-    function hideSchedulerProgress(clearJob = false) {
-      const modal = document.getElementById('schedulerProgressModal');
-      modal.classList.remove('active');
 
-      // Clear polling intervals
-      if (schedulerPollingInterval) {
-        clearInterval(schedulerPollingInterval);
-        schedulerPollingInterval = null;
-      }
-      if (currentJobPollingInterval) {
-        clearInterval(currentJobPollingInterval);
-        currentJobPollingInterval = null;
-      }
+    function hideSchedulerProgress() {
+      document.getElementById('schedulerProgressModal').classList.remove('active');
+    }
 
-      // Reset schedules
-      schedulesToProcess = [];
-
-      // Optionally clear completed job
-      if (clearJob) {
-        clearCompletedJob();
-      }
-    }
-    
-    function updateSchedulerProgress(stats, scheduleResults) {
-      const totalSchedules = schedulesToProcess.length;
-      document.getElementById('schedulesProcessedCount').textContent = 
-        `${stats.schedulesProcessed || 0} / ${totalSchedules}`;
-      document.getElementById('emailsSentCount').textContent = stats.emailsSent || 0;
-      document.getElementById('errorsCount').textContent = stats.errors || 0;
-      
-      // Update schedule statuses based on results if provided
-      if (scheduleResults && scheduleResults.length > 0) {
-        // Map results to our schedule list
-        scheduleResults.forEach(result => {
-          const schedule = schedulesToProcess.find(s => s.id === result.scheduleId);
-          if (schedule) {
-            schedule.status = result.status; // 'success', 'skipped', 'error'
-            schedule.emailsSent = result.emailsSent;
-            schedule.emailsFailed = result.emailsFailed;
-            schedule.skipReason = result.skipReason;
-            schedule.error = result.error;
-          }
-        });
-      } else {
-        // Fallback: Update schedule statuses based on progress count
-        const processed = stats.schedulesProcessed || 0;
-        for (let i = 0; i < schedulesToProcess.length; i++) {
-          if (i < processed) {
-            schedulesToProcess[i].status = 'success';
-          } else if (i === processed) {
-            schedulesToProcess[i].status = 'processing';
-          } else {
-            schedulesToProcess[i].status = 'pending';
-          }
-        }
-      }
-      
-      renderScheduleProgressList();
-    }
-    
-    async function pollSchedulerStatus(startStats) {
-      try {
-        const response = await authFetch('/api/email-scheduler/status');
-        if (!response.ok) return;
-        
-        const stats = await response.json();
-        
-        // Calculate delta since start
-        const schedulesProcessed = (stats.schedulesProcessed || 0) - (startStats.schedulesProcessed || 0);
-        const emailsSent = (stats.successfulSends || 0) - (startStats.successfulSends || 0);
-        const errors = (stats.failedSends || 0) - (startStats.failedSends || 0);
-        
-        updateSchedulerProgress({
-          schedulesProcessed,
-          emailsSent,
-          errors
-        });
-        
-        // Update status text
-        if (stats.isRunning && stats.lastRunTime) {
-          const elapsed = Math.floor((Date.now() - new Date(stats.lastRunTime).getTime()) / 1000);
-          document.getElementById('schedulerStatusText').textContent = 
-            `Running... (${elapsed}s elapsed)`;
-        }
-      } catch (error) {
-        console.error('Error polling scheduler status:', error);
-      }
-    }
-    
     async function runAllSchedulesNow() {
-      const btn = document.getElementById('runAllSchedulesBtn');
-      const originalText = btn.innerHTML;
-
-      // First check if there's already a job running
-      try {
-        const statusResponse = await authFetch('/api/email-scheduler/job-status');
-        const jobStatus = await statusResponse.json();
-
-        if (jobStatus.running) {
-          // A job is already running - show its progress instead
-          alert('A scheduler job is already running. Opening progress view...');
-          await showJobProgress();
-          return;
-        }
-
-        // If there's a completed job, ask if they want to run a new one
-        if (jobStatus.status === 'completed' || jobStatus.status === 'error') {
-          if (!confirm('A previous job has finished. Would you like to clear it and run a new one?\n\nThis will process ALL report schedules and send emails.')) {
-            await showJobProgress(); // Show results of previous job
-            return;
-          }
-          // Clear the old job
-          await authFetch('/api/email-scheduler/clear-job', { method: 'POST' });
-        } else {
-          // No job exists - confirm before starting
-          if (!confirm('This will immediately process ALL report schedules and send emails to all recipients. Continue?')) {
-            return;
-          }
-        }
-      } catch (error) {
-        console.error('Error checking job status:', error);
-        // Continue anyway
-      }
-
-      try {
-        // Disable button
-        btn.disabled = true;
-        btn.innerHTML = '⏳ Starting...';
-
-        // Show progress modal first
-        await showSchedulerProgress();
-        document.getElementById('schedulerStatusText').textContent = 'Starting job...';
-
-        console.log('🚀 Starting scheduler job...');
-
-        // Start the async job (returns immediately)
-        const response = await authFetch('/api/email-scheduler/run-now', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          if (response.status === 409) {
-            // Job already running
-            alert('A job is already running.');
-            await showJobProgress();
-            return;
-          }
-          throw new Error(errorData.error || `Failed to start job: ${response.status}`);
-        }
-
-        const result = await response.json();
-        console.log('✅ Job started:', result);
-
-        // Show the indicator
-        showJobIndicator({ running: true, processedSchedules: 0, totalSchedules: 0 });
-
-        // Update button
-        btn.innerHTML = '⏳ Running...';
-
-        // Start polling for job updates
-        startJobPolling();
-
-        // Also poll from within the modal to update progress
-        const pollModal = setInterval(async () => {
-          try {
-            const statusResp = await authFetch('/api/email-scheduler/job-status');
-            const status = await statusResp.json();
-
-            updateSchedulerProgressFromJob(status);
-
-            // If job is done, stop polling and show results
-            if (!status.running) {
-              clearInterval(pollModal);
-
-              // Reset button
-              btn.disabled = false;
-              btn.innerHTML = originalText;
-
-              if (status.status === 'completed') {
-                document.getElementById('schedulerStatusText').textContent =
-                  `✅ Complete! ${status.emailsSent} emails sent.`;
-              } else if (status.status === 'error') {
-                document.getElementById('schedulerStatusText').textContent =
-                  `❌ Error: ${status.error || 'Unknown error'}`;
-              }
-
-              // Refresh schedules table
-              await loadReportSchedules();
-            }
-          } catch (err) {
-            console.error('Error polling in modal:', err);
-          }
-        }, 2000);
-
-      } catch (error) {
-        console.error('❌ Error starting scheduler:', error);
-
-        document.getElementById('schedulerStatusText').textContent =
-          '❌ Failed to start: ' + error.message;
-
-        btn.disabled = false;
-        btn.innerHTML = originalText;
-
-        setTimeout(() => {
-          hideSchedulerProgress();
-          alert('Failed to start scheduler: ' + error.message);
-        }, 2000);
-      }
+      await openRunReportsModal();
     }
 
     // ============================================
