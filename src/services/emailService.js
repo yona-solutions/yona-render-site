@@ -79,6 +79,10 @@ class EmailService {
           entityName = schedule.subsidiary_name || schedule.subsidiary_id;
           entityType = 'Subsidiary';
           break;
+        case 'customer_tag':
+          entityName = schedule.customer_tag_name || schedule.customer_tag_id;
+          entityType = 'Customer Tag';
+          break;
         default:
           entityName = 'Unknown';
           entityType = schedule.template_type;
@@ -230,4 +234,3 @@ Yona Solutions
 const emailService = new EmailService();
 
 module.exports = emailService;
-

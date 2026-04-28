@@ -956,9 +956,10 @@
   <div class="main-content">
     <!-- Header Tabs -->
     <div class="header-tabs">
-      <button class="tab active">District</button>
-      <button class="tab">Region</button>
-      <button class="tab">Subsidiary</button>
+      <button class="tab active" data-hierarchy="district">District</button>
+      <button class="tab" data-hierarchy="region">Region</button>
+      <button class="tab" data-hierarchy="subsidiary">Subsidiary</button>
+      <button class="tab" data-hierarchy="customer_tag">Customer Tag</button>
     </div>
 
     <!-- Controls -->
@@ -1248,6 +1249,33 @@
     
     let monthSelect, districtSelect, subsidiaryFilterSelect, serviceFilterSelect, subsidiaryHeaderSelect;
 
+    const HIERARCHY_CONFIG = {
+      district: {
+        endpoint: '/api/storage/districts',
+        label: 'District',
+        placeholder: 'district',
+        filterMode: 'subsidiary'
+      },
+      region: {
+        endpoint: '/api/storage/regions',
+        label: 'Region',
+        placeholder: 'region',
+        filterMode: 'subsidiary'
+      },
+      subsidiary: {
+        endpoint: '/api/storage/departments',
+        label: 'Subsidiary',
+        placeholder: 'subsidiary',
+        filterMode: 'service'
+      },
+      customer_tag: {
+        endpoint: '/api/storage/customer-tags',
+        label: 'Customer Tag',
+        placeholder: 'customer tag',
+        filterMode: 'none'
+      }
+    };
+
     function escapeHtml(value) {
       return String(value ?? '').replace(/[&<>"']/g, char => ({
         '&': '&amp;',
@@ -1300,9 +1328,10 @@
     }
     
     /**
-     * Current hierarchy type (district, region, or subsidiary)
+     * Current hierarchy type
      */
     let currentHierarchy = 'district';
+    let currentHierarchyLabel = HIERARCHY_CONFIG[currentHierarchy].label;
     
     /**
      * Load hierarchy options based on the selected type
@@ -1311,17 +1340,11 @@
      */
     async function loadHierarchyOptions(hierarchyType = 'district') {
       try {
-        // Map hierarchy types to API endpoints
-        const endpointMap = {
-          'district': '/api/storage/districts',
-          'region': '/api/storage/regions',
-          'subsidiary': '/api/storage/departments'
-        };
-        
-        const endpoint = endpointMap[hierarchyType];
-        if (!endpoint) {
+        const hierarchyConfig = HIERARCHY_CONFIG[hierarchyType];
+        if (!hierarchyConfig) {
           throw new Error(`Unknown hierarchy type: ${hierarchyType}`);
         }
+        const endpoint = hierarchyConfig.endpoint;
         
         console.log(`📡 Fetching ${hierarchyType} data from ${endpoint}...`);
         const response = await authFetch(endpoint);
@@ -1354,9 +1377,10 @@
         console.error(`Error loading ${hierarchyType}:`, error);
         
         // Fallback to sample data
+        const fallbackLabel = HIERARCHY_CONFIG[hierarchyType]?.label || hierarchyType;
         const fallbackData = [
-          { value: '101', label: `Sample ${hierarchyType} 101` },
-          { value: '102', label: `Sample ${hierarchyType} 102` }
+          { value: '101', label: `Sample ${fallbackLabel} 101` },
+          { value: '102', label: `Sample ${fallbackLabel} 102` }
         ];
         districtSelect.setOptions(fallbackData);
         console.warn(`Using sample ${hierarchyType} as fallback`);
@@ -1452,27 +1476,34 @@
     }
     
     async function applyHierarchySelection(hierarchyType, hierarchyLabelText = null) {
-      const labelText = hierarchyLabelText || (hierarchyType.charAt(0).toUpperCase() + hierarchyType.slice(1));
+      const hierarchyConfig = HIERARCHY_CONFIG[hierarchyType];
+      if (!hierarchyConfig) {
+        throw new Error(`Unknown hierarchy type: ${hierarchyType}`);
+      }
+
+      const labelText = hierarchyLabelText || hierarchyConfig.label;
 
       console.log('Hierarchy changed to:', hierarchyType);
+      currentHierarchy = hierarchyType;
+      currentHierarchyLabel = labelText;
 
       // Update the dropdown label to match selected hierarchy
       const hierarchyLabel = document.querySelector('.control-group:nth-child(3) .control-label');
       hierarchyLabel.textContent = labelText;
 
       // Update the dropdown placeholder
-      districtSelect.input.setAttribute('placeholder', `Select ${hierarchyType}...`);
+      districtSelect.input.setAttribute('placeholder', `Select ${hierarchyConfig.placeholder}...`);
 
       // Show/hide filters based on hierarchy type
       const subsidiaryFilterGroup = document.getElementById('subsidiaryFilterGroup');
       const serviceFilterGroup = document.getElementById('serviceFilterGroup');
 
-      if (hierarchyType === 'region' || hierarchyType === 'district') {
+      if (hierarchyConfig.filterMode === 'subsidiary') {
         subsidiaryFilterGroup.style.display = 'block';
         serviceFilterGroup.style.display = 'none';
         await loadSubsidiariesForFilter();
         serviceFilterSelect.selectOption(null, '');
-      } else if (hierarchyType === 'subsidiary') {
+      } else if (hierarchyConfig.filterMode === 'service') {
         subsidiaryFilterGroup.style.display = 'none';
         serviceFilterGroup.style.display = 'block';
         await loadServicesForFilter();
@@ -1527,7 +1558,7 @@
       loadAvailableDates();
       loadSubsidiariesForHeader();
       const activeTab = document.querySelector('.tab.active');
-      const initialHierarchy = activeTab ? activeTab.textContent.toLowerCase().trim() : currentHierarchy;
+      const initialHierarchy = activeTab?.dataset?.hierarchy || currentHierarchy;
       const initialLabel = activeTab ? activeTab.textContent.trim() : null;
       await applyHierarchySelection(initialHierarchy, initialLabel);
     });
@@ -1546,11 +1577,11 @@
     });
 
     /**
-     * Hierarchy tabs - switch between District, Region, Subsidiary
+     * Hierarchy tabs - switch between hierarchy types
      * 
      * When a tab is clicked:
      * 1. Update active tab styling
-     * 2. Extract hierarchy type from tab text ("District", "Region", "Subsidiary")
+     * 2. Extract hierarchy type from tab dataset
      * 3. Update the dropdown label to match the hierarchy type
      * 4. Update the dropdown placeholder text
      * 5. Load the appropriate data via API call
@@ -1559,6 +1590,7 @@
      * - Districts (44 items + 9 tags) when District tab is active
      * - Regions (12 items) when Region tab is active
      * - Subsidiaries (7 items) when Subsidiary tab is active
+     * - Customer tags when Customer Tag tab is active
      */
     document.querySelectorAll('.tab').forEach(tab => {
       tab.addEventListener('click', async function() {
@@ -1567,8 +1599,8 @@
         // Add active state to clicked tab
         this.classList.add('active');
         
-        // Get hierarchy type from tab text (lowercase for API compatibility)
-        const hierarchyType = this.textContent.toLowerCase().trim();
+        // Use explicit data-hierarchy so multi-word labels map cleanly to API values
+        const hierarchyType = this.dataset.hierarchy || this.textContent.toLowerCase().trim();
         await applyHierarchySelection(hierarchyType, this.textContent.trim());
       });
     });
@@ -1616,8 +1648,8 @@
       
       // Validate selections
       if (!selectedId) {
-        console.warn(`⚠️ No ${hierarchy} selected`);
-        alert(`Please select a ${hierarchy} first`);
+        console.warn(`⚠️ No ${currentHierarchyLabel.toLowerCase()} selected`);
+        alert(`Please select a ${currentHierarchyLabel.toLowerCase()} first`);
         return;
       }
       
@@ -1653,7 +1685,7 @@
             ];
           } else {
             return [
-              { id: 'district-summary', label: 'Fetching district summary' },
+              { id: 'district-summary', label: `Fetching ${currentHierarchyLabel.toLowerCase()} summary` },
               { id: 'processing-facilities', label: 'Processing facilities', hasDetail: true },
               { id: 'finalizing', label: 'Finalizing reports' }
             ];

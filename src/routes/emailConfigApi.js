@@ -506,6 +506,8 @@ router.post('/report-schedules', async (req, res) => {
       region_name,
       subsidiary_id,
       subsidiary_name,
+      customer_tag_id,
+      customer_tag_name,
       tags,
       email_group_ids,  // Now an array
       frequency,
@@ -537,6 +539,8 @@ router.post('/report-schedules', async (req, res) => {
       region_name: region_name || null,
       subsidiary_id: subsidiary_id || null,
       subsidiary_name: subsidiary_name || null,
+      customer_tag_id: customer_tag_id || null,
+      customer_tag_name: customer_tag_name || null,
       tags: normalizeScheduleTags(tags) || [],
       email_group_ids: Array.isArray(email_group_ids) ? email_group_ids.map(id => parseInt(id)) : [],
       frequency: frequency || 'monthly',
@@ -607,6 +611,8 @@ router.put('/report-schedules/:id', async (req, res) => {
       'region_name',
       'subsidiary_id',
       'subsidiary_name',
+      'customer_tag_id',
+      'customer_tag_name',
       'tags',
       'email_group_ids',  // Now an array
       'frequency',
@@ -972,7 +978,7 @@ router.post('/report-schedules/:id/send-to-groups', async (req, res) => {
     if (!schedule.template_type) {
       return res.status(400).json({
         error: 'Missing template type',
-        message: 'Please select a Template Type (District, Region, or Subsidiary)'
+        message: 'Please select a Template Type (District, Region, Subsidiary, or Customer Tag)'
       });
     }
 

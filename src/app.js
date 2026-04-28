@@ -78,7 +78,17 @@ async function createApp() {
           ADD COLUMN IF NOT EXISTS service_filter_name VARCHAR(255),
           ADD COLUMN IF NOT EXISTS header_subsidiary_id VARCHAR(255),
           ADD COLUMN IF NOT EXISTS header_subsidiary_name VARCHAR(255),
+          ADD COLUMN IF NOT EXISTS customer_tag_id VARCHAR(255),
+          ADD COLUMN IF NOT EXISTS customer_tag_name VARCHAR(255),
           ADD COLUMN IF NOT EXISTS last_run_at TIMESTAMPTZ
+        `);
+        await emailConfigService.pool.query(`
+          ALTER TABLE report_schedules
+          DROP CONSTRAINT IF EXISTS chk_template_type
+        `);
+        await emailConfigService.pool.query(`
+          ALTER TABLE report_schedules
+          ADD CONSTRAINT chk_template_type CHECK (template_type IN ('district', 'region', 'subsidiary', 'customer_tag'))
         `);
         await emailConfigService.pool.query(`
           UPDATE report_schedules

@@ -44,6 +44,8 @@ CREATE TABLE IF NOT EXISTS report_schedules (
   region_name VARCHAR(255),
   subsidiary_id VARCHAR(255),
   subsidiary_name VARCHAR(255),
+  customer_tag_id VARCHAR(255),
+  customer_tag_name VARCHAR(255),
   email_group_id INTEGER REFERENCES email_groups(id),
   email_group_ids INTEGER[],
   frequency VARCHAR(50) NOT NULL,
@@ -57,7 +59,7 @@ CREATE TABLE IF NOT EXISTS report_schedules (
   next_send_at TIMESTAMP,
   last_run_at TIMESTAMP,
   
-  CONSTRAINT chk_template_type CHECK (template_type IN ('district', 'region', 'subsidiary')),
+  CONSTRAINT chk_template_type CHECK (template_type IN ('district', 'region', 'subsidiary', 'customer_tag')),
   CONSTRAINT chk_process CHECK (process IN ('standard', 'operational')),
   CONSTRAINT chk_frequency CHECK (frequency IN ('daily', 'weekly', 'monthly')),
   CONSTRAINT chk_day_of_week CHECK (

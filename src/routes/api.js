@@ -128,6 +128,134 @@ function applyOrgLabel(meta, orgLabel) {
   return meta;
 }
 
+async function generateCustomerSummaryAndFacilityReport({
+  bigQueryService,
+  accountConfig,
+  childrenMap,
+  sectionConfig,
+  censusRecords,
+  summaryTypeLabel,
+  entityName,
+  customers,
+  customerIds,
+  date,
+  reportPlType,
+  orgLabel,
+  summaryParentRegion = '',
+  resolveFacilityContext
+}) {
+  console.log(`   Querying BigQuery for ${summaryTypeLabel.toLowerCase()} summary (Month + YTD)...`);
+  const monthData = await bigQueryService.getPLData({
+    hierarchy: 'district',
+    customerIds,
+    date,
+    accountConfig,
+    ytd: false
+  });
+  const ytdData = await bigQueryService.getPLData({
+    hierarchy: 'district',
+    customerIds,
+    date,
+    accountConfig,
+    ytd: true
+  });
+
+  const summaryCensus = sumCensusForCustomers(censusRecords, customers, date);
+  const summaryMeta = {
+    typeLabel: summaryTypeLabel,
+    entityName,
+    monthLabel: date,
+    facilityCount: 0,
+    plType: reportPlType,
+    parentRegion: summaryParentRegion || '',
+    actualCensus: summaryCensus.actual,
+    budgetCensus: summaryCensus.budget,
+    headcount: summaryCensus.headcount
+  };
+  applyOrgLabel(summaryMeta, orgLabel);
+
+  console.log(`   Generating ${summaryTypeLabel.toLowerCase()} summary P&L (header will be updated with actual counts)...`);
+  const summaryResult = await pnlRenderService.generatePNLReport(
+    monthData,
+    ytdData,
+    summaryMeta,
+    accountConfig,
+    childrenMap,
+    sectionConfig
+  );
+
+  if (summaryResult.noRevenue) {
+    return {
+      html: '',
+      noRevenue: true,
+      facilityCount: 0,
+      meta: summaryMeta
+    };
+  }
+
+  console.log(`   ✅ Query complete - processing facility P&Ls in memory...`);
+  const facilityReports = [];
+  let facilityCount = 0;
+
+  for (const customer of customers) {
+    const facilityMonthData = accountService.filterDataByCustomers(monthData, [customer.customer_internal_id]);
+    const facilityYtdData = accountService.filterDataByCustomers(ytdData, [customer.customer_internal_id]);
+
+    const customerCode = customer.customer_code || getCustomerCodeFromLabel(customer.label);
+    const census = sumCensusForCodes(censusRecords, customerCode ? [customerCode] : [], date);
+    const facilityContext = typeof resolveFacilityContext === 'function'
+      ? (resolveFacilityContext(customer) || {})
+      : {};
+
+    const facilityMeta = {
+      typeLabel: 'Facility',
+      entityName: customer.label,
+      monthLabel: date,
+      parentDistrict: facilityContext.parentDistrict || entityName,
+      parentRegion: facilityContext.parentRegion || summaryParentRegion || '',
+      plType: reportPlType,
+      actualCensus: census.actual,
+      budgetCensus: census.budget,
+      headcount: census.headcount,
+      startDateEst: customer.start_date_est
+    };
+    applyOrgLabel(facilityMeta, orgLabel);
+
+    const facilityResult = await pnlRenderService.generatePNLReport(
+      facilityMonthData,
+      facilityYtdData,
+      facilityMeta,
+      accountConfig,
+      childrenMap,
+      sectionConfig
+    );
+
+    if (!facilityResult.noRevenue) {
+      if (!isCustomerPnlHidden(customer)) {
+        facilityReports.push(facilityResult.html);
+      }
+      if (shouldCountFacility(customer)) {
+        facilityCount++;
+      }
+    }
+  }
+
+  summaryMeta.facilityCount = facilityCount;
+  const updatedSummaryHeaderHtml = await pnlRenderService.generateHeader(summaryMeta);
+  const parts = summaryResult.html.split('<hr class="pnl-divider">');
+  const summaryContentHtml = parts[1] || '';
+  const completeSummaryHtml = `    <div class="pnl-report-container page-break">
+      ${updatedSummaryHeaderHtml}
+      <hr class="pnl-divider">${summaryContentHtml}`;
+
+  return {
+    html: [completeSummaryHtml, ...facilityReports].join('\n\n'),
+    noRevenue: false,
+    facilityCount,
+    meta: summaryMeta
+  };
+}
+
 /**
  * Configure API routes
  * 
@@ -261,6 +389,24 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
       res.status(500).json({ 
         error: error.message,
         code: 'DISTRICTS_FETCH_ERROR'
+      });
+    }
+  });
+
+  /**
+   * Get customer tags from customer configuration
+   *
+   * GET /api/storage/customer-tags
+   */
+  router.get('/storage/customer-tags', async (req, res) => {
+    try {
+      const customerTags = await storageService.getCustomerTags();
+      res.json(customerTags);
+    } catch (error) {
+      console.error('Error fetching customer tags:', error);
+      res.status(500).json({
+        error: error.message,
+        code: 'CUSTOMER_TAGS_FETCH_ERROR'
       });
     }
   });
@@ -921,11 +1067,11 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
       console.log(`   📊 P&L Type: ${reportPlType}`);
 
       // Validate hierarchy type
-      if (!['district', 'region', 'subsidiary'].includes(hierarchy)) {
+      if (!['district', 'region', 'subsidiary', 'customer_tag'].includes(hierarchy)) {
         return res.status(400).json({ 
           error: 'Invalid hierarchy type',
           code: 'INVALID_HIERARCHY',
-          allowed: ['district', 'region', 'subsidiary']
+          allowed: ['district', 'region', 'subsidiary', 'customer_tag']
         });
       }
 
@@ -1045,6 +1191,23 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
         queryParams.isTag = isTag; // Store whether this is a tag for header generation
         queryParams.districtRegion = districtRegion || '';
         console.log(`   Found ${customerIds.length} customer IDs for ${isTag ? 'tag' : 'district'}: ${districtName}`);
+      } else if (hierarchy === 'customer_tag') {
+        const customerTagResult = await storageService.getCustomersForCustomerTag(actualId);
+        const { customers, customerTagName } = customerTagResult;
+
+        if (customers.length === 0) {
+          return res.status(404).json({
+            error: 'No customers found for selected customer tag',
+            code: 'NO_CUSTOMERS_FOUND'
+          });
+        }
+
+        selectedLabel = customerTagName;
+
+        const customerIds = customers.map(c => c.customer_internal_id);
+        queryParams.customerIds = customerIds;
+        queryParams.customers = customers;
+        console.log(`   Found ${customerIds.length} customer IDs for customer tag: ${customerTagName}`);
       } else if (hierarchy === 'region') {
         // Get region internal ID and name
         const regionResult = await storageService.getRegionInternalId(actualId);
@@ -1241,137 +1404,73 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
       let totalNoRevenue = false;
       
       if (hierarchy === 'district') {
-        // District rendering: District -> Facilities
-        // (Tags are treated as districts - they just aggregate multiple districts' customers)
-        // OPTIMIZED: Only 4 BigQuery queries total (District Month/YTD + All Customers Month/YTD)
-        
-        const allCustomerIds = queryParams.customerIds;
-        
-        // Query 1 & 2: District Summary (Month + YTD)
-        console.log('   Querying BigQuery for district summary (Month + YTD)...');
-        const districtData = await bigQueryService.getPLData({ ...queryParams, ytd: false });
-        const districtYtdData = await bigQueryService.getPLData({ ...queryParams, ytd: true });
-        
-        const districtCensus = sumCensusForCustomers(censusRecords, queryParams.customers, date);
-
-        // District summaries include census rollup
-        const districtMeta = {
-          typeLabel: queryParams.isTag ? 'District Tag' : 'District',
-          entityName: selectedLabel,
-          monthLabel: date,
-          facilityCount: 0, // Will be updated after processing
-          plType: reportPlType,
-          parentRegion: queryParams.districtRegion || '',
-          actualCensus: districtCensus.actual,
-          budgetCensus: districtCensus.budget,
-          headcount: districtCensus.headcount
-        };
-        applyOrgLabel(districtMeta, orgLabel);
-        
-        console.log('   Generating district summary P&L (header will be updated with actual counts)...');
-        const districtResult = await pnlRenderService.generatePNLReport(
-          districtData,
-          districtYtdData,
-          districtMeta,
+        const districtReport = await generateCustomerSummaryAndFacilityReport({
+          bigQueryService,
           accountConfig,
           childrenMap,
-          sectionConfig
-        );
-        
-        totalNoRevenue = districtResult.noRevenue;
-        
-        // Query 3 & 4: All customers in district (Month + YTD)
-        console.log(`\n   Querying BigQuery for all ${allCustomerIds.length} customers (Month + YTD)...`);
-        const allCustomersMonthData = await bigQueryService.getPLData({ 
-          hierarchy: 'district', 
-          customerIds: allCustomerIds, 
-          date, 
-          accountConfig, 
-          ytd: false 
-        });
-        const allCustomersYtdData = await bigQueryService.getPLData({ 
-          hierarchy: 'district', 
-          customerIds: allCustomerIds, 
-          date, 
-          accountConfig, 
-          ytd: true 
-        });
-        
-        console.log('   ✅ Query complete - processing facility P&Ls in memory...');
-        
-        // Generate facility P&L for each customer by filtering in memory
-        const facilityReports = [];
-        let facilityCount = 0;
-        
-        for (const customer of queryParams.customers) {
-          const facilityMonthData = accountService.filterDataByCustomers(allCustomersMonthData, [customer.customer_internal_id]);
-          const facilityYtdData = accountService.filterDataByCustomers(allCustomersYtdData, [customer.customer_internal_id]);
-          
-          const customerCode = customer.customer_code || getCustomerCodeFromLabel(customer.label);
-          const census = sumCensusForCodes(censusRecords, customerCode ? [customerCode] : [], date);
-          
-          const facilityMeta = {
-            typeLabel: 'Facility',
-            entityName: customer.label,
-            monthLabel: date,
+          sectionConfig,
+          censusRecords,
+          summaryTypeLabel: queryParams.isTag ? 'District Tag' : 'District',
+          entityName: selectedLabel,
+          customers: queryParams.customers,
+          customerIds: queryParams.customerIds,
+          date,
+          reportPlType,
+          orgLabel,
+          summaryParentRegion: queryParams.districtRegion || '',
+          resolveFacilityContext: () => ({
             parentDistrict: selectedLabel,
-            parentRegion: queryParams.districtRegion || '',
-            plType: reportPlType,
-            actualCensus: census.actual,
-            budgetCensus: census.budget,
-            headcount: census.headcount,
-            startDateEst: customer.start_date_est
-          };
-          applyOrgLabel(facilityMeta, orgLabel);
-          
-          const facilityResult = await pnlRenderService.generatePNLReport(
-            facilityMonthData,
-            facilityYtdData,
-            facilityMeta,
-            accountConfig,
-            childrenMap,
-            sectionConfig
-          );
-          
-          // Only include facilities with revenue
-          if (!facilityResult.noRevenue) {
-            if (!isCustomerPnlHidden(customer)) {
-              facilityReports.push(facilityResult.html);
-            }
-            if (shouldCountFacility(customer)) {
-              facilityCount++;
-            }
-          }
-        }
-        
-        // Update district header with actual facility count
-        districtMeta.facilityCount = facilityCount;
-        const updatedDistrictHeaderHtml = await pnlRenderService.generateHeader(districtMeta);
-        
-        // Combine updated header with district content (split on <hr class="pnl-divider">)
-        const parts = districtResult.html.split('<hr class="pnl-divider">');
-        const districtContentHtml = parts[1]; // Everything after the header and divider
-        
-        // Reconstruct with new header: opening tag + new header + divider + rest of content
-        const completeDistrictHtml = `    <div class="pnl-report-container page-break">
-      ${updatedDistrictHeaderHtml}
-      <hr class="pnl-divider">${districtContentHtml}`;
-        
-        // Combine all reports
-        const finalHtml = [completeDistrictHtml, ...facilityReports].join('\n\n');
-        
-        console.log(`✅ Generated district summary + ${facilityCount} facility P&Ls`);
-        console.log(`   🚀 Performance: Used only 4 BigQuery queries instead of ${2 + (queryParams.customers.length * 2)}`);
-        
+            parentRegion: queryParams.districtRegion || ''
+          })
+        });
+
+        totalNoRevenue = districtReport.noRevenue;
+
+        console.log(`✅ Generated district summary + ${districtReport.facilityCount} facility P&Ls`);
+
         res.json({
-          html: finalHtml,
+          html: districtReport.html,
           noRevenue: totalNoRevenue,
           hierarchy,
           selectedId,
           selectedLabel,
           date,
-          facilityCount: facilityCount,
-          meta: districtMeta
+          facilityCount: districtReport.facilityCount,
+          meta: districtReport.meta
+        });
+      } else if (hierarchy === 'customer_tag') {
+        const customerTagReport = await generateCustomerSummaryAndFacilityReport({
+          bigQueryService,
+          accountConfig,
+          childrenMap,
+          sectionConfig,
+          censusRecords,
+          summaryTypeLabel: 'Customer Tag',
+          entityName: selectedLabel,
+          customers: queryParams.customers,
+          customerIds: queryParams.customerIds,
+          date,
+          reportPlType,
+          orgLabel,
+          resolveFacilityContext: customer => ({
+            parentDistrict: customer.parentDistrictLabel || selectedLabel,
+            parentRegion: customer.parentRegion || ''
+          })
+        });
+
+        totalNoRevenue = customerTagReport.noRevenue;
+
+        console.log(`✅ Generated customer tag summary + ${customerTagReport.facilityCount} facility P&Ls`);
+
+        res.json({
+          html: customerTagReport.html,
+          noRevenue: totalNoRevenue,
+          hierarchy,
+          selectedId,
+          selectedLabel,
+          date,
+          facilityCount: customerTagReport.facilityCount,
+          meta: customerTagReport.meta
         });
       } else if (hierarchy === 'region') {
         // Multi-level region rendering: Region Summary -> District Summaries -> Facility P&Ls

@@ -13,6 +13,16 @@ function getDistrictTags(config) {
   return Array.isArray(config?.districtTags) ? config.districtTags : [];
 }
 
+function getCustomerTags(config) {
+  const rawTags = Array.isArray(config?.customerTags)
+    ? config.customerTags
+    : (Array.isArray(config?.tags) ? config.tags : []);
+
+  return rawTags
+    .map(tag => String(tag || '').trim())
+    .filter(Boolean);
+}
+
 function getDimensionDisplayOrder(id, config) {
   if (config?.order !== undefined && config.order !== null) {
     return config.order;
@@ -343,6 +353,39 @@ class StorageService {
   }
 
   /**
+   * Get customer tags from customer configuration file
+   *
+   * Returns unique customer tag values from customer entries only.
+   * These are used as a dedicated selector source for customer-tag P&Ls.
+   *
+   * @returns {Promise<Array<{id: string, label: string, type: string}>>}
+   */
+  async getCustomerTags() {
+    const configData = await this.getFileAsJson('customer_config.json');
+
+    const items = [];
+    const uniqueTags = new Set();
+
+    for (const config of Object.values(configData)) {
+      if (config.customer_internal_id != null && !config.displayExcluded) {
+        getCustomerTags(config).forEach(tag => uniqueTags.add(tag));
+      }
+    }
+
+    uniqueTags.forEach(tag => {
+      items.push({
+        id: `tag_${tag}`,
+        label: tag,
+        type: 'tag'
+      });
+    });
+
+    items.sort((a, b) => a.label.localeCompare(b.label));
+
+    return items;
+  }
+
+  /**
    * Get regions and region tags from region configuration file
    * 
    * Returns both individual regions and unique tag values.
@@ -614,6 +657,70 @@ class StorageService {
       districtName: districtDisplayName,
       districtRegion: districtRegionLabel,
       isTag
+    };
+  }
+
+  /**
+   * Get all customers for a customer tag.
+   *
+   * Customer tags are always tag-based groupings, so the selector accepts the
+   * same tag-prefixed ID format used elsewhere in the app.
+   *
+   * @param {string} customerTagId - Tag ID, typically prefixed with "tag_"
+   * @returns {Promise<{customers: Array, customerTagName: string, isTag: boolean}>}
+   */
+  async getCustomersForCustomerTag(customerTagId) {
+    const configData = await this.getFileAsJson('customer_config.json');
+    const configOrder = buildConfigOrderIndex(configData);
+    const customers = [];
+    const seenIds = new Set();
+    const isTag = String(customerTagId || '').startsWith('tag_');
+    const searchValue = isTag ? String(customerTagId).substring(4) : String(customerTagId || '');
+    const pathCache = {};
+
+    for (const [id, config] of Object.entries(configData)) {
+      if (config.customer_internal_id == null || config.displayExcluded) {
+        continue;
+      }
+
+      const tags = getCustomerTags(config);
+      if (!tags.includes(searchValue) || seenIds.has(config.customer_internal_id)) {
+        continue;
+      }
+
+      seenIds.add(config.customer_internal_id);
+
+      const parentDistrictConfig = config.parent ? configData[config.parent] : null;
+
+      let customerCode = config.customer_code;
+      if (!customerCode && config.label) {
+        const match = config.label.match(/^([A-Z]{2,5}\d{2,3})\b/);
+        customerCode = match ? match[1] : config.label.split(' - ')[0]?.trim();
+      }
+
+      customers.push({
+        customer_internal_id: config.customer_internal_id,
+        customer_code: customerCode,
+        label: config.label,
+        configId: id,
+        parentDistrictId: config.parent,
+        parentDistrictLabel: parentDistrictConfig?.label || config.parent || '',
+        parentRegion: parentDistrictConfig?.districtRegion || parentDistrictConfig?.region_label || null,
+        start_date_est: config.start_date_est,
+        customerPnlHidden: Boolean(config.customerPnlHidden),
+        customerPnlCountExcluded: Boolean(config.customerPnlCountExcluded)
+      });
+    }
+
+    customers.sort((a, b) => compareCustomersByDisplayOrder(configData, configOrder, a, b, {
+      groupIsTag: true,
+      pathCache
+    }));
+
+    return {
+      customers,
+      customerTagName: searchValue,
+      isTag: true
     };
   }
 

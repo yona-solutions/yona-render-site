@@ -25,6 +25,13 @@ function getScheduleEntity(schedule) {
     };
   }
 
+  if (schedule.template_type === 'customer_tag' && schedule.customer_tag_id) {
+    return {
+      entityId: schedule.customer_tag_id,
+      entityName: schedule.customer_tag_name || 'Customer Tag'
+    };
+  }
+
   throw new Error(`Please select a ${schedule.template_type} before generating the report`);
 }
 

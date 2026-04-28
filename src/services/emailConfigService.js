@@ -346,6 +346,8 @@ class EmailConfigService {
       region_name,
       subsidiary_id,
       subsidiary_name,
+      customer_tag_id,
+      customer_tag_name,
       email_group_id,
       email_group_ids,
       frequency,
@@ -374,11 +376,11 @@ class EmailConfigService {
         service_filter_id, service_filter_name,
         header_subsidiary_id, header_subsidiary_name,
         district_id, district_name, region_id, region_name,
-        subsidiary_id, subsidiary_name,
+        subsidiary_id, subsidiary_name, customer_tag_id, customer_tag_name,
         email_group_id, email_group_ids, frequency,
         day_of_week, day_of_month, time_of_day, enabled
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
       RETURNING *
     `;
 
@@ -397,6 +399,8 @@ class EmailConfigService {
       region_name || (finalTemplateType === 'region' ? entity_name : null),
       subsidiary_id || (finalTemplateType === 'subsidiary' ? entity_id : null),
       subsidiary_name || (finalTemplateType === 'subsidiary' ? entity_name : null),
+      customer_tag_id || (finalTemplateType === 'customer_tag' ? entity_id : null),
+      customer_tag_name || (finalTemplateType === 'customer_tag' ? entity_name : null),
       email_group_id || null,
       email_group_ids || null,
       frequency,
@@ -435,6 +439,8 @@ class EmailConfigService {
       region_name,
       subsidiary_id,
       subsidiary_name,
+      customer_tag_id,
+      customer_tag_name,
       email_group_id,
       email_group_ids,
       frequency,
@@ -517,6 +523,14 @@ class EmailConfigService {
     if (subsidiary_name !== undefined || (finalTemplateType === 'subsidiary' && entity_name !== undefined)) {
       setClauses.push(`subsidiary_name = $${paramIndex++}`);
       values.push(subsidiary_name !== undefined ? subsidiary_name : entity_name);
+    }
+    if (customer_tag_id !== undefined || (finalTemplateType === 'customer_tag' && entity_id !== undefined)) {
+      setClauses.push(`customer_tag_id = $${paramIndex++}`);
+      values.push(customer_tag_id !== undefined ? customer_tag_id : entity_id);
+    }
+    if (customer_tag_name !== undefined || (finalTemplateType === 'customer_tag' && entity_name !== undefined)) {
+      setClauses.push(`customer_tag_name = $${paramIndex++}`);
+      values.push(customer_tag_name !== undefined ? customer_tag_name : entity_name);
     }
     if (email_group_id !== undefined) {
       setClauses.push(`email_group_id = $${paramIndex++}`);

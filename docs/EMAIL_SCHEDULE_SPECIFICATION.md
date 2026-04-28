@@ -85,6 +85,14 @@ This document specifies the exact structure and behavior for automated P&L repor
   - **subsidiary_id**: ID from dropdown
   - **subsidiary_name**: Display label
 
+### 6a. Customer Tag Dropdown
+- **Visible**: Only when Template Type = "Customer Tag"
+- **Data Source**: `/api/storage/customer-tags`
+- **Filtering**: Uses configured customer tags from `customer_config.json`
+- **Storage Format**:
+  - **customer_tag_id**: ID from dropdown (for example `tag_Memory Care`)
+  - **customer_tag_name**: Display label
+
 ### 7. Email Group
 - **Type**: Dropdown
 - **Required**: Yes
@@ -135,7 +143,7 @@ CREATE TABLE report_schedules (
   
   -- Template Configuration
   template_name VARCHAR(255) NOT NULL,
-  template_type VARCHAR(50) NOT NULL,  -- 'district', 'region', 'subsidiary'
+  template_type VARCHAR(50) NOT NULL,  -- 'district', 'region', 'subsidiary', 'customer_tag'
   process VARCHAR(50) NOT NULL,        -- 'standard', 'operational'
   
   -- Entity Fields (only one set populated based on template_type)
@@ -145,6 +153,8 @@ CREATE TABLE report_schedules (
   region_name VARCHAR(255),            -- Display name
   subsidiary_id VARCHAR(255),          -- Subsidiary ID
   subsidiary_name VARCHAR(255),        -- Display name
+  customer_tag_id VARCHAR(255),        -- Customer Tag ID
+  customer_tag_name VARCHAR(255),      -- Display name
   
   -- Email Configuration
   email_group_id INTEGER NOT NULL REFERENCES email_groups(id),
@@ -165,7 +175,7 @@ CREATE TABLE report_schedules (
   next_send_at TIMESTAMP,
   
   -- Constraints
-  CONSTRAINT chk_template_type CHECK (template_type IN ('district', 'region', 'subsidiary')),
+  CONSTRAINT chk_template_type CHECK (template_type IN ('district', 'region', 'subsidiary', 'customer_tag')),
   CONSTRAINT chk_process CHECK (process IN ('standard', 'operational')),
   CONSTRAINT chk_day_of_week CHECK (
     day_of_week IS NULL OR 
@@ -175,7 +185,8 @@ CREATE TABLE report_schedules (
   CONSTRAINT chk_entity_required CHECK (
     (template_type = 'district' AND district_id IS NOT NULL) OR
     (template_type = 'region' AND region_id IS NOT NULL) OR
-    (template_type = 'subsidiary' AND subsidiary_id IS NOT NULL)
+    (template_type = 'subsidiary' AND subsidiary_id IS NOT NULL) OR
+    (template_type = 'customer_tag' AND customer_tag_id IS NOT NULL)
   )
 );
 ```
@@ -366,8 +377,8 @@ When a schedule is due (`next_send_at <= NOW` and `enabled = true`):
 
 1. **Determine Entity**:
    ```javascript
-   const entityId = schedule.district_id || schedule.region_id || schedule.subsidiary_id;
-   const hierarchyType = schedule.template_type; // 'district', 'region', or 'subsidiary'
+   const entityId = schedule.district_id || schedule.region_id || schedule.subsidiary_id || schedule.customer_tag_id;
+   const hierarchyType = schedule.template_type; // 'district', 'region', 'subsidiary', or 'customer_tag'
    ```
 
 2. **Generate P&L Report**:
@@ -403,4 +414,3 @@ The email report schedule system provides a complete template-based approach to 
 - **Full Integration**: Ready to integrate with existing P&L generation and PDF export
 
 All mock data has been updated to reflect this new structure and is available for immediate testing at `/email-config`.
-

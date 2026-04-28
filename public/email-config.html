@@ -1001,6 +1001,11 @@
       color: #c05621;
     }
 
+    .type-badge.customer_tag {
+      background: #edfdfd;
+      color: #285e61;
+    }
+
     /* Mini Tags for Email Groups */
     .mini-tag {
       display: inline-block;
@@ -1738,6 +1743,7 @@
                     <option value="district">District</option>
                     <option value="region">Region</option>
                     <option value="subsidiary">Subsidiary</option>
+                    <option value="customer_tag">Customer Tag</option>
                   </select>
                 </th>
                 <th>
@@ -1978,6 +1984,7 @@
                   <option value="district">District</option>
                   <option value="region">Region</option>
                   <option value="subsidiary">Subsidiary</option>
+                  <option value="customer_tag">Customer Tag</option>
                 </select>
               </div>
 
@@ -2023,6 +2030,13 @@
               <label for="editRegionId" id="editRegionLabel">Region <span style="color: #e53e3e;">*</span></label>
               <select id="editRegionId" onchange="onEditEntityChange('region')">
                 <option value="">Select region...</option>
+              </select>
+            </div>
+
+            <div class="form-group" id="editCustomerTagGroup">
+              <label for="editCustomerTagId">Customer Tag <span style="color: #e53e3e;">*</span></label>
+              <select id="editCustomerTagId" onchange="onEditEntityChange('customerTag')">
+                <option value="">Select customer tag...</option>
               </select>
             </div>
 
@@ -2099,6 +2113,7 @@
     let regionOptions = [];
     let subsidiaryOptions = [];
     let serviceOptions = [];
+    let customerTagOptions = [];
     
     // Track unsaved changes
     let unsavedChanges = new Map(); // scheduleId -> changes object
@@ -2227,11 +2242,12 @@
     async function loadHierarchyOptions() {
       try {
         // Load districts, regions, and subsidiaries in parallel
-        const [districtsData, regionsData, subsidiariesData, servicesData] = await Promise.all([
+        const [districtsData, regionsData, subsidiariesData, servicesData, customerTagsData] = await Promise.all([
           authFetch('/api/storage/districts').then(r => r.json()),
           authFetch('/api/storage/regions').then(r => r.json()),
           authFetch('/api/storage/departments').then(r => r.json()),
-          authFetch('/api/storage/services').then(r => r.json())
+          authFetch('/api/storage/services').then(r => r.json()),
+          authFetch('/api/storage/customer-tags').then(r => r.json())
         ]);
 
         console.log('📊 Raw data loaded:');
@@ -2295,11 +2311,20 @@
           }));
         }
 
+        customerTagOptions = [];
+        if (Array.isArray(customerTagsData)) {
+          customerTagOptions = customerTagsData.map(item => ({
+            id: item.id,
+            label: item.label || item.id
+          }));
+        }
+
         console.log('📊 Loaded hierarchy options:');
         console.log('  Districts:', districtOptions.length);
         console.log('  Regions:', regionOptions.length);
         console.log('  Subsidiaries:', subsidiaryOptions.length);
         console.log('  Services:', serviceOptions.length);
+        console.log('  Customer Tags:', customerTagOptions.length);
 
         if (districtOptions.length > 0) {
           console.log('📊 Sample district options:', districtOptions.slice(0, 3));
@@ -2313,9 +2338,104 @@
         if (serviceOptions.length > 0) {
           console.log('📊 Sample service options:', serviceOptions.slice(0, 3).map(o => o.label));
         }
+        if (customerTagOptions.length > 0) {
+          console.log('📊 Sample customer tag options:', customerTagOptions.slice(0, 3).map(o => o.label));
+        }
       } catch (error) {
         console.error('Error loading hierarchy options:', error);
       }
+    }
+
+    const TEMPLATE_TYPE_LABELS = {
+      district: 'District',
+      region: 'Region',
+      subsidiary: 'Subsidiary',
+      customer_tag: 'Customer Tag'
+    };
+
+    function getTemplateTypeLabel(type) {
+      return TEMPLATE_TYPE_LABELS[type] || '—';
+    }
+
+    function getScheduleEntitySelection(schedule) {
+      if (schedule.template_type === 'district' && schedule.district_id) {
+        return {
+          entityId: schedule.district_id,
+          entityName: schedule.district_name || 'District',
+          entityLabel: 'District'
+        };
+      }
+
+      if (schedule.template_type === 'region' && schedule.region_id) {
+        return {
+          entityId: schedule.region_id,
+          entityName: schedule.region_name || 'Region',
+          entityLabel: 'Region'
+        };
+      }
+
+      if (schedule.template_type === 'subsidiary' && schedule.subsidiary_id) {
+        return {
+          entityId: schedule.subsidiary_id,
+          entityName: schedule.subsidiary_name || 'Subsidiary',
+          entityLabel: 'Subsidiary'
+        };
+      }
+
+      if (schedule.template_type === 'customer_tag' && schedule.customer_tag_id) {
+        return {
+          entityId: schedule.customer_tag_id,
+          entityName: schedule.customer_tag_name || 'Customer Tag',
+          entityLabel: 'Customer Tag'
+        };
+      }
+
+      return null;
+    }
+
+    function getScheduleEntityDisplay(schedule) {
+      if (schedule.template_type === 'district') {
+        const parts = [];
+        if (schedule.district_name) parts.push(schedule.district_name);
+        if (schedule.subsidiary_name) parts.push(schedule.subsidiary_name);
+        return {
+          entityDisplay: parts.length > 0 ? parts.join(' / ') : '—',
+          entityTooltip: parts.length === 2
+            ? `District: ${schedule.district_name}, Subsidiary: ${schedule.subsidiary_name}`
+            : (schedule.district_name ? `District: ${schedule.district_name}` : (schedule.subsidiary_name ? `Subsidiary: ${schedule.subsidiary_name}` : ''))
+        };
+      }
+
+      if (schedule.template_type === 'region') {
+        const parts = [];
+        if (schedule.region_name) parts.push(schedule.region_name);
+        if (schedule.subsidiary_name) parts.push(schedule.subsidiary_name);
+        return {
+          entityDisplay: parts.length > 0 ? parts.join(' / ') : '—',
+          entityTooltip: parts.length === 2
+            ? `Region: ${schedule.region_name}, Subsidiary: ${schedule.subsidiary_name}`
+            : (schedule.region_name ? `Region: ${schedule.region_name}` : (schedule.subsidiary_name ? `Subsidiary: ${schedule.subsidiary_name}` : ''))
+        };
+      }
+
+      if (schedule.template_type === 'subsidiary' && schedule.subsidiary_name) {
+        return {
+          entityDisplay: schedule.subsidiary_name,
+          entityTooltip: `Subsidiary: ${schedule.subsidiary_name}`
+        };
+      }
+
+      if (schedule.template_type === 'customer_tag' && schedule.customer_tag_name) {
+        return {
+          entityDisplay: schedule.customer_tag_name,
+          entityTooltip: `Customer Tag: ${schedule.customer_tag_name}`
+        };
+      }
+
+      return {
+        entityDisplay: '—',
+        entityTooltip: ''
+      };
     }
 
 
@@ -2506,33 +2626,7 @@
       }
 
       tbody.innerHTML = schedulesToRender.map(schedule => {
-        // Get entity display based on type - show region+subsidiary when applicable
-        let entityDisplay = '—';
-        let entityTooltip = '';
-        if (schedule.template_type === 'district') {
-          const parts = [];
-          if (schedule.district_name) parts.push(schedule.district_name);
-          if (schedule.subsidiary_name) parts.push(schedule.subsidiary_name);
-          if (parts.length > 0) {
-            entityDisplay = parts.join(' / ');
-            entityTooltip = parts.length === 2
-              ? `District: ${schedule.district_name}, Subsidiary: ${schedule.subsidiary_name}`
-              : (schedule.district_name ? `District: ${schedule.district_name}` : `Subsidiary: ${schedule.subsidiary_name}`);
-          }
-        } else if (schedule.template_type === 'region') {
-          const parts = [];
-          if (schedule.region_name) parts.push(schedule.region_name);
-          if (schedule.subsidiary_name) parts.push(schedule.subsidiary_name);
-          if (parts.length > 0) {
-            entityDisplay = parts.join(' / ');
-            entityTooltip = parts.length === 2
-              ? `Region: ${schedule.region_name}, Subsidiary: ${schedule.subsidiary_name}`
-              : (schedule.region_name ? `Region: ${schedule.region_name}` : `Subsidiary: ${schedule.subsidiary_name}`);
-          }
-        } else if (schedule.template_type === 'subsidiary' && schedule.subsidiary_name) {
-          entityDisplay = schedule.subsidiary_name;
-          entityTooltip = `Subsidiary: ${schedule.subsidiary_name}`;
-        }
+        const { entityDisplay, entityTooltip } = getScheduleEntityDisplay(schedule);
 
         // Get email group names
         const groupNames = getScheduleEmailGroupNames(schedule);
@@ -2563,7 +2657,7 @@
               ${tagsDisplay}
             </td>
             <td>
-              <span class="type-badge ${schedule.template_type || ''}">${schedule.template_type ? (schedule.template_type.charAt(0).toUpperCase() + schedule.template_type.slice(1)) : '—'}</span>
+              <span class="type-badge ${schedule.template_type || ''}">${getTemplateTypeLabel(schedule.template_type)}</span>
             </td>
             <td>
               ${processBadge}
@@ -2659,7 +2753,8 @@
           const entityMatch =
             (schedule.district_name || '').toLowerCase().includes(entityFilter) ||
             (schedule.region_name || '').toLowerCase().includes(entityFilter) ||
-            (schedule.subsidiary_name || '').toLowerCase().includes(entityFilter);
+            (schedule.subsidiary_name || '').toLowerCase().includes(entityFilter) ||
+            (schedule.customer_tag_name || '').toLowerCase().includes(entityFilter);
           if (!entityMatch) return false;
         }
 
@@ -3311,6 +3406,7 @@
       populateEntityDropdowns();
       document.getElementById('editDistrictId').value = schedule.district_id || '';
       document.getElementById('editRegionId').value = schedule.region_id || '';
+      document.getElementById('editCustomerTagId').value = schedule.customer_tag_id || '';
       document.getElementById('editSubsidiaryId').value = schedule.subsidiary_id || '';
       document.getElementById('editServiceFilterId').value = schedule.service_filter_id || '';
       document.getElementById('editHeaderSubsidiaryId').value = schedule.header_subsidiary_id || '';
@@ -3346,6 +3442,7 @@
       populateEntityDropdowns();
       document.getElementById('editDistrictId').value = '';
       document.getElementById('editRegionId').value = '';
+      document.getElementById('editCustomerTagId').value = '';
       document.getElementById('editSubsidiaryId').value = '';
       document.getElementById('editServiceFilterId').value = '';
       document.getElementById('editHeaderSubsidiaryId').value = '';
@@ -3371,11 +3468,15 @@
       }
       const serviceFilterInput = document.getElementById('editServiceFilterId');
       const headerInput = document.getElementById('editHeaderSubsidiaryId');
+      const customerTagInput = document.getElementById('editCustomerTagId');
       if (serviceFilterInput) {
         serviceFilterInput.value = '';
       }
       if (headerInput) {
         headerInput.value = '';
+      }
+      if (customerTagInput) {
+        customerTagInput.value = '';
       }
       isScheduleTagInputFocused = false;
       isScheduleTagPickerOpen = false;
@@ -3440,6 +3541,11 @@
         'Select region...'
       );
       populateSelectOptions(
+        document.getElementById('editCustomerTagId'),
+        customerTagOptions,
+        'Select customer tag...'
+      );
+      populateSelectOptions(
         document.getElementById('editSubsidiaryId'),
         subsidiaryOptions,
         templateType === 'subsidiary' ? 'Select subsidiary...' : 'No subsidiary filter'
@@ -3463,12 +3569,14 @@
 
       const districtSelect = document.getElementById('editDistrictId');
       const regionSelect = document.getElementById('editRegionId');
+      const customerTagSelect = document.getElementById('editCustomerTagId');
       const subsidiarySelect = document.getElementById('editSubsidiaryId');
       const serviceFilterSelect = document.getElementById('editServiceFilterId');
       const headerSubsidiarySelect = document.getElementById('editHeaderSubsidiaryId');
 
       const districtGroup = document.getElementById('editDistrictGroup');
       const regionGroup = document.getElementById('editRegionGroup');
+      const customerTagGroup = document.getElementById('editCustomerTagGroup');
       const subsidiaryGroup = document.getElementById('editSubsidiaryGroup');
       const serviceFilterGroup = document.getElementById('editServiceFilterGroup');
       const headerSubsidiaryGroup = document.getElementById('editHeaderSubsidiaryGroup');
@@ -3481,21 +3589,25 @@
       const isDistrict = type === 'district';
       const isRegion = type === 'region';
       const isSubsidiary = type === 'subsidiary';
+      const isCustomerTag = type === 'customer_tag';
 
       districtGroup.style.display = isDistrict ? 'block' : 'none';
       regionGroup.style.display = isRegion ? 'block' : 'none';
-      subsidiaryGroup.style.display = type ? 'block' : 'none';
+      customerTagGroup.style.display = isCustomerTag ? 'block' : 'none';
+      subsidiaryGroup.style.display = (isDistrict || isRegion || isSubsidiary) ? 'block' : 'none';
       serviceFilterGroup.style.display = isSubsidiary ? 'block' : 'none';
       headerSubsidiaryGroup.style.display = type ? 'block' : 'none';
 
       districtSelect.disabled = !isDistrict;
       regionSelect.disabled = !isRegion;
-      subsidiarySelect.disabled = !type;
+      customerTagSelect.disabled = !isCustomerTag;
+      subsidiarySelect.disabled = !(isDistrict || isRegion || isSubsidiary);
       serviceFilterSelect.disabled = !isSubsidiary;
       headerSubsidiarySelect.disabled = !type;
 
       districtSelect.required = isDistrict;
       regionSelect.required = isRegion;
+      customerTagSelect.required = isCustomerTag;
       subsidiarySelect.required = isSubsidiary;
       headerSubsidiarySelect.required = Boolean(type);
 
@@ -3513,8 +3625,12 @@
       if (!preserveSelections) {
         if (!isDistrict) districtSelect.value = '';
         if (!isRegion) regionSelect.value = '';
+        if (!isCustomerTag) customerTagSelect.value = '';
         if (!isSubsidiary) serviceFilterSelect.value = '';
         if ((previousType === 'subsidiary') !== isSubsidiary) {
+          subsidiarySelect.value = '';
+        }
+        if (!(isDistrict || isRegion || isSubsidiary)) {
           subsidiarySelect.value = '';
         }
         if (!type) {
@@ -3586,6 +3702,7 @@
       const process = getScheduleProcessValue(rawProcess);
       const districtSelect = document.getElementById('editDistrictId');
       const regionSelect = document.getElementById('editRegionId');
+      const customerTagSelect = document.getElementById('editCustomerTagId');
       const subsidiarySelect = document.getElementById('editSubsidiaryId');
       const serviceFilterSelect = document.getElementById('editServiceFilterId');
       const headerSubsidiarySelect = document.getElementById('editHeaderSubsidiaryId');
@@ -3607,6 +3724,7 @@
       let districtId = null, districtName = null;
       let regionId = null, regionName = null;
       let subsidiaryId = null, subsidiaryName = null;
+      let customerTagId = null, customerTagName = null;
       let serviceFilterId = null, serviceFilterName = null;
       let headerSubsidiaryId = null, headerSubsidiaryName = null;
 
@@ -3644,6 +3762,12 @@
           const opt = getOptionById(serviceOptions, serviceFilterId);
           serviceFilterName = opt ? opt.label : null;
         }
+      } else if (templateType === 'customer_tag') {
+        customerTagId = customerTagSelect.value || null;
+        if (customerTagId) {
+          const opt = getOptionById(customerTagOptions, customerTagId);
+          customerTagName = opt ? opt.label : null;
+        }
       }
 
       headerSubsidiaryId = headerSubsidiarySelect.value || null;
@@ -3662,6 +3786,10 @@
       }
       if (templateType === 'subsidiary' && !subsidiaryId) {
         alert('Please select a subsidiary');
+        return;
+      }
+      if (templateType === 'customer_tag' && !customerTagId) {
+        alert('Please select a customer tag');
         return;
       }
       if (!headerSubsidiaryId) {
@@ -3684,6 +3812,8 @@
         region_name: regionName,
         subsidiary_id: subsidiaryId,
         subsidiary_name: subsidiaryName,
+        customer_tag_id: customerTagId,
+        customer_tag_name: customerTagName,
         email_group_ids: modalEmailGroupIds,
         enabled: currentEditingSchedule ? currentEditingSchedule.enabled !== false : true
       };
@@ -3734,6 +3864,8 @@
         district_id: null,
         region_id: null,
         subsidiary_id: null,
+        customer_tag_id: null,
+        customer_tag_name: null,
         email_group_id: null,
         enabled: true
       };
@@ -3778,6 +3910,9 @@
       } else if (fieldName === 'subsidiary_id') {
         const option = subsidiaryOptions.find(o => o.id === value);
         changes.subsidiary_name = option ? option.label : null;
+      } else if (fieldName === 'customer_tag_id') {
+        const option = customerTagOptions.find(o => o.id === value);
+        changes.customer_tag_name = option ? option.label : null;
       }
 
       // Mark row as changed
@@ -4068,6 +4203,8 @@
         region_name: null,
         subsidiary_id: null,
         subsidiary_name: null,
+        customer_tag_id: null,
+        customer_tag_name: null,
         email_group_ids: [],
         enabled: true,
         created_at: new Date(),
@@ -4229,7 +4366,7 @@
 
       // Validate that required fields are set
       if (!schedule.template_type) {
-        alert('Please select a Template Type (District, Region, or Subsidiary)');
+        alert('Please select a Template Type (District, Region, Subsidiary, or Customer Tag)');
         return;
       }
 
@@ -4238,18 +4375,12 @@
         return;
       }
 
-      // Get entity info for display
-      let entityName;
-      if (schedule.template_type === 'district' && schedule.district_id) {
-        entityName = schedule.district_name || 'District';
-      } else if (schedule.template_type === 'region' && schedule.region_id) {
-        entityName = schedule.region_name || 'Region';
-      } else if (schedule.template_type === 'subsidiary' && schedule.subsidiary_id) {
-        entityName = schedule.subsidiary_name || 'Subsidiary';
-      } else {
-        alert(`Please select a ${schedule.template_type} before downloading`);
+      const entitySelection = getScheduleEntitySelection(schedule);
+      if (!entitySelection) {
+        alert(`Please select a ${getTemplateTypeLabel(schedule.template_type)} before downloading`);
         return;
       }
+      const { entityName } = entitySelection;
 
       currentScheduleForDownload = scheduleId;
 
@@ -4270,7 +4401,7 @@
       }
 
       const detailParts = [
-        schedule.template_type,
+        getTemplateTypeLabel(schedule.template_type),
         entityName,
         getScheduleProcessValue(schedule.process)
       ];
@@ -4320,21 +4451,12 @@
         return;
       }
 
-      // Get entity ID based on template type
-      let entityId, entityName;
-      if (schedule.template_type === 'district' && schedule.district_id) {
-        entityId = schedule.district_id;
-        entityName = schedule.district_name || 'District';
-      } else if (schedule.template_type === 'region' && schedule.region_id) {
-        entityId = schedule.region_id;
-        entityName = schedule.region_name || 'Region';
-      } else if (schedule.template_type === 'subsidiary' && schedule.subsidiary_id) {
-        entityId = schedule.subsidiary_id;
-        entityName = schedule.subsidiary_name || 'Subsidiary';
-      } else {
-        alert(`Please select a ${schedule.template_type} before downloading`);
+      const entitySelection = getScheduleEntitySelection(schedule);
+      if (!entitySelection) {
+        alert(`Please select a ${getTemplateTypeLabel(schedule.template_type)} before downloading`);
         return;
       }
+      const { entityId, entityName } = entitySelection;
 
       const latestDate = reportDate;
 
@@ -4643,7 +4765,7 @@
 
       // Validate that required fields are set
       if (!schedule.template_type) {
-        alert('Please select a Template Type (District, Region, or Subsidiary)');
+        alert('Please select a Template Type (District, Region, Subsidiary, or Customer Tag)');
         return;
       }
 
@@ -4652,21 +4774,12 @@
         return;
       }
 
-      // Get entity ID based on template type
-      let entityId, entityName;
-      if (schedule.template_type === 'district' && schedule.district_id) {
-        entityId = schedule.district_id;
-        entityName = schedule.district_name || 'District';
-      } else if (schedule.template_type === 'region' && schedule.region_id) {
-        entityId = schedule.region_id;
-        entityName = schedule.region_name || 'Region';
-      } else if (schedule.template_type === 'subsidiary' && schedule.subsidiary_id) {
-        entityId = schedule.subsidiary_id;
-        entityName = schedule.subsidiary_name || 'Subsidiary';
-      } else {
-        alert(`Please select a ${schedule.template_type} before sending email`);
+      const entitySelection = getScheduleEntitySelection(schedule);
+      if (!entitySelection) {
+        alert(`Please select a ${getTemplateTypeLabel(schedule.template_type)} before sending email`);
         return;
       }
+      const { entityId, entityName } = entitySelection;
 
       try {
         console.log('📧 Starting email send for schedule:', schedule.template_name);
@@ -4753,7 +4866,7 @@
 
       // Validate required fields
       if (!schedule.template_type) {
-        alert('Please select a Template Type (District, Region, or Subsidiary)');
+        alert('Please select a Template Type (District, Region, Subsidiary, or Customer Tag)');
         return;
       }
 
@@ -4762,21 +4875,12 @@
         return;
       }
 
-      // Get entity ID based on template type
-      let entityId, entityName;
-      if (schedule.template_type === 'district' && schedule.district_id) {
-        entityId = schedule.district_id;
-        entityName = schedule.district_name || 'District';
-      } else if (schedule.template_type === 'region' && schedule.region_id) {
-        entityId = schedule.region_id;
-        entityName = schedule.region_name || 'Region';
-      } else if (schedule.template_type === 'subsidiary' && schedule.subsidiary_id) {
-        entityId = schedule.subsidiary_id;
-        entityName = schedule.subsidiary_name || 'Subsidiary';
-      } else {
-        alert(`Please select a ${schedule.template_type} before sending email`);
+      const entitySelection = getScheduleEntitySelection(schedule);
+      if (!entitySelection) {
+        alert(`Please select a ${getTemplateTypeLabel(schedule.template_type)} before sending email`);
         return;
       }
+      const { entityId, entityName } = entitySelection;
 
       try {
         console.log('📧 Starting email send to all groups for schedule:', schedule.template_name);
@@ -5300,18 +5404,32 @@
     function formatDate(dateString) {
       if (!dateString) return '-';
       const date = new Date(dateString);
+      if (Number.isNaN(date.getTime())) return '-';
 
-      // Format: Jan 23rd 3:45pm EST
-      const month = date.toLocaleDateString('en-US', { month: 'short' });
-      const day = date.getDate();
+      const browserTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+      const month = new Intl.DateTimeFormat('en-US', {
+        month: 'short',
+        timeZone: browserTimeZone
+      }).format(date);
+      const day = parseInt(new Intl.DateTimeFormat('en-US', {
+        day: 'numeric',
+        timeZone: browserTimeZone
+      }).format(date), 10);
       const ordinal = getOrdinalSuffix(day);
+      const timeParts = new Intl.DateTimeFormat('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+        timeZone: browserTimeZone,
+        timeZoneName: 'short'
+      }).formatToParts(date);
 
-      let hours = date.getHours();
-      const minutes = date.getMinutes().toString().padStart(2, '0');
-      const ampm = hours >= 12 ? 'pm' : 'am';
-      hours = hours % 12 || 12;
+      const hour = timeParts.find(part => part.type === 'hour')?.value || '';
+      const minute = timeParts.find(part => part.type === 'minute')?.value || '00';
+      const dayPeriod = (timeParts.find(part => part.type === 'dayPeriod')?.value || '').toLowerCase();
+      const timeZoneName = timeParts.find(part => part.type === 'timeZoneName')?.value || browserTimeZone;
 
-      return `${month} ${day}${ordinal} ${hours}:${minutes}${ampm} EST`;
+      return `${month} ${day}${ordinal} ${hour}:${minute}${dayPeriod} ${timeZoneName}`;
     }
   </script>
 </body>

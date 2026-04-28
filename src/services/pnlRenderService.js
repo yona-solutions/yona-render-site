@@ -155,6 +155,7 @@ function generateHeader(meta) {
     if (typeLabel === 'Region') return 'Region';
     if (typeLabel === 'District' || typeLabel === 'District Tag') return 'District';
     if (typeLabel === 'Subsidiary' || typeLabel === 'Subsidiary Tag') return 'Entity';
+    if (typeLabel === 'Customer Tag') return 'Customer Tag';
     return typeLabel || 'Report';
   })();
   
@@ -292,6 +293,26 @@ function generateHeader(meta) {
       <div class="pnl-report-header" style="text-align:center; margin-bottom:10px">
         <div class="pnl-title" style="font-weight:700">${escapeHtml(entityName)}</div>
         ${buildRow([organization, parentRegion], { bold: true, className: 'pnl-header-row-secondary' })}
+        ${buildRow([
+          formattedMonth,
+          resolvedAccountCount != null ? `Accounts: ${resolvedAccountCount}` : '',
+          `Report Type: ${resolvedReportType}`
+        ])}
+        ${buildRow(
+          [
+            `Census: ${actualCensus != null ? formatDecimal(actualCensus) : ''}`,
+            `Budget Census: ${budgetCensus != null ? formatDecimal(budgetCensus) : ''}`,
+            `Headcount: ${headcount != null ? formatInteger(headcount) : ''}`
+          ],
+          { italic: true }
+        )}
+      </div>
+    `;
+  } else if (typeLabel === 'Customer Tag') {
+    return `
+      <div class="pnl-report-header" style="text-align:center; margin-bottom:10px">
+        <div class="pnl-title" style="font-weight:700">${escapeHtml(entityName)}</div>
+        ${buildRow([organization], { bold: true, className: 'pnl-header-row-secondary' })}
         ${buildRow([
           formattedMonth,
           resolvedAccountCount != null ? `Accounts: ${resolvedAccountCount}` : '',
@@ -467,7 +488,7 @@ async function generatePNLReport(monthData, ytdData, meta, accountConfig, childr
   const revenueYtd = valYtdAct['Income'] || 0;
 
   // Facilities, districts, and regions are included only when they have non-zero net income.
-  if (['Facility', 'District', 'District Tag', 'Region'].includes(meta.typeLabel)) {
+  if (['Facility', 'District', 'District Tag', 'Customer Tag', 'Region'].includes(meta.typeLabel)) {
     if (Math.abs(netIncomeMonth) < epsilon && Math.abs(netIncomeYtd) < epsilon) {
       return { noRevenue: true, html: '' };
     }
