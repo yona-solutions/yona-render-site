@@ -1441,7 +1441,7 @@
     .schedule-progress-head-stages,
     .schedule-progress-row-stages {
       display: grid;
-      grid-template-columns: 68px 68px 76px;
+      grid-template-columns: 96px 96px 76px;
       gap: 10px;
       align-items: center;
       justify-items: center;
@@ -1455,6 +1455,11 @@
       letter-spacing: 0.04em;
       text-transform: uppercase;
       color: #718096;
+      white-space: nowrap;
+    }
+
+    .schedule-progress-head-stages span {
+      white-space: nowrap;
     }
 
     .schedule-progress-row-main {
@@ -1572,7 +1577,7 @@
 
   <!-- Scheduler Progress Modal -->
   <div id="schedulerProgressModal" class="loading-modal">
-    <div class="loading-content" style="max-width: 700px; max-height: 80vh; overflow-y: auto;">
+    <div class="loading-content" style="max-width: 820px; width: min(90vw, 820px); max-height: 80vh; overflow-y: auto;">
       <div class="loading-spinner" id="schedulerSpinner"></div>
       <div class="loading-message" id="schedulerTitle" style="font-size: 18px; margin-bottom: 8px;">⚙️ Running Reports...</div>
       <div id="schedulerMetaText" style="color: #718096; font-size: 13px; text-align: center; margin-bottom: 20px;">
@@ -2944,13 +2949,23 @@
     }
 
     function getBatchItemProgress(item) {
+      if (!item?.result_payload || typeof item.result_payload !== 'object') {
+        return {};
+      }
+
+      return item.result_payload.progress && typeof item.result_payload.progress === 'object'
+        ? item.result_payload.progress
+        : item.result_payload;
+    }
+
+    function getBatchItemResultPayload(item) {
       return item?.result_payload && typeof item.result_payload === 'object'
         ? item.result_payload
         : {};
     }
 
     function getNormalizedBatchItemStatus(item) {
-      const payloadStatus = getBatchItemProgress(item)?.status;
+      const payloadStatus = getBatchItemProgress(item)?.status || getBatchItemResultPayload(item)?.status;
       if (['queued', 'running', 'success', 'partial', 'skipped', 'failed'].includes(payloadStatus)) {
         return payloadStatus;
       }
@@ -5149,7 +5164,8 @@
       });
 
       const metrics = getBatchDisplayMetrics(batchRun);
-      const displayStatus = batchRun.status === 'completed' && metrics.schedulesWithIssues > 0
+      const hasCompletedWorkWithIssues = metrics.schedulesWithIssues > 0 && (metrics.pdfsGenerated > 0 || metrics.emailsDelivered > 0);
+      const displayStatus = (batchRun.status === 'completed' && metrics.schedulesWithIssues > 0) || (batchRun.status === 'failed' && hasCompletedWorkWithIssues)
         ? 'partial'
         : batchRun.status;
 
