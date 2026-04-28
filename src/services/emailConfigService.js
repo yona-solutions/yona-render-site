@@ -570,33 +570,47 @@ class EmailConfigService {
   }
 
   /**
-   * Update schedule send timestamps
+   * Update schedule run metadata
    * @param {number} id - Schedule ID
-   * @param {Date} lastSentAt - When the schedule was last sent
-   * @param {Date} nextSendAt - When the schedule should next be sent (null to keep existing)
-   * @param {string} triggerType - 'manual' or 'scheduled' to update the appropriate last_run column
+   * @param {Object} data - Timestamp data to persist
+   * @param {Date} data.lastRunAt - When the schedule last ran
+   * @param {Date|null} data.lastSentAt - When the schedule last successfully delivered email
+   * @param {Date|undefined|null} data.nextSendAt - Next scheduled run timestamp (legacy scheduler support)
    */
-  async updateScheduleSendTimestamps(id, lastSentAt, nextSendAt, triggerType = 'scheduled') {
+  async updateScheduleRunTimestamps(id, { lastRunAt, lastSentAt = null, nextSendAt = undefined } = {}) {
     if (!this.isAvailable()) {
       throw new Error('Database not initialized');
     }
 
-    // Determine which column to update based on trigger type
-    const lastRunColumn = triggerType === 'manual' ? 'last_run_manual' : 'last_run_automated';
-
     const query = `
       UPDATE report_schedules
       SET
-        last_sent_at = $1,
-        next_send_at = COALESCE($2, next_send_at),
-        ${lastRunColumn} = $1,
+        last_run_at = COALESCE($1, last_run_at),
+        last_sent_at = COALESCE($2, last_sent_at),
+        next_send_at = COALESCE($3, next_send_at),
         updated_at = CURRENT_TIMESTAMP
-      WHERE id = $3
+      WHERE id = $4
       RETURNING *
     `;
 
-    const result = await this.pool.query(query, [lastSentAt, nextSendAt, id]);
+    const result = await this.pool.query(query, [
+      lastRunAt || null,
+      lastSentAt,
+      nextSendAt === undefined ? null : nextSendAt,
+      id
+    ]);
     return result.rows[0];
+  }
+
+  /**
+   * Backwards-compatible wrapper for older send timestamp callers.
+   */
+  async updateScheduleSendTimestamps(id, lastSentAt, nextSendAt) {
+    return this.updateScheduleRunTimestamps(id, {
+      lastRunAt: lastSentAt,
+      lastSentAt,
+      nextSendAt
+    });
   }
 
   /**

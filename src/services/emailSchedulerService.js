@@ -83,6 +83,7 @@ class EmailSchedulerService {
   getStats() {
     return {
       ...this.stats,
+      schedulerEnabled: process.env.EMAIL_SCHEDULER_ENABLED === 'true',
       isRunning: this.isRunning,
       lastRunTime: this.lastRunTime,
       nextRunTime: this.isRunning ? this.getNextRunTime() : null
@@ -449,7 +450,11 @@ class EmailSchedulerService {
       const now = new Date();
       const nextSendAt = this.calculateNextSendTime(schedule, now);
 
-      await emailConfigService.updateScheduleSendTimestamps(schedule.id, now, nextSendAt, triggerType);
+      await emailConfigService.updateScheduleRunTimestamps(schedule.id, {
+        lastRunAt: now,
+        lastSentAt: now,
+        nextSendAt
+      });
 
     } catch (error) {
       console.error('Error updating schedule timestamps:', error);

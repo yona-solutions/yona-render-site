@@ -11,6 +11,7 @@ const emailService = require('../services/emailService');
 const emailSchedulerService = require('../services/emailSchedulerService');
 const reportBatchTaskService = require('../services/reportBatchTaskService');
 const scheduleReportService = require('../services/scheduleReportService');
+const pnlPdfServer = require('../utils/pnlPdfServer');
 
 // Store reference to bigQueryService instance (set via createEmailConfigRoutes)
 let bigQueryServiceInstance = null;
@@ -87,6 +88,63 @@ function normalizeScheduleTags(tags) {
 
 function normalizeBatchMode(mode) {
   return String(mode || '').trim().toLowerCase() === 'generate' ? 'generate' : 'send';
+}
+
+function createInitialBatchProgressPayload({
+  scheduleId = null,
+  scheduleName = '',
+  mode = 'send',
+  reportDate = null,
+  emailGroupIds = [],
+  recipientCount = 0
+} = {}) {
+  return {
+    scheduleId,
+    scheduleName,
+    mode,
+    reportDate: scheduleReportService.normalizeReportDateValue(reportDate),
+    emailGroupIds,
+    recipientCount,
+    recipientResults: [],
+    currentStep: 'validate',
+    status: 'queued',
+    steps: {
+      validate: { status: 'pending', detail: '' },
+      fetch_data: { status: 'pending', detail: '' },
+      generate_pdf: { status: 'pending', detail: '' },
+      send_email: { status: mode === 'generate' ? 'skipped' : 'pending', detail: mode === 'generate' ? 'Generate only run' : '' }
+    }
+  };
+}
+
+function mergeBatchProgressPayload(currentPayload, patch = {}) {
+  const merged = {
+    ...(currentPayload || {}),
+    ...patch
+  };
+
+  merged.steps = {
+    ...((currentPayload && currentPayload.steps) || {}),
+    ...(patch.steps || {})
+  };
+
+  if (patch.recipientResults !== undefined) {
+    merged.recipientResults = patch.recipientResults;
+  } else if (currentPayload?.recipientResults) {
+    merged.recipientResults = currentPayload.recipientResults;
+  } else {
+    merged.recipientResults = [];
+  }
+
+  if (patch.emailGroupIds !== undefined) {
+    merged.emailGroupIds = patch.emailGroupIds;
+  } else if (currentPayload?.emailGroupIds) {
+    merged.emailGroupIds = currentPayload.emailGroupIds;
+  } else {
+    merged.emailGroupIds = [];
+  }
+
+  return merged;
 }
 
 // ============================================
@@ -778,6 +836,7 @@ router.post('/report-schedules/:id/send-email', async (req, res) => {
 
       // Log the test run
       if (emailConfigService.isAvailable()) {
+        const completedAt = new Date();
         await emailConfigService.createRunLog({
           schedule_id: schedule.id,
           template_name: schedule.template_name,
@@ -794,9 +853,11 @@ router.post('/report-schedules/:id/send-email', async (req, res) => {
           pdf_size_bytes: pdfBuffer.length
         });
 
-        // Update last_run_manual timestamp
-        await emailConfigService.updateScheduleSendTimestamps(schedule.id, new Date(), null, 'manual');
-        console.log(`   Updated last_run_manual timestamp`);
+        await emailConfigService.updateScheduleRunTimestamps(schedule.id, {
+          lastRunAt: completedAt,
+          lastSentAt: completedAt
+        });
+        console.log('   Updated last_run_at timestamp');
       }
 
       res.json({
@@ -811,6 +872,7 @@ router.post('/report-schedules/:id/send-email', async (req, res) => {
 
       // Log the failed test run
       if (emailConfigService.isAvailable()) {
+        const completedAt = new Date();
         await emailConfigService.createRunLog({
           schedule_id: schedule.id,
           template_name: schedule.template_name,
@@ -826,6 +888,10 @@ router.post('/report-schedules/:id/send-email', async (req, res) => {
           recipient_emails: [recipientEmail],
           trigger_type: 'test',
           pdf_size_bytes: pdfBuffer.length
+        });
+
+        await emailConfigService.updateScheduleRunTimestamps(schedule.id, {
+          lastRunAt: completedAt
         });
       }
 
@@ -965,6 +1031,7 @@ router.post('/report-schedules/:id/send-to-groups', async (req, res) => {
 
     // Log the run
     if (emailConfigService.isAvailable()) {
+      const completedAt = new Date();
       await emailConfigService.createRunLog({
         schedule_id: parseInt(id),
         template_name: schedule.template_name,
@@ -983,9 +1050,11 @@ router.post('/report-schedules/:id/send-to-groups', async (req, res) => {
         duration_ms: duration
       });
 
-      // Update last_run_manual timestamp
-      await emailConfigService.updateScheduleSendTimestamps(schedule.id, new Date(), null, 'manual');
-      console.log(`   Updated last_run_manual timestamp`);
+      await emailConfigService.updateScheduleRunTimestamps(schedule.id, {
+        lastRunAt: completedAt,
+        lastSentAt: emailsSent > 0 ? completedAt : null
+      });
+      console.log('   Updated last_run_at timestamp');
     }
 
     res.json({
@@ -1020,9 +1089,28 @@ router.post('/report-schedules/:id/send-to-groups', async (req, res) => {
 router.post('/report-schedules/:id/process', requireApiKey, async (req, res) => {
   const startTime = Date.now();
   const { id } = req.params;
-  const { triggerType = 'scheduled', reportDate, mode = 'send' } = req.body;
+  const {
+    triggerType = 'scheduled',
+    reportDate,
+    mode = 'send',
+    batchItemId: rawBatchItemId
+  } = req.body;
+  const normalizedMode = normalizeBatchMode(mode);
+  const batchItemId = rawBatchItemId ? parseInt(rawBatchItemId) : null;
+  let batchProgress = null;
 
-  console.log(`\n📧 Processing schedule ${id} (trigger: ${triggerType}, mode: ${mode})`);
+  const persistBatchProgress = async (patch = {}) => {
+    if (!batchItemId || !emailConfigService.isAvailable()) {
+      return;
+    }
+
+    batchProgress = mergeBatchProgressPayload(batchProgress, patch);
+    await emailConfigService.updateReportBatchRunItem(batchItemId, {
+      result_payload: batchProgress
+    });
+  };
+
+  console.log(`\n📧 Processing schedule ${id} (trigger: ${triggerType}, mode: ${normalizedMode})`);
 
   try {
     // Get report schedule
@@ -1041,8 +1129,35 @@ router.post('/report-schedules/:id/process', requireApiKey, async (req, res) => 
       });
     }
 
+    batchProgress = createInitialBatchProgressPayload({
+      scheduleId: parseInt(id),
+      scheduleName: schedule.template_name,
+      mode: normalizedMode,
+      reportDate
+    });
+
+    await persistBatchProgress({
+      status: 'running',
+      currentStep: 'validate',
+      steps: {
+        validate: {
+          status: 'running',
+          detail: 'Checking schedule configuration'
+        }
+      }
+    });
+
     // Check if schedule is enabled
     if (schedule.enabled === false) {
+      await persistBatchProgress({
+        status: 'skipped',
+        steps: {
+          validate: {
+            status: 'failed',
+            detail: 'Schedule is disabled'
+          }
+        }
+      });
       return res.status(400).json({
         error: 'Schedule is disabled',
         scheduleId: parseInt(id),
@@ -1054,6 +1169,15 @@ router.post('/report-schedules/:id/process', requireApiKey, async (req, res) => 
 
     // Validate schedule configuration
     if (!schedule.template_type) {
+      await persistBatchProgress({
+        status: 'skipped',
+        steps: {
+          validate: {
+            status: 'failed',
+            detail: 'Template type is required'
+          }
+        }
+      });
       return res.status(400).json({
         error: 'Invalid schedule configuration',
         message: 'Template type is required',
@@ -1065,6 +1189,15 @@ router.post('/report-schedules/:id/process', requireApiKey, async (req, res) => 
     }
 
     if (!schedule.process) {
+      await persistBatchProgress({
+        status: 'skipped',
+        steps: {
+          validate: {
+            status: 'failed',
+            detail: 'Process is required'
+          }
+        }
+      });
       return res.status(400).json({
         error: 'Invalid schedule configuration',
         message: 'Process (standard/operational) is required',
@@ -1080,6 +1213,15 @@ router.post('/report-schedules/:id/process', requireApiKey, async (req, res) => 
     try {
       ({ entityId, entityName } = scheduleReportService.getScheduleEntity(schedule));
     } catch (error) {
+      await persistBatchProgress({
+        status: 'skipped',
+        steps: {
+          validate: {
+            status: 'failed',
+            detail: error.message
+          }
+        }
+      });
       return res.status(400).json({
         error: 'Invalid schedule configuration',
         message: error.message,
@@ -1092,7 +1234,17 @@ router.post('/report-schedules/:id/process', requireApiKey, async (req, res) => 
 
     const emailGroupIds = scheduleReportService.getScheduleEmailGroupIds(schedule);
 
-    if (mode === 'send' && emailGroupIds.length === 0) {
+    if (normalizedMode === 'send' && emailGroupIds.length === 0) {
+      await persistBatchProgress({
+        status: 'skipped',
+        emailGroupIds,
+        steps: {
+          validate: {
+            status: 'failed',
+            detail: 'No email groups assigned'
+          }
+        }
+      });
       return res.status(400).json({
         error: 'No email groups assigned',
         scheduleId: parseInt(id),
@@ -1102,7 +1254,17 @@ router.post('/report-schedules/:id/process', requireApiKey, async (req, res) => 
       });
     }
 
-    if (mode === 'send' && !emailService.isAvailable()) {
+    if (normalizedMode === 'send' && !emailService.isAvailable()) {
+      await persistBatchProgress({
+        status: 'failed',
+        emailGroupIds,
+        steps: {
+          validate: {
+            status: 'failed',
+            detail: 'Email service is not configured'
+          }
+        }
+      });
       return res.status(503).json({
         error: 'Email service not configured',
         message: 'SendGrid API key not configured',
@@ -1112,11 +1274,22 @@ router.post('/report-schedules/:id/process', requireApiKey, async (req, res) => 
       });
     }
 
-    const recipientList = mode === 'send'
+    const recipientList = normalizedMode === 'send'
       ? await scheduleReportService.getScheduleRecipients(schedule)
       : [];
 
-    if (mode === 'send' && recipientList.length === 0) {
+    if (normalizedMode === 'send' && recipientList.length === 0) {
+      await persistBatchProgress({
+        status: 'skipped',
+        emailGroupIds,
+        recipientCount: 0,
+        steps: {
+          validate: {
+            status: 'failed',
+            detail: 'No recipients in email groups'
+          }
+        }
+      });
       return res.status(400).json({
         error: 'No recipients in email groups',
         scheduleId: parseInt(id),
@@ -1129,33 +1302,92 @@ router.post('/report-schedules/:id/process', requireApiKey, async (req, res) => 
     console.log(`   Schedule: ${schedule.template_name}`);
     console.log(`   Type: ${schedule.template_type} - ${entityName}`);
     console.log(`   Process: ${schedule.process}`);
-    if (mode === 'send') {
+    if (normalizedMode === 'send') {
       console.log(`   Recipients: ${recipientList.length}`);
     }
 
-    const {
-      reportDate: resolvedReportDate,
-      pdfBuffer,
-      preparedReport
-    } = await scheduleReportService.generateSchedulePdf(schedule, {
-      reportDate,
-      bigQueryService: bigQueryServiceInstance
+    await persistBatchProgress({
+      status: 'running',
+      emailGroupIds,
+      recipientCount: recipientList.length,
+      currentStep: 'fetch_data',
+      steps: {
+        validate: {
+          status: 'success',
+          detail: normalizedMode === 'send'
+            ? `${emailGroupIds.length} group${emailGroupIds.length === 1 ? '' : 's'} • ${recipientList.length} recipient${recipientList.length === 1 ? '' : 's'}`
+            : 'Configuration valid for generate-only run'
+        },
+        fetch_data: {
+          status: 'running',
+          detail: 'Loading P&L data'
+        }
+      }
     });
 
-    console.log(`   Using date: ${resolvedReportDate}${reportDate ? ' (user selected)' : ' (latest available)'}`);
+    const resolvedReportDate = await scheduleReportService.resolveReportDate(reportDate, bigQueryServiceInstance);
+    const normalizedReportDate = scheduleReportService.normalizeReportDateValue(resolvedReportDate);
+    const htmlContent = await scheduleReportService.fetchScheduleReportHtml(schedule, {
+      entityId,
+      reportDate: normalizedReportDate
+    });
+
+    await persistBatchProgress({
+      reportDate: normalizedReportDate,
+      currentStep: 'generate_pdf',
+      steps: {
+        fetch_data: {
+          status: 'success',
+          detail: `Loaded P&L data for ${normalizedReportDate}`
+        },
+        generate_pdf: {
+          status: 'running',
+          detail: 'Building PDF'
+        }
+      }
+    });
+
+    const {
+      pdfBuffer,
+      prepared: preparedReport
+    } = await pnlPdfServer.generatePdfBufferFromReportHtml(htmlContent);
+
+    console.log(`   Using date: ${normalizedReportDate}${reportDate ? ' (user selected)' : ' (latest available)'}`);
     console.log(`   Filtered to ${preparedReport.keptCount} report(s) with non-zero net income`);
     console.log(`   PDF generated: ${(pdfBuffer.length / 1024).toFixed(1)} KB`);
+
+    await persistBatchProgress({
+      reportDate: normalizedReportDate,
+      currentStep: normalizedMode === 'send' ? 'send_email' : 'generate_pdf',
+      steps: {
+        generate_pdf: {
+          status: 'success',
+          detail: `${preparedReport.keptCount} report${preparedReport.keptCount === 1 ? '' : 's'} • ${(pdfBuffer.length / 1024).toFixed(1)} KB`
+        },
+        ...(normalizedMode === 'generate' ? {
+          send_email: {
+            status: 'skipped',
+            detail: 'Generate only run'
+          }
+        } : {
+          send_email: {
+            status: 'running',
+            detail: `Sending to ${recipientList.length} recipient${recipientList.length === 1 ? '' : 's'}`
+          }
+        })
+      }
+    });
 
     let successCount = 0;
     let failCount = 0;
     const recipientResults = [];
 
-    if (mode === 'send') {
+    if (normalizedMode === 'send') {
       console.log(`   Sending emails to ${recipientList.length} recipient(s)...`);
 
       for (const recipientEmail of recipientList) {
         try {
-          await emailService.sendPDFEmail(schedule, pdfBuffer, recipientEmail, resolvedReportDate);
+          await emailService.sendPDFEmail(schedule, pdfBuffer, recipientEmail, normalizedReportDate);
           successCount++;
           recipientResults.push({ email: recipientEmail, status: 'sent' });
           console.log(`      ✓ Sent to ${recipientEmail}`);
@@ -1164,13 +1396,23 @@ router.post('/report-schedules/:id/process', requireApiKey, async (req, res) => 
           recipientResults.push({ email: recipientEmail, status: 'failed', error: error.message });
           console.log(`      ✗ Failed: ${recipientEmail} - ${error.message}`);
         }
+
+        await persistBatchProgress({
+          recipientResults,
+          steps: {
+            send_email: {
+              status: 'running',
+              detail: `${successCount} sent • ${failCount} failed of ${recipientList.length}`
+            }
+          }
+        });
       }
     }
 
     // Determine status
     let status;
     let errorMessage = null;
-    if (mode === 'generate') {
+    if (normalizedMode === 'generate') {
       status = 'success';
     } else if (successCount === 0) {
       status = 'failed';
@@ -1181,8 +1423,26 @@ router.post('/report-schedules/:id/process', requireApiKey, async (req, res) => 
       status = 'success';
     }
 
+    await persistBatchProgress({
+      status,
+      currentStep: status === 'failed' ? 'send_email' : 'complete',
+      recipientResults,
+      steps: {
+        send_email: normalizedMode === 'generate'
+          ? {
+              status: 'skipped',
+              detail: 'Generate only run'
+            }
+          : {
+              status: status === 'success' ? 'success' : (status === 'partial' ? 'partial' : 'failed'),
+              detail: `${successCount} sent • ${failCount} failed`
+            }
+      }
+    });
+
     // Log the run
     if (emailConfigService.isAvailable()) {
+      const completedAt = new Date();
       await emailConfigService.createRunLog({
         schedule_id: schedule.id,
         template_name: schedule.template_name,
@@ -1190,7 +1450,7 @@ router.post('/report-schedules/:id/process', requireApiKey, async (req, res) => 
         process: schedule.process,
         entity_id: entityId,
         entity_name: entityName,
-        report_date: resolvedReportDate,
+        report_date: normalizedReportDate,
         status: status,
         error_message: errorMessage,
         emails_sent: successCount,
@@ -1200,14 +1460,14 @@ router.post('/report-schedules/:id/process', requireApiKey, async (req, res) => 
         pdf_size_bytes: pdfBuffer.length
       });
 
-      // Update schedule timestamps
-      if (mode === 'send' && successCount > 0) {
-        await emailConfigService.updateScheduleSendTimestamps(schedule.id, new Date(), null, triggerType);
-      }
+      await emailConfigService.updateScheduleRunTimestamps(schedule.id, {
+        lastRunAt: completedAt,
+        lastSentAt: normalizedMode === 'send' && successCount > 0 ? completedAt : null
+      });
     }
 
     const durationMs = Date.now() - startTime;
-    if (mode === 'generate') {
+    if (normalizedMode === 'generate') {
       console.log(`   ✅ Complete: PDF generated (${durationMs}ms)`);
     } else {
       console.log(`   ✅ Complete: ${successCount} sent, ${failCount} failed (${durationMs}ms)`);
@@ -1218,18 +1478,30 @@ router.post('/report-schedules/:id/process', requireApiKey, async (req, res) => 
       scheduleId: parseInt(id),
       scheduleName: schedule.template_name,
       status,
-      mode,
+      mode: normalizedMode,
       emailsSent: successCount,
       emailsFailed: failCount,
-      reportDate: resolvedReportDate,
+      reportDate: normalizedReportDate,
       pdfSizeBytes: pdfBuffer.length,
       durationMs,
       error: errorMessage,
-      recipients: recipientResults
+      recipients: recipientResults,
+      progress: batchProgress
     });
 
   } catch (error) {
     console.error(`❌ Error processing schedule ${id}:`, error);
+
+    await persistBatchProgress({
+      status: 'failed',
+      steps: {
+        [(batchProgress && batchProgress.currentStep) || 'validate']: {
+          status: 'failed',
+          detail: error.message
+        }
+      }
+    }).catch(() => null);
+
     res.status(500).json({
       error: 'Failed to process schedule',
       message: error.message,
@@ -1454,7 +1726,13 @@ router.post('/report-batches/items/:itemId/execute', requireApiKey, async (req, 
       attempt_count: (item.attempt_count || 0) + 1,
       last_attempt_at: new Date(),
       completed_at: null,
-      error_message: null
+      error_message: null,
+      result_payload: createInitialBatchProgressPayload({
+        scheduleId: item.schedule_id,
+        scheduleName: item.schedule_name,
+        mode: item.run_mode,
+        reportDate: item.report_date
+      })
     });
 
     const headers = {
@@ -1468,7 +1746,8 @@ router.post('/report-batches/items/:itemId/execute', requireApiKey, async (req, 
       body: JSON.stringify({
         triggerType: 'manual-batch',
         reportDate: scheduleReportService.normalizeReportDateValue(item.report_date),
-        mode: item.run_mode
+        mode: item.run_mode,
+        batchItemId: itemId
       })
     });
 
@@ -1505,9 +1784,11 @@ router.post('/report-batches/items/:itemId/execute', requireApiKey, async (req, 
       });
     }
 
-    const itemStatus = processPayload.status === 'partial'
-      ? 'partial'
-      : (processPayload.status === 'skipped' ? 'skipped' : 'success');
+    const itemStatus = processPayload.status === 'failed'
+      ? 'failed'
+      : (processPayload.status === 'partial'
+          ? 'partial'
+          : (processPayload.status === 'skipped' ? 'skipped' : 'success'));
 
     await emailConfigService.updateReportBatchRunItem(itemId, {
       status: itemStatus,

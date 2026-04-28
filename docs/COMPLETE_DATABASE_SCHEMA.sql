@@ -55,8 +55,7 @@ CREATE TABLE IF NOT EXISTS report_schedules (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   last_sent_at TIMESTAMP,
   next_send_at TIMESTAMP,
-  last_run_manual TIMESTAMP,
-  last_run_automated TIMESTAMP,
+  last_run_at TIMESTAMP,
   
   CONSTRAINT chk_template_type CHECK (template_type IN ('district', 'region', 'subsidiary')),
   CONSTRAINT chk_process CHECK (process IN ('standard', 'operational')),

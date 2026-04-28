@@ -28,6 +28,7 @@ const emailConfigService = require('./src/services/emailConfigService');
 const emailSchedulerService = require('./src/services/emailSchedulerService');
 
 const PORT = process.env.PORT || 3000;
+const EMAIL_SCHEDULER_ENABLED = process.env.EMAIL_SCHEDULER_ENABLED === 'true';
 
 // Start the application
 async function startServer() {
@@ -45,9 +46,12 @@ async function startServer() {
       console.log(`   Node: ${process.version}`);
       console.log('=================================');
       
-      // Start the email scheduler
       console.log('');
-      emailSchedulerService.start();
+      if (EMAIL_SCHEDULER_ENABLED) {
+        emailSchedulerService.start();
+      } else {
+        console.log('⏰ Email scheduler disabled - automated runs are off');
+      }
       console.log('');
     });
 

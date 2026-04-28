@@ -77,12 +77,44 @@ async function createApp() {
           ADD COLUMN IF NOT EXISTS service_filter_id VARCHAR(255),
           ADD COLUMN IF NOT EXISTS service_filter_name VARCHAR(255),
           ADD COLUMN IF NOT EXISTS header_subsidiary_id VARCHAR(255),
-          ADD COLUMN IF NOT EXISTS header_subsidiary_name VARCHAR(255)
+          ADD COLUMN IF NOT EXISTS header_subsidiary_name VARCHAR(255),
+          ADD COLUMN IF NOT EXISTS last_run_at TIMESTAMPTZ
         `);
         await emailConfigService.pool.query(`
           UPDATE report_schedules
           SET tags = ARRAY[]::TEXT[]
           WHERE tags IS NULL
+        `);
+        await emailConfigService.pool.query(`
+          UPDATE report_schedules
+          SET last_run_at = COALESCE(last_run_at, GREATEST(last_run_manual, last_run_automated, last_sent_at))
+          WHERE last_run_at IS NULL
+        `);
+
+        const runLogsTable = await emailConfigService.pool.query(`
+          SELECT to_regclass('public.run_logs') AS table_name
+        `);
+        if (runLogsTable.rows[0]?.table_name) {
+          await emailConfigService.pool.query(`
+            UPDATE report_schedules rs
+            SET last_run_at = latest.last_run_at
+            FROM (
+              SELECT
+                schedule_id,
+                MAX(COALESCE(run_completed_at, run_started_at)) AS last_run_at
+              FROM run_logs
+              WHERE schedule_id IS NOT NULL
+              GROUP BY schedule_id
+            ) AS latest
+            WHERE rs.id = latest.schedule_id
+              AND (rs.last_run_at IS NULL OR latest.last_run_at > rs.last_run_at)
+          `);
+        }
+
+        await emailConfigService.pool.query(`
+          ALTER TABLE report_schedules
+          DROP COLUMN IF EXISTS last_run_manual,
+          DROP COLUMN IF EXISTS last_run_automated
         `);
       }
 

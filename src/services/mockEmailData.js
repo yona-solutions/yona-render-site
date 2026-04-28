@@ -125,6 +125,7 @@ const mockReportSchedules = [
     created_at: new Date('2026-01-15T10:30:00Z'),
     updated_at: new Date('2026-01-15T10:30:00Z'),
     last_sent_at: new Date('2026-01-20T08:00:00Z'),
+    last_run_at: new Date('2026-01-20T08:00:00Z'),
     next_send_at: new Date('2026-01-27T08:00:00Z')
   },
   {
@@ -148,6 +149,7 @@ const mockReportSchedules = [
     created_at: new Date('2026-01-16T15:00:00Z'),
     updated_at: new Date('2026-01-16T15:00:00Z'),
     last_sent_at: new Date('2026-01-05T09:00:00Z'),
+    last_run_at: new Date('2026-01-05T09:00:00Z'),
     next_send_at: new Date('2026-02-05T09:00:00Z')
   },
   {
@@ -171,6 +173,7 @@ const mockReportSchedules = [
     created_at: new Date('2026-01-18T11:30:00Z'),
     updated_at: new Date('2026-01-18T11:30:00Z'),
     last_sent_at: new Date('2026-01-01T07:00:00Z'),
+    last_run_at: new Date('2026-01-01T07:00:00Z'),
     next_send_at: new Date('2026-02-01T07:00:00Z')
   },
   {
@@ -194,6 +197,7 @@ const mockReportSchedules = [
     created_at: new Date('2026-01-19T16:00:00Z'),
     updated_at: new Date('2026-01-19T16:00:00Z'),
     last_sent_at: new Date('2026-01-17T16:00:00Z'),
+    last_run_at: new Date('2026-01-17T16:00:00Z'),
     next_send_at: new Date('2026-01-24T16:00:00Z')
   },
   {
@@ -217,6 +221,7 @@ const mockReportSchedules = [
     created_at: new Date('2026-01-17T10:00:00Z'),
     updated_at: new Date('2026-01-17T10:00:00Z'),
     last_sent_at: new Date('2026-01-03T10:00:00Z'),
+    last_run_at: new Date('2026-01-03T10:00:00Z'),
     next_send_at: new Date('2026-02-03T10:00:00Z')
   },
   {
@@ -240,6 +245,7 @@ const mockReportSchedules = [
     created_at: new Date('2026-01-20T09:00:00Z'),
     updated_at: new Date('2026-01-22T15:00:00Z'),
     last_sent_at: new Date('2026-01-15T14:00:00Z'),
+    last_run_at: new Date('2026-01-15T14:00:00Z'),
     next_send_at: null
   },
   {
@@ -263,6 +269,7 @@ const mockReportSchedules = [
     created_at: new Date('2026-01-21T11:00:00Z'),
     updated_at: new Date('2026-01-21T11:00:00Z'),
     last_sent_at: new Date('2026-01-10T08:30:00Z'),
+    last_run_at: new Date('2026-01-10T08:30:00Z'),
     next_send_at: new Date('2026-02-10T08:30:00Z')
   },
   {
@@ -286,6 +293,7 @@ const mockReportSchedules = [
     created_at: new Date('2026-01-22T09:30:00Z'),
     updated_at: new Date('2026-01-22T09:30:00Z'),
     last_sent_at: new Date('2026-01-21T11:00:00Z'),
+    last_run_at: new Date('2026-01-21T11:00:00Z'),
     next_send_at: new Date('2026-01-28T11:00:00Z')
   }
 ];
@@ -396,6 +404,7 @@ function createMockReportSchedule(data) {
     created_at: new Date(),
     updated_at: new Date(),
     last_sent_at: null,
+    last_run_at: null,
     next_send_at: null
   };
   

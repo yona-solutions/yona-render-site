@@ -1377,6 +1377,226 @@
     .validation-error.visible {
       display: block;
     }
+
+    .run-summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: 12px;
+    }
+
+    .run-summary-card {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 14px 12px;
+    }
+
+    .run-summary-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: #718096;
+      margin-bottom: 6px;
+    }
+
+    .run-summary-value {
+      font-size: 20px;
+      font-weight: 700;
+      color: #1a202c;
+      line-height: 1.1;
+    }
+
+    .schedule-progress-card {
+      padding: 16px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .schedule-progress-card:last-child {
+      border-bottom: none;
+    }
+
+    .schedule-progress-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+
+    .schedule-progress-title {
+      font-weight: 600;
+      color: #2d3748;
+      margin-bottom: 4px;
+    }
+
+    .schedule-progress-status-badge {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 5px 10px;
+      font-size: 11px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .schedule-progress-status-badge.queued {
+      background: #edf2f7;
+      color: #4a5568;
+    }
+
+    .schedule-progress-status-badge.running {
+      background: #ebf4ff;
+      color: #2b6cb0;
+    }
+
+    .schedule-progress-status-badge.success {
+      background: #f0fff4;
+      color: #276749;
+    }
+
+    .schedule-progress-status-badge.partial {
+      background: #fffaf0;
+      color: #c05621;
+    }
+
+    .schedule-progress-status-badge.failed {
+      background: #fff5f5;
+      color: #c53030;
+    }
+
+    .schedule-progress-status-badge.skipped {
+      background: #f7fafc;
+      color: #718096;
+    }
+
+    .schedule-progress-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .schedule-progress-meta-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 5px 9px;
+      background: #f7fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 999px;
+      font-size: 11px;
+      color: #4a5568;
+    }
+
+    .schedule-step-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .schedule-step-pill {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 11px;
+      font-weight: 700;
+      border: 1px solid #e2e8f0;
+      background: #ffffff;
+      color: #718096;
+    }
+
+    .schedule-step-pill.pending {
+      background: #ffffff;
+      color: #718096;
+    }
+
+    .schedule-step-pill.queued {
+      background: #edf2f7;
+      color: #4a5568;
+    }
+
+    .schedule-step-pill.running {
+      background: #ebf4ff;
+      border-color: #bee3f8;
+      color: #2b6cb0;
+    }
+
+    .schedule-step-pill.success {
+      background: #f0fff4;
+      border-color: #c6f6d5;
+      color: #276749;
+    }
+
+    .schedule-step-pill.partial {
+      background: #fffaf0;
+      border-color: #fbd38d;
+      color: #c05621;
+    }
+
+    .schedule-step-pill.failed {
+      background: #fff5f5;
+      border-color: #fed7d7;
+      color: #c53030;
+    }
+
+    .schedule-step-pill.skipped {
+      background: #f7fafc;
+      border-color: #e2e8f0;
+      color: #718096;
+    }
+
+    .schedule-progress-subtext {
+      font-size: 12px;
+      color: #4a5568;
+      line-height: 1.45;
+    }
+
+    .schedule-progress-recipients {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-top: 10px;
+    }
+
+    .schedule-progress-recipient {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 8px 10px;
+      border-radius: 8px;
+      background: #f7fafc;
+      font-size: 12px;
+    }
+
+    .schedule-progress-recipient.sent {
+      background: #f0fff4;
+    }
+
+    .schedule-progress-recipient.failed {
+      background: #fff5f5;
+    }
+
+    .schedule-progress-recipient-status {
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .schedule-progress-more {
+      font-size: 11px;
+      color: #718096;
+      padding-left: 4px;
+    }
+
+    .schedule-last-run {
+      font-size: 12px;
+      color: #4a5568;
+      line-height: 1.35;
+      white-space: nowrap;
+    }
   </style>
 </head>
 <body>
@@ -1405,17 +1625,23 @@
       </div>
       
       <div style="background: #f7fafc; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-        <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
-          <span style="color: #4a5568; font-weight: 500;">📊 Reports Processed:</span>
-          <span style="color: #2d3748; font-weight: 600;" id="schedulesProcessedCount">0 / 0</span>
-        </div>
-        <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
-          <span style="color: #4a5568; font-weight: 500;">✉️ Emails Sent:</span>
-          <span style="color: #48bb78; font-weight: 600;" id="emailsSentCount">0</span>
-        </div>
-        <div style="display: flex; justify-content: space-between;">
-          <span style="color: #4a5568; font-weight: 500;">⚠️ Issues:</span>
-          <span style="color: #f56565; font-weight: 600;" id="errorsCount">0</span>
+        <div class="run-summary-grid">
+          <div class="run-summary-card">
+            <div class="run-summary-label">Reports Processed</div>
+            <div class="run-summary-value" id="schedulesProcessedCount">0 / 0</div>
+          </div>
+          <div class="run-summary-card">
+            <div class="run-summary-label">PDFs Generated</div>
+            <div class="run-summary-value" id="pdfsGeneratedCount">0</div>
+          </div>
+          <div class="run-summary-card">
+            <div class="run-summary-label">Emails Delivered</div>
+            <div class="run-summary-value" id="emailsSentCount">0</div>
+          </div>
+          <div class="run-summary-card">
+            <div class="run-summary-label">Schedules With Issues</div>
+            <div class="run-summary-value" id="errorsCount">0</div>
+          </div>
         </div>
       </div>
 
@@ -1462,7 +1688,7 @@
     <div class="header">
       <div class="header-left">
         <h1>📧 Email Configuration</h1>
-        <p>Configure automated report schedules and manage email distribution lists</p>
+        <p>Manage saved report setups, batch runs, and email distribution lists</p>
       </div>
       <div class="header-actions" style="display: flex; align-items: center; gap: 12px;">
         <div id="jobStatusIndicator" style="display: none; padding: 8px 14px; background: #fef3c7; border: 1px solid #f59e0b; border-radius: 6px; font-size: 13px; cursor: pointer;" onclick="showJobProgress()">
@@ -1481,7 +1707,7 @@
         <div class="section-header">
           <div>
             <h2>📮 Email Groups</h2>
-            <div class="subtitle">Manage distribution lists for automated reports</div>
+            <div class="subtitle">Manage the recipient groups used for report deliveries</div>
           </div>
           <button class="btn btn-primary" onclick="openEmailGroupModal()">
             ➕ New Email Group
@@ -1518,7 +1744,7 @@
         <div class="section-header">
           <div>
             <h2>📊 Report Schedules</h2>
-            <div class="subtitle">Configure automated P&L report delivery</div>
+            <div class="subtitle">Save report setups and run tagged batches on demand</div>
           </div>
           <div style="display: flex; gap: 12px;">
             <button class="btn btn-secondary" onclick="toggleFilterRow()" id="filterToggleBtn">
@@ -1537,6 +1763,7 @@
                 <th class="resizable" style="width: 110px;">Process<span class="resize-handle"></span></th>
                 <th class="resizable" style="width: 190px;">Entity<span class="resize-handle"></span></th>
                 <th class="resizable" style="width: 130px;">Email Groups<span class="resize-handle"></span></th>
+                <th class="resizable" style="width: 135px;">Last Run<span class="resize-handle"></span></th>
                 <th style="width: 85px; text-align: center;">Edit</th>
                 <th style="width: 135px; text-align: center;">Download</th>
                 <th style="width: 125px; text-align: center;">Email</th>
@@ -1565,12 +1792,13 @@
                 <th></th>
                 <th></th>
                 <th></th>
+                <th></th>
                 <th><button class="btn btn-small btn-secondary" onclick="clearColumnFilters()" style="font-size: 10px; padding: 2px 6px;">Clear</button></th>
               </tr>
             </thead>
             <tbody id="reportSchedulesBody">
               <tr>
-                <td colspan="10">
+                <td colspan="11">
                   <div class="loading">
                     <div class="loading-spinner"></div>
                     <p>Loading report schedules...</p>
@@ -2347,17 +2575,18 @@
         }
 
         // Get email group names
-        const groupNames = (schedule.email_group_ids || []).map(gid => {
-          const group = emailGroups.find(g => g.id === gid);
-          return group ? group.name : null;
-        }).filter(Boolean);
+        const groupNames = getScheduleEmailGroupNames(schedule);
         const scheduleTags = getScheduleTags(schedule);
+        const lastRunValue = getScheduleLastRunValue(schedule);
 
         const groupsDisplay = groupNames.length > 0
           ? groupNames.map(n => `<span class="mini-tag">${escapeHtml(n)}</span>`).join(' ')
           : '<span style="color: #a0aec0;">None</span>';
         const tagsDisplay = scheduleTags.length > 0
           ? `<div class="schedule-tags-inline">${scheduleTags.map(tag => `<span class="schedule-tag-pill">${escapeHtml(tag)}</span>`).join('')}</div>`
+          : '<span style="color: #a0aec0;">—</span>';
+        const lastRunDisplay = lastRunValue
+          ? `<span class="schedule-last-run" title="${escapeHtml(formatDate(lastRunValue))}">${escapeHtml(formatDate(lastRunValue))}</span>`
           : '<span style="color: #a0aec0;">—</span>';
 
         // Process badge
@@ -2384,6 +2613,9 @@
             </td>
             <td>
               ${groupsDisplay}
+            </td>
+            <td>
+              ${lastRunDisplay}
             </td>
             <td style="text-align: center;">
               <button class="btn btn-small btn-secondary" onclick="openScheduleEditModal(${schedule.id})" style="font-size: 11px; padding: 4px 8px;">✏️ Edit</button>
@@ -2743,6 +2975,111 @@
 
     function getScheduleTags(schedule) {
       return normalizeScheduleTags(schedule?.tags || []);
+    }
+
+    function getScheduleEmailGroupNames(schedule) {
+      return (schedule?.email_group_ids || []).map(groupId => {
+        const group = emailGroups.find(candidate => candidate.id === groupId);
+        return group ? group.name : null;
+      }).filter(Boolean);
+    }
+
+    function getScheduleLastRunValue(schedule) {
+      return schedule?.last_run_at || schedule?.last_sent_at || null;
+    }
+
+    function getBatchItemProgress(item) {
+      return item?.result_payload && typeof item.result_payload === 'object'
+        ? item.result_payload
+        : {};
+    }
+
+    function getNormalizedBatchItemStatus(item) {
+      const payloadStatus = getBatchItemProgress(item)?.status;
+      if (['queued', 'running', 'success', 'partial', 'skipped', 'failed'].includes(payloadStatus)) {
+        return payloadStatus;
+      }
+      return item?.status || 'queued';
+    }
+
+    function getBatchStepState(progress, stepKey) {
+      return progress?.steps?.[stepKey] || { status: 'pending', detail: '' };
+    }
+
+    function getScheduleProgressSummary(schedule) {
+      const progress = schedule.progress || {};
+      const validateStep = getBatchStepState(progress, 'validate');
+      const fetchStep = getBatchStepState(progress, 'fetch_data');
+      const pdfStep = getBatchStepState(progress, 'generate_pdf');
+      const emailStep = getBatchStepState(progress, 'send_email');
+
+      if (schedule.status === 'running') {
+        const runningStep = [validateStep, fetchStep, pdfStep, emailStep].find(step => step.status === 'running');
+        return runningStep?.detail || 'Running...';
+      }
+
+      if (schedule.status === 'success') {
+        if (schedule.mode === 'generate') {
+          return pdfStep.detail || 'PDF generated successfully';
+        }
+        return emailStep.detail || `Delivered ${schedule.emailsSent || 0} email${(schedule.emailsSent || 0) === 1 ? '' : 's'}`;
+      }
+
+      if (schedule.status === 'partial') {
+        return emailStep.detail || `Partial delivery: ${schedule.emailsSent || 0} sent, ${schedule.emailsFailed || 0} failed`;
+      }
+
+      if (schedule.status === 'failed') {
+        const failedStep = [
+          ['validate', validateStep],
+          ['fetch_data', fetchStep],
+          ['generate_pdf', pdfStep],
+          ['send_email', emailStep]
+        ].find(([, step]) => step.status === 'failed');
+
+        if (failedStep) {
+          return failedStep[1].detail || 'This schedule failed before it completed';
+        }
+
+        return schedule.error || 'This schedule failed before it completed';
+      }
+
+      if (schedule.status === 'skipped') {
+        return validateStep.detail || schedule.error || 'Skipped';
+      }
+
+      return 'Queued to start';
+    }
+
+    function getBatchDisplayMetrics(batchRun) {
+      const items = batchRun.items || [];
+      let pdfsGenerated = 0;
+      let emailsDelivered = 0;
+      let schedulesWithIssues = 0;
+
+      items.forEach(item => {
+        const progress = getBatchItemProgress(item);
+        const pdfStep = getBatchStepState(progress, 'generate_pdf');
+        const normalizedStatus = getNormalizedBatchItemStatus(item);
+
+        if (pdfStep.status === 'success') {
+          pdfsGenerated += 1;
+        }
+
+        emailsDelivered += Number(item.emails_sent || 0);
+
+        if (['failed', 'partial', 'skipped'].includes(normalizedStatus)) {
+          schedulesWithIssues += 1;
+        }
+      });
+
+      return {
+        processedCount: batchRun.processed_schedules || 0,
+        totalCount: batchRun.total_schedules || 0,
+        pdfsGenerated,
+        emailsDelivered,
+        schedulesWithIssues
+      };
     }
 
     function getAllExistingScheduleTags() {
@@ -4673,29 +5010,33 @@
       const processed = batchRun.processed_schedules || 0;
       const total = batchRun.total_schedules || 0;
       const monthLabel = formatReportMonth(batchRun.report_date);
+      const displayStatus = batchRun.status === 'completed'
+        && ((batchRun.emails_failed || 0) > 0 || (batchRun.failed_schedules || 0) > 0 || (batchRun.partial_schedules || 0) > 0)
+        ? 'partial'
+        : batchRun.status;
 
-      if (batchRun.status === 'queued' || batchRun.status === 'running') {
+      if (displayStatus === 'queued' || displayStatus === 'running') {
         indicator.style.background = '#fef3c7';
         indicator.style.borderColor = '#f59e0b';
         statusText.textContent = `⏳ ${batchRun.tag} · ${monthLabel} (${processed}/${total})`;
         return;
       }
 
-      if (batchRun.status === 'completed') {
+      if (displayStatus === 'completed') {
         indicator.style.background = '#d1fae5';
         indicator.style.borderColor = '#10b981';
         statusText.textContent = `✅ ${batchRun.tag} complete`;
         return;
       }
 
-      if (batchRun.status === 'partial') {
+      if (displayStatus === 'partial') {
         indicator.style.background = '#feebc8';
         indicator.style.borderColor = '#dd6b20';
         statusText.textContent = `⚠️ ${batchRun.tag} finished with issues`;
         return;
       }
 
-      if (batchRun.status === 'failed') {
+      if (displayStatus === 'failed') {
         indicator.style.background = '#fee2e2';
         indicator.style.borderColor = '#ef4444';
         statusText.textContent = `❌ ${batchRun.tag} failed`;
@@ -4746,21 +5087,35 @@
 
     function updateSchedulerProgressFromJob(batchRun) {
       currentBatchRunId = batchRun.id;
-      schedulesToProcess = (batchRun.items || []).map(item => ({
-        id: item.id,
-        name: item.schedule_name,
-        status: item.status,
-        mode: item.run_mode,
-        emailsSent: item.emails_sent || 0,
-        emailsFailed: item.emails_failed || 0,
-        error: item.error_message
-      }));
+      schedulesToProcess = (batchRun.items || []).map(item => {
+        const schedule = reportSchedules.find(candidate => String(candidate.id) === String(item.schedule_id));
+        const progress = getBatchItemProgress(item);
+        return {
+          batchItemId: item.id,
+          scheduleId: item.schedule_id,
+          name: item.schedule_name,
+          status: getNormalizedBatchItemStatus(item),
+          mode: item.run_mode,
+          emailsSent: item.emails_sent || 0,
+          emailsFailed: item.emails_failed || 0,
+          error: item.error_message,
+          progress,
+          groupNames: schedule ? getScheduleEmailGroupNames(schedule) : [],
+          tag: batchRun.tag,
+          reportDate: batchRun.report_date
+        };
+      });
+
+      const metrics = getBatchDisplayMetrics(batchRun);
+      const displayStatus = batchRun.status === 'completed' && metrics.schedulesWithIssues > 0
+        ? 'partial'
+        : batchRun.status;
 
       document.getElementById('schedulesProcessedCount').textContent =
-        `${batchRun.processed_schedules || 0} / ${batchRun.total_schedules || 0}`;
-      document.getElementById('emailsSentCount').textContent = batchRun.emails_sent || 0;
-      document.getElementById('errorsCount').textContent =
-        (batchRun.failed_schedules || 0) + (batchRun.partial_schedules || 0);
+        `${metrics.processedCount} / ${metrics.totalCount}`;
+      document.getElementById('pdfsGeneratedCount').textContent = metrics.pdfsGenerated;
+      document.getElementById('emailsSentCount').textContent = metrics.emailsDelivered;
+      document.getElementById('errorsCount').textContent = metrics.schedulesWithIssues;
 
       const spinner = document.getElementById('schedulerSpinner');
       const title = document.getElementById('schedulerTitle');
@@ -4769,22 +5124,22 @@
 
       meta.textContent = `${batchRun.tag} · ${formatReportMonth(batchRun.report_date)} · ${modeLabel}`;
 
-      if (batchRun.status === 'queued' || batchRun.status === 'running') {
+      if (displayStatus === 'queued' || displayStatus === 'running') {
         if (spinner) spinner.style.display = 'inline-block';
         if (title) title.textContent = '⚙️ Running Reports...';
         document.getElementById('schedulerStatusText').textContent =
-          `Processing ${batchRun.processed_schedules || 0} of ${batchRun.total_schedules || 0} schedules...`;
-      } else if (batchRun.status === 'completed') {
+          `Processing ${metrics.processedCount} of ${metrics.totalCount} schedules...`;
+      } else if (displayStatus === 'completed') {
         if (spinner) spinner.style.display = 'none';
         if (title) title.textContent = '✅ Report Run Complete';
         document.getElementById('schedulerStatusText').textContent =
-          `Completed ${batchRun.total_schedules || 0} schedules successfully.`;
-      } else if (batchRun.status === 'partial') {
+          `Generated ${metrics.pdfsGenerated} PDF${metrics.pdfsGenerated === 1 ? '' : 's'} and delivered ${metrics.emailsDelivered} email${metrics.emailsDelivered === 1 ? '' : 's'}.`;
+      } else if (displayStatus === 'partial') {
         if (spinner) spinner.style.display = 'none';
         if (title) title.textContent = '⚠️ Report Run Complete With Issues';
         document.getElementById('schedulerStatusText').textContent =
-          `${batchRun.failed_schedules || 0} failed and ${batchRun.partial_schedules || 0} completed with partial delivery.`;
-      } else if (batchRun.status === 'failed') {
+          `${metrics.pdfsGenerated} PDF${metrics.pdfsGenerated === 1 ? '' : 's'} generated, with ${metrics.schedulesWithIssues} schedule${metrics.schedulesWithIssues === 1 ? '' : 's'} needing attention.`;
+      } else if (displayStatus === 'failed') {
         if (spinner) spinner.style.display = 'none';
         if (title) title.textContent = '❌ Report Run Failed';
         document.getElementById('schedulerStatusText').textContent =
@@ -4826,52 +5181,71 @@
       }
 
       container.innerHTML = schedulesToProcess.map(schedule => {
-        const statusIcon = {
-          queued: '⏳',
-          running: '⚙️',
-          success: '✅',
-          partial: '⚠️',
-          skipped: '⏭️',
-          failed: '❌'
-        }[schedule.status] || '⏳';
+        const progress = schedule.progress || {};
+        const statusLabel = {
+          queued: 'Queued',
+          running: 'Running',
+          success: schedule.mode === 'generate' ? 'Generated' : 'Delivered',
+          partial: 'Partial',
+          skipped: 'Skipped',
+          failed: 'Failed'
+        }[schedule.status] || 'Queued';
 
-        const statusColor = {
-          queued: '#cbd5e0',
-          running: '#5a6fd8',
-          success: '#48bb78',
-          partial: '#dd6b20',
-          skipped: '#718096',
-          failed: '#f56565'
-        }[schedule.status] || '#cbd5e0';
+        const stepDefinitions = [
+          { key: 'validate', label: 'Validated' },
+          { key: 'fetch_data', label: 'Fetched P&L' },
+          { key: 'generate_pdf', label: 'Generated PDF' },
+          { key: 'send_email', label: schedule.mode === 'generate' ? 'Email Skipped' : 'Sent Emails' }
+        ];
 
-        let statusText = 'Queued';
-        if (schedule.status === 'running') {
-          statusText = 'Running...';
-        } else if (schedule.status === 'success') {
-          statusText = schedule.mode === 'generate'
-            ? 'PDF generated successfully'
-            : `Sent ${schedule.emailsSent || 0} email${(schedule.emailsSent || 0) === 1 ? '' : 's'}`;
-        } else if (schedule.status === 'partial') {
-          statusText = `Partial delivery: ${schedule.emailsSent || 0} sent, ${schedule.emailsFailed || 0} failed`;
-        } else if (schedule.status === 'skipped') {
-          statusText = schedule.error || 'Skipped';
-        } else if (schedule.status === 'failed') {
-          statusText = schedule.error || 'Failed to process';
-        }
+        const groupChips = schedule.groupNames.length > 0
+          ? schedule.groupNames.map(groupName => `<span class="schedule-progress-meta-chip">👥 ${escapeHtml(groupName)}</span>`).join('')
+          : '<span class="schedule-progress-meta-chip">👥 No groups attached</span>';
+
+        const recipientCount = progress.recipientCount || 0;
+        const metaChips = `
+          ${groupChips}
+          <span class="schedule-progress-meta-chip">🏷️ ${escapeHtml(schedule.tag || 'Untagged')}</span>
+          <span class="schedule-progress-meta-chip">📆 ${escapeHtml(formatReportMonth(schedule.reportDate))}</span>
+          <span class="schedule-progress-meta-chip">${schedule.mode === 'generate' ? '🧾 Generate only' : '📤 Generate and send'}</span>
+          ${schedule.mode === 'send' ? `<span class="schedule-progress-meta-chip">✉️ ${recipientCount} recipient${recipientCount === 1 ? '' : 's'}</span>` : ''}
+        `;
+
+        const stepPills = stepDefinitions.map(step => {
+          const stepState = getBatchStepState(progress, step.key);
+          const stepStatus = stepState.status || 'pending';
+          return `<span class="schedule-step-pill ${stepStatus}" title="${escapeHtml(stepState.detail || step.label)}">${escapeHtml(step.label)}</span>`;
+        }).join('');
+
+        const recipientResults = Array.isArray(progress.recipientResults) ? progress.recipientResults : [];
+        const recipientListHtml = recipientResults.length > 0
+          ? `
+            <div class="schedule-progress-recipients">
+              ${recipientResults.slice(0, 6).map(recipient => `
+                <div class="schedule-progress-recipient ${recipient.status === 'sent' ? 'sent' : 'failed'}">
+                  <span>${escapeHtml(recipient.email)}</span>
+                  <span class="schedule-progress-recipient-status">${recipient.status === 'sent' ? 'Sent' : escapeHtml(recipient.error || 'Failed')}</span>
+                </div>
+              `).join('')}
+              ${recipientResults.length > 6 ? `<div class="schedule-progress-more">+${recipientResults.length - 6} more recipient${recipientResults.length - 6 === 1 ? '' : 's'}</div>` : ''}
+            </div>
+          `
+          : '';
 
         return `
-          <div style="padding: 16px; border-bottom: 1px solid #e2e8f0;">
-            <div style="display: flex; align-items: start; gap: 12px;">
-              <div style="font-size: 24px; line-height: 1;">${statusIcon}</div>
+          <div class="schedule-progress-card">
+            <div class="schedule-progress-header">
               <div style="flex: 1;">
-                <div style="font-weight: 600; color: #2d3748; margin-bottom: 4px;">
+                <div class="schedule-progress-title">
                   ${escapeHtml(schedule.name)}
                 </div>
-                <div style="font-size: 12px; font-weight: 500; color: ${statusColor};">
-                  ${escapeHtml(statusText)}
-                </div>
+                <div class="schedule-progress-subtext">${escapeHtml(getScheduleProgressSummary(schedule))}</div>
               </div>
+              <span class="schedule-progress-status-badge ${schedule.status}">${escapeHtml(statusLabel)}</span>
             </div>
+            <div class="schedule-progress-meta">${metaChips}</div>
+            <div class="schedule-step-row">${stepPills}</div>
+            ${recipientListHtml}
           </div>
         `;
       }).join('');
