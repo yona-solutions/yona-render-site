@@ -999,7 +999,7 @@
           </div>
         </div>
 
-        <!-- Subsidiary Filter (visible when Region or District tab is active) -->
+        <!-- Subsidiary Filter (visible when Region tab is active) -->
         <div class="control-group control-group-subsidiary" id="subsidiaryFilterGroup" style="display: none;">
           <label class="control-label">Subsidiary</label>
           <div class="searchable-select" id="subsidiaryFilterWrapper">
@@ -1255,7 +1255,7 @@
         endpoint: '/api/storage/districts',
         label: 'District',
         placeholder: 'district',
-        filterMode: 'subsidiary'
+        filterMode: 'none'
       },
       region: {
         endpoint: '/api/storage/regions',
@@ -1722,8 +1722,8 @@
           console.log(`   🏷️ Using subsidiary header label: ${selectedHeaderLabel}`);
         }
 
-        // Add subsidiary filter if Region or District hierarchy and a subsidiary is selected
-        if ((hierarchy === 'region' || hierarchy === 'district') && subsidiaryFilterSelect && subsidiaryFilterSelect.selectedValue) {
+        // Add subsidiary filter if Region hierarchy and a subsidiary is selected
+        if (hierarchy === 'region' && subsidiaryFilterSelect && subsidiaryFilterSelect.selectedValue) {
           const subsidiaryFilter = subsidiaryFilterSelect.selectedValue;
           // Only add filter parameter if a subsidiary is actually selected (not empty)
           if (subsidiaryFilter && subsidiaryFilter !== 'all') {

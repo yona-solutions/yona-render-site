@@ -2654,14 +2654,9 @@
 
     function getScheduleEntityDisplay(schedule) {
       if (schedule.template_type === 'district') {
-        const parts = [];
-        if (schedule.district_name) parts.push(schedule.district_name);
-        if (schedule.subsidiary_name) parts.push(schedule.subsidiary_name);
         return {
-          entityDisplay: parts.length > 0 ? parts.join(' / ') : '—',
-          entityTooltip: parts.length === 2
-            ? `District: ${schedule.district_name}, Subsidiary: ${schedule.subsidiary_name}`
-            : (schedule.district_name ? `District: ${schedule.district_name}` : (schedule.subsidiary_name ? `Subsidiary: ${schedule.subsidiary_name}` : ''))
+          entityDisplay: schedule.district_name || '—',
+          entityTooltip: schedule.district_name ? `District: ${schedule.district_name}` : ''
         };
       }
 
@@ -3763,6 +3758,10 @@
       return String(process || '').trim().toLowerCase() === 'operational' ? 'operational' : 'standard';
     }
 
+    function supportsSubsidiaryFilter(templateType) {
+      return templateType === 'region';
+    }
+
     function buildScheduleDataUrl(schedule, entityId, reportDate) {
       const params = new URLSearchParams({
         hierarchy: schedule.template_type,
@@ -3775,7 +3774,7 @@
         params.set('orgLabel', schedule.header_subsidiary_name);
       }
 
-      if ((schedule.template_type === 'region' || schedule.template_type === 'district') && schedule.subsidiary_id) {
+      if (supportsSubsidiaryFilter(schedule.template_type) && schedule.subsidiary_id) {
         params.set('subsidiaryFilter', schedule.subsidiary_id);
       }
 
@@ -3849,7 +3848,7 @@
 
     function setEditSubsidiaryFilterExpanded(expanded, { clearValue = false } = {}) {
       const type = document.getElementById('editTemplateType')?.value || '';
-      const isDistrictOrRegion = type === 'district' || type === 'region';
+      const hasOptionalSubsidiaryFilter = supportsSubsidiaryFilter(type);
       const isSubsidiary = type === 'subsidiary';
       const toggle = document.getElementById('editSubsidiaryFilterToggle');
       const toggleGroup = document.getElementById('editSubsidiaryFilterToggleGroup');
@@ -3872,7 +3871,7 @@
         return;
       }
 
-      if (isDistrictOrRegion) {
+      if (hasOptionalSubsidiaryFilter) {
         toggleGroup.style.display = 'block';
         subsidiaryGroup.style.display = expanded ? 'block' : 'none';
         actions.style.display = expanded ? 'flex' : 'none';
@@ -3931,6 +3930,7 @@
       const isRegion = type === 'region';
       const isSubsidiary = type === 'subsidiary';
       const isCustomerTag = type === 'customer_tag';
+      const hasOptionalSubsidiaryFilter = supportsSubsidiaryFilter(type);
 
       districtGroup.style.display = isDistrict ? 'block' : 'none';
       regionGroup.style.display = isRegion ? 'block' : 'none';
@@ -3941,7 +3941,7 @@
       districtSelect.disabled = !isDistrict;
       regionSelect.disabled = !isRegion;
       customerTagSelect.disabled = !isCustomerTag;
-      subsidiarySelect.disabled = !(isDistrict || isRegion || isSubsidiary);
+      subsidiarySelect.disabled = !(hasOptionalSubsidiaryFilter || isSubsidiary);
       serviceFilterSelect.disabled = !isSubsidiary;
       headerSubsidiarySelect.disabled = !type;
 
@@ -3954,7 +3954,7 @@
       if (isSubsidiary) {
         subsidiaryLabel.innerHTML = 'Subsidiary <span style="color: #e53e3e;">*</span>';
         subsidiaryHelp.textContent = 'Required: select the same subsidiary you would choose on the P&L page.';
-      } else if (isDistrict || isRegion) {
+      } else if (hasOptionalSubsidiaryFilter) {
         subsidiaryLabel.textContent = 'Subsidiary Filter';
         subsidiaryHelp.textContent = 'Optional: filter by subsidiary, matching the P&L page.';
       } else {
@@ -3970,7 +3970,7 @@
         if ((previousType === 'subsidiary') !== isSubsidiary) {
           subsidiarySelect.value = '';
         }
-        if (!(isDistrict || isRegion || isSubsidiary)) {
+        if (!(hasOptionalSubsidiaryFilter || isSubsidiary)) {
           subsidiarySelect.value = '';
         }
         if (!type) {
@@ -3979,7 +3979,11 @@
         }
       }
 
-      const shouldExpandSubsidiaryFilter = isSubsidiary || ((isDistrict || isRegion) && Boolean(subsidiarySelect.value));
+      if (isDistrict) {
+        subsidiarySelect.value = '';
+      }
+
+      const shouldExpandSubsidiaryFilter = isSubsidiary || (hasOptionalSubsidiaryFilter && Boolean(subsidiarySelect.value));
       setEditSubsidiaryFilterExpanded(shouldExpandSubsidiaryFilter);
 
       typeSelect.dataset.previousType = type;
@@ -4080,11 +4084,6 @@
         if (districtId) {
           const opt = getOptionById(districtOptions, districtId);
           districtName = opt ? opt.label : null;
-        }
-        subsidiaryId = subsidiarySelect.value || null;
-        if (subsidiaryId) {
-          const opt = getOptionById(subsidiaryOptions, subsidiaryId);
-          subsidiaryName = opt ? opt.label : null;
         }
       } else if (templateType === 'region') {
         regionId = regionSelect.value || null;
@@ -4752,7 +4751,7 @@
         entityName,
         getScheduleProcessValue(schedule.process)
       ];
-      if ((schedule.template_type === 'district' || schedule.template_type === 'region') && schedule.subsidiary_name) {
+      if (supportsSubsidiaryFilter(schedule.template_type) && schedule.subsidiary_name) {
         detailParts.push(`subsidiary filter: ${schedule.subsidiary_name}`);
       }
       if (schedule.template_type === 'subsidiary' && schedule.service_filter_name) {
@@ -6331,12 +6330,6 @@
         if (districtId) {
           const option = getOptionById(districtOptions, districtId);
           districtName = option ? option.label : null;
-        }
-
-        subsidiaryId = subsidiarySelect.value || null;
-        if (subsidiaryId) {
-          const option = getOptionById(subsidiaryOptions, subsidiaryId);
-          subsidiaryName = option ? option.label : null;
         }
       } else if (templateType === 'region') {
         regionId = regionSelect.value || null;
