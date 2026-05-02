@@ -186,6 +186,122 @@ Yona Solutions
   }
 
   /**
+   * Send one grouped email containing multiple PDF attachments.
+   *
+   * @param {Object} reportGroup - Report group configuration
+   * @param {Array} attachments - Attachment objects with filename + pdfBuffer
+   * @param {string} recipientEmail - Recipient email address
+   * @param {string} reportDate - Report date (formatted)
+   * @returns {Promise<Object>} Send result with success status
+   */
+  async sendGroupedPDFEmail(reportGroup, attachments, recipientEmail, reportDate) {
+    if (!this.isAvailable()) {
+      throw new Error('Email service not initialized');
+    }
+
+    if (!Array.isArray(attachments) || attachments.length === 0) {
+      throw new Error('At least one PDF attachment is required');
+    }
+
+    try {
+      const groupName = reportGroup?.name || reportGroup?.template_name || 'P&L Report Group';
+      const attachmentCount = attachments.length;
+      const subject = `${groupName} - ${reportDate} P&L Packet`;
+      const attachmentListHtml = attachments.map(attachment => (
+        `<li><strong>${attachment.label || attachment.template_name || attachment.filename}</strong></li>`
+      )).join('');
+
+      const htmlContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <style>
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+              line-height: 1.6;
+              color: #333;
+              max-width: 600px;
+              margin: 0 auto;
+              padding: 20px;
+            }
+            ul {
+              margin: 12px 0 18px 20px;
+              padding: 0;
+            }
+          </style>
+        </head>
+        <body>
+          <p>Hello,</p>
+
+          <p>This is Yona Solutions. Your grouped P&amp;L packet for <strong>${groupName}</strong> is ready.</p>
+
+          <p>The attached email includes ${attachmentCount} P&amp;L attachment${attachmentCount === 1 ? '' : 's'} for <strong>${reportDate}</strong>:</p>
+
+          <ul>${attachmentListHtml}</ul>
+
+          <p>Best regards,<br>Yona Solutions</p>
+        </body>
+        </html>
+      `;
+
+      const textAttachmentList = attachments
+        .map(attachment => `- ${attachment.label || attachment.template_name || attachment.filename}`)
+        .join('\n');
+
+      const textContent = `
+Hello,
+
+This is Yona Solutions. Your grouped P&L packet for ${groupName} is ready.
+
+The attached email includes ${attachmentCount} P&L attachment${attachmentCount === 1 ? '' : 's'} for ${reportDate}:
+${textAttachmentList}
+
+Best regards,
+Yona Solutions
+      `.trim();
+
+      const msg = {
+        to: recipientEmail,
+        from: {
+          email: this.senderEmail,
+          name: 'Yona Solutions SPHERE'
+        },
+        subject,
+        text: textContent,
+        html: htmlContent,
+        attachments: attachments.map(attachment => ({
+          content: attachment.pdfBuffer.toString('base64'),
+          filename: attachment.filename,
+          type: 'application/pdf',
+          disposition: 'attachment'
+        }))
+      };
+
+      console.log(`📧 Sending grouped email to ${recipientEmail}...`);
+      console.log(`   Subject: ${subject}`);
+      console.log(`   Attachments: ${attachments.map(attachment => attachment.filename).join(', ')}`);
+
+      await sgMail.send(msg);
+
+      console.log(`✅ Grouped email sent successfully to ${recipientEmail}`);
+
+      return {
+        success: true,
+        recipient: recipientEmail,
+        subject,
+        attachmentCount
+      };
+    } catch (error) {
+      console.error('❌ Failed to send grouped email:', error.message);
+      if (error.response) {
+        console.error('   SendGrid Error:', error.response.body);
+      }
+      throw new Error(`Failed to send grouped email: ${error.message}`);
+    }
+  }
+
+  /**
    * Send a simple text/HTML email (no attachments)
    *
    * @param {string} to - Recipient email address

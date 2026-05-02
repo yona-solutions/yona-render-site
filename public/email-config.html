@@ -1111,6 +1111,8 @@
       border-radius: 10px;
       box-shadow: 0 16px 36px rgba(15, 23, 42, 0.12);
       padding: 10px;
+      max-height: 220px;
+      overflow-y: auto;
       z-index: 40;
     }
 
@@ -1185,6 +1187,58 @@
       color: #e53e3e;
     }
 
+    .optional-filter-toggle {
+      appearance: none;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 11px 12px;
+      border: 1px dashed #cbd5e0;
+      border-radius: 10px;
+      background: #f8fafc;
+      color: #4a5568;
+      font-size: 13px;
+      font-weight: 600;
+      text-align: left;
+      cursor: pointer;
+      transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+    }
+
+    .optional-filter-toggle:hover {
+      border-color: #93c5fd;
+      background: #f1f5f9;
+    }
+
+    .optional-filter-toggle.active {
+      border-style: solid;
+      border-color: #bfdbfe;
+      background: #eff6ff;
+      color: #1d4ed8;
+    }
+
+    .optional-filter-toggle-text {
+      min-width: 0;
+    }
+
+    .optional-filter-toggle-meta {
+      flex-shrink: 0;
+      font-size: 11px;
+      font-weight: 600;
+      color: #718096;
+    }
+
+    .optional-filter-toggle.active .optional-filter-toggle-meta {
+      color: #2c5282;
+    }
+
+    .optional-filter-actions {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 8px;
+    }
+
     .modal-tag {
       display: inline-flex;
       align-items: center;
@@ -1211,6 +1265,111 @@
 
     .modal-tag button:hover {
       color: #e53e3e;
+    }
+
+    .report-group-chip-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .report-group-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 10px;
+      border-radius: 999px;
+      border: 1px solid transparent;
+      font-size: 11px;
+      font-weight: 600;
+      line-height: 1.2;
+    }
+
+    .report-group-chip.tag {
+      background: #edf5ff;
+      color: #2c5282;
+      border-color: #bfdbfe;
+    }
+
+    .report-group-chip.report {
+      background: #fff7ed;
+      color: #9a3412;
+      border-color: #fdba74;
+      border-radius: 10px;
+    }
+
+    .report-group-chip.email {
+      background: #edfdf5;
+      color: #276749;
+      border-color: #bbf7d0;
+    }
+
+    .report-group-empty {
+      color: #a0aec0;
+      font-size: 12px;
+      font-style: italic;
+    }
+
+    .report-group-builder-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .report-group-builder-item {
+      padding: 12px 14px;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      background: #f8fafc;
+    }
+
+    .report-group-builder-item-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 6px;
+    }
+
+    .report-group-builder-item-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #2d3748;
+      margin-bottom: 3px;
+    }
+
+    .report-group-builder-item-meta {
+      font-size: 12px;
+      color: #718096;
+      line-height: 1.5;
+    }
+
+    .report-group-builder-empty {
+      padding: 18px;
+      text-align: center;
+      border: 1px dashed #cbd5e0;
+      border-radius: 10px;
+      background: #f8fafc;
+      color: #718096;
+      font-size: 13px;
+    }
+
+    .report-group-modal-note {
+      padding: 10px 12px;
+      border-radius: 8px;
+      background: #ebf8ff;
+      border: 1px solid #bee3f8;
+      color: #2c5282;
+      font-size: 12px;
+      line-height: 1.5;
+      margin-bottom: 16px;
+    }
+
+    #reportGroupModal {
+      z-index: 1000;
+    }
+
+    #scheduleEditModal {
+      z-index: 1001;
     }
 
     /* Loading Modal */
@@ -1446,8 +1605,8 @@
     .schedule-progress-head-stages,
     .schedule-progress-row-stages {
       display: grid;
-      grid-template-columns: 96px 96px 76px;
-      gap: 10px;
+      grid-template-columns: minmax(128px, 1.35fr) minmax(104px, 1fr) minmax(76px, 0.8fr);
+      gap: 12px;
       align-items: center;
       justify-items: center;
       flex-shrink: 0;
@@ -1460,11 +1619,15 @@
       letter-spacing: 0.04em;
       text-transform: uppercase;
       color: #718096;
-      white-space: nowrap;
+      white-space: normal;
+      line-height: 1.25;
     }
 
     .schedule-progress-head-stages span {
-      white-space: nowrap;
+      display: block;
+      width: 100%;
+      white-space: normal;
+      overflow-wrap: anywhere;
     }
 
     .schedule-progress-row-main {
@@ -1491,6 +1654,15 @@
 
     .schedule-progress-row-detail.issue {
       color: #c53030;
+    }
+
+    .schedule-stage-cell {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      min-width: 0;
     }
 
     .schedule-stage-indicator {
@@ -1535,6 +1707,15 @@
       background: #f7fafc;
       border-color: #e2e8f0;
       color: #a0aec0;
+    }
+
+    .schedule-stage-metric {
+      font-size: 11px;
+      font-weight: 600;
+      color: #718096;
+      line-height: 1.2;
+      text-align: center;
+      white-space: nowrap;
     }
 
     .schedule-progress-email-count {
@@ -1592,7 +1773,7 @@
       <div style="background: #f7fafc; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
         <div class="run-summary-grid">
           <div class="run-summary-card">
-            <div class="run-summary-label">Reports Processed</div>
+            <div class="run-summary-label">Groups Processed</div>
             <div class="run-summary-value" id="schedulesProcessedCount">0 / 0</div>
           </div>
           <div class="run-summary-card">
@@ -1653,13 +1834,13 @@
     <div class="header">
       <div class="header-left">
         <h1>📧 Email Configuration</h1>
-        <p>Manage saved report setups, batch runs, and email distribution lists</p>
+        <p>Manage report groups, P&amp;L definitions, and email distribution lists</p>
       </div>
       <div class="header-actions" style="display: flex; align-items: center; gap: 12px;">
         <div id="jobStatusIndicator" style="display: none; padding: 8px 14px; background: #fef3c7; border: 1px solid #f59e0b; border-radius: 6px; font-size: 13px; cursor: pointer;" onclick="showJobProgress()">
           <span id="jobStatusText">⏳ Job running...</span>
         </div>
-        <button class="btn btn-success" id="runAllSchedulesBtn" onclick="openRunReportsModal()">
+        <button class="btn btn-secondary" onclick="openRunReportsModal()">
           ▶️ Run Reports
         </button>
       </div>
@@ -1687,7 +1868,7 @@
                 <th>Description</th>
                 <th>Email Count</th>
                 <th>Created</th>
-                <th>Actions</th>
+                <th style="width: 160px; text-align: center;">Actions</th>
               </tr>
             </thead>
             <tbody id="emailGroupsBody">
@@ -1704,82 +1885,41 @@
         </div>
       </div>
 
-      <!-- Report Schedules Section -->
+      <!-- Report Groups Section -->
       <div class="section-card">
         <div class="section-header">
           <div>
-            <h2>📊 Report Schedules</h2>
-            <div class="subtitle">Save report setups and run tagged batches on demand</div>
+            <h2>📚 Report Groups</h2>
+            <div class="subtitle">Each group can hold multiple P&amp;Ls and one shared set of email groups</div>
           </div>
-          <div style="display: flex; gap: 12px;">
-            <button class="btn btn-secondary" onclick="toggleFilterRow()" id="filterToggleBtn">
-              🔍 Show Filters
-            </button>
-          </div>
+          <button class="btn btn-primary" onclick="openReportGroupModal()">
+            ➕ New Report Group
+          </button>
         </div>
         
         <div class="table-container">
           <table id="reportSchedulesTable">
             <thead>
               <tr>
-                <th class="resizable" style="width: 170px;">Template Name<span class="resize-handle"></span></th>
-                <th class="resizable" style="width: 160px;">Tags<span class="resize-handle"></span></th>
-                <th class="resizable" style="width: 100px;">Type<span class="resize-handle"></span></th>
-                <th class="resizable" style="width: 110px;">Process<span class="resize-handle"></span></th>
-                <th class="resizable" style="width: 190px;">Entity<span class="resize-handle"></span></th>
-                <th class="resizable" style="width: 130px;">Email Groups<span class="resize-handle"></span></th>
-                <th class="resizable" style="width: 135px;">Last Run<span class="resize-handle"></span></th>
-                <th style="width: 85px; text-align: center;">Edit</th>
-                <th style="width: 135px; text-align: center;">Download</th>
-                <th style="width: 125px; text-align: center;">Email</th>
-                <th style="width: 95px; text-align: center;">Delete</th>
-              </tr>
-              <tr class="column-filter-row">
-                <th><input type="text" class="column-filter" id="filterTemplateName" placeholder="Filter..." onkeyup="applyColumnFilters()"></th>
-                <th><input type="text" class="column-filter" id="filterTags" placeholder="Filter..." onkeyup="applyColumnFilters()"></th>
-                <th>
-                  <select class="column-filter" id="filterType" onchange="applyColumnFilters()">
-                    <option value="">All</option>
-                    <option value="district">District</option>
-                    <option value="region">Region</option>
-                    <option value="subsidiary">Subsidiary</option>
-                    <option value="customer_tag">Customer Tag</option>
-                  </select>
-                </th>
-                <th>
-                  <select class="column-filter" id="filterProcess" onchange="applyColumnFilters()">
-                    <option value="">All</option>
-                    <option value="standard">Standard</option>
-                    <option value="operational">Operational</option>
-                  </select>
-                </th>
-                <th><input type="text" class="column-filter" id="filterEntity" placeholder="Filter..." onkeyup="applyColumnFilters()"></th>
-                <th><input type="text" class="column-filter" id="filterEmailGroup" placeholder="Filter..." onkeyup="applyColumnFilters()"></th>
-                <th></th>
-                <th></th>
-                <th></th>
-                <th></th>
-                <th><button class="btn btn-small btn-secondary" onclick="clearColumnFilters()" style="font-size: 10px; padding: 2px 6px;">Clear</button></th>
+                <th style="width: 220px;">Group Name</th>
+                <th style="width: 180px;">Tags</th>
+                <th>P&amp;Ls</th>
+                <th style="width: 220px;">Email Groups</th>
+                <th style="width: 170px;">Last Run</th>
+                <th style="width: 160px; text-align: center;">Actions</th>
               </tr>
             </thead>
             <tbody id="reportSchedulesBody">
               <tr>
-                <td colspan="11">
+                <td colspan="6">
                   <div class="loading">
                     <div class="loading-spinner"></div>
-                    <p>Loading report schedules...</p>
+                    <p>Loading report groups...</p>
                   </div>
                 </td>
               </tr>
             </tbody>
           </table>
-        </div>
-        
-        <!-- Add New Schedule Button -->
-        <div style="margin-top: 12px; text-align: center;">
-          <button class="btn btn-primary" onclick="openNewScheduleModal()" style="min-width: 200px;">
-            ➕ Add New Schedule
-          </button>
         </div>
       </div>
     </div>
@@ -1869,12 +2009,12 @@
         <div class="form-group" style="margin-top: 16px;">
           <label for="runReportsMode" style="font-weight: 600; margin-bottom: 8px; display: block;">Action:</label>
           <select id="runReportsMode" onchange="updateRunReportsSelectionHelp()" style="width: 100%; padding: 10px; font-size: 14px; border: 1px solid #e2e8f0; border-radius: 6px;">
-            <option value="send">Generate and send reports</option>
-            <option value="generate">Generate reports only</option>
+            <option value="send">Generate and send grouped emails</option>
+            <option value="generate">Generate grouped packets only</option>
           </select>
         </div>
         <div id="runReportsSelectionHelp" style="margin-top: 14px; padding: 12px; background: #f7fafc; border-radius: 6px; font-size: 13px; color: #4a5568;">
-          Choose a tag to see how many schedules will run.
+          Choose a tag to see how many report groups will run.
         </div>
         <div class="form-actions" style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 20px;">
           <button type="button" class="btn btn-secondary" onclick="closeRunReportsModal()">Cancel</button>
@@ -1956,11 +2096,87 @@
     </div>
   </div>
 
-  <!-- Schedule Edit Modal -->
+  <!-- Report Group Modal -->
+  <div class="modal" id="reportGroupModal">
+    <div class="modal-content" style="max-width: 760px;">
+      <div class="modal-header">
+        <h3 id="reportGroupModalTitle">Create Report Group</h3>
+        <button class="modal-close" onclick="closeReportGroupModal()">&times;</button>
+      </div>
+      <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
+        <form id="reportGroupForm">
+          <input type="hidden" id="reportGroupId">
+
+          <div style="margin-bottom: 24px;">
+            <h4 style="font-size: 14px; color: #4a5568; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0;">Group Details</h4>
+            <div class="report-group-modal-note">
+              One report group can hold multiple P&amp;Ls and one set of recipients. Every P&amp;L you add below gets its own configuration popup.
+            </div>
+            <div class="form-group">
+              <label for="reportGroupName">Group Name <span style="color: #e53e3e;">*</span></label>
+              <input type="text" id="reportGroupName" required placeholder="e.g., Monthly Leadership Packet">
+            </div>
+            <div class="form-group" style="margin-top: 16px;">
+              <label>Tags</label>
+              <div id="reportGroupTagControl" class="tag-editor-control">
+                <div id="reportGroupTagField" class="tag-input-shell" onclick="focusReportGroupTagInput()">
+                  <div id="reportGroupTagsContainer" class="tag-editor-chips">
+                    <!-- Tags rendered here -->
+                  </div>
+                  <input type="text" id="reportGroupTagInput" class="tag-input-inline" placeholder="Search or add a tag">
+                </div>
+                <div id="reportGroupTagSuggestions" class="tag-suggestions-panel">
+                  <!-- Suggestions rendered here -->
+                </div>
+              </div>
+              <div style="display: flex; justify-content: flex-end; margin-top: 8px;">
+                <button type="button" class="btn btn-secondary btn-small" onclick="addTagToReportGroup()">Add Tag</button>
+              </div>
+              <div class="form-help">Tags live at the report group level. Start typing to reuse tags from other report groups, or press Enter to create a new one.</div>
+            </div>
+          </div>
+
+          <div style="margin-bottom: 24px;">
+            <h4 style="font-size: 14px; color: #4a5568; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0;">Email Groups</h4>
+            <div class="form-group">
+              <label>Selected Email Groups</label>
+              <div id="reportGroupEmailGroupsContainer" style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; min-height: 32px; padding: 8px; background: #f7fafc; border-radius: 6px; border: 1px solid #e2e8f0;">
+                <!-- Email groups rendered here -->
+              </div>
+              <select id="reportGroupEmailGroupSelect" onchange="addEmailGroupToReportGroup(this.value); this.value='';" style="width: 100%;">
+                <option value="">+ Add email group...</option>
+              </select>
+            </div>
+          </div>
+
+          <div style="margin-bottom: 24px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0;">
+              <div>
+                <h4 style="font-size: 14px; color: #4a5568; margin-bottom: 4px;">Included P&amp;Ls</h4>
+                <div class="form-help">Each one becomes a separate P&amp;L attachment in the group.</div>
+              </div>
+              <button type="button" class="btn btn-secondary btn-small" onclick="openGroupReportModal()">
+                ➕ Add P&amp;L
+              </button>
+            </div>
+            <div id="reportGroupReportsContainer" class="report-group-builder-list">
+              <!-- P&L cards rendered here -->
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeReportGroupModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveReportGroup()">Save Report Group</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- P&L Edit Modal -->
   <div class="modal" id="scheduleEditModal">
     <div class="modal-content" style="max-width: 700px;">
       <div class="modal-header">
-        <h3 id="scheduleEditModalTitle">Edit Report Schedule</h3>
+        <h3 id="scheduleEditModalTitle">Configure P&amp;L</h3>
         <button class="modal-close" onclick="closeScheduleEditModal()">&times;</button>
       </div>
       <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
@@ -1969,11 +2185,11 @@
 
           <!-- Basic Info Section -->
           <div style="margin-bottom: 24px;">
-            <h4 style="font-size: 14px; color: #4a5568; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0;">Basic Information</h4>
+            <h4 style="font-size: 14px; color: #4a5568; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0;">P&amp;L Details</h4>
 
             <div class="form-group">
-              <label for="editTemplateName">Template Name <span style="color: #e53e3e;">*</span></label>
-              <input type="text" id="editTemplateName" required placeholder="e.g., District 5 Monthly Report">
+              <label for="editTemplateName">P&amp;L Name <span style="color: #e53e3e;">*</span></label>
+              <input type="text" id="editTemplateName" required placeholder="e.g., District 5 Monthly P&amp;L">
             </div>
 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
@@ -1998,26 +2214,11 @@
               </div>
             </div>
 
-            <div class="form-group" style="margin-top: 16px;">
-              <label for="editScheduleTagInput">Tags</label>
-              <div id="editScheduleTagControl" class="tag-editor-control">
-                <div id="editScheduleTagField" class="tag-input-shell" onclick="focusScheduleTagInput()">
-                  <div id="editScheduleTagsContainer" class="tag-editor-chips">
-                    <!-- Tags will be inserted here -->
-                  </div>
-                  <input type="text" id="editScheduleTagInput" class="tag-input-inline" placeholder="Search or add a tag">
-                </div>
-                <div id="scheduleTagSuggestions" class="tag-suggestions-panel">
-                  <!-- Suggestions will be inserted here -->
-                </div>
-              </div>
-              <div class="form-help">Use tags to organize schedules and filter the table quickly. Press Enter or comma to add, or click a suggestion to reuse an existing tag.</div>
-            </div>
           </div>
 
           <!-- Entity Selection Section -->
           <div style="margin-bottom: 24px;">
-            <h4 style="font-size: 14px; color: #4a5568; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0;">Entity Selection</h4>
+            <h4 style="font-size: 14px; color: #4a5568; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0;">Report Selection</h4>
 
             <div class="form-group" id="editDistrictGroup">
               <label for="editDistrictId" id="editDistrictLabel">District <span style="color: #e53e3e;">*</span></label>
@@ -2040,12 +2241,22 @@
               </select>
             </div>
 
+            <div class="form-group" id="editSubsidiaryFilterToggleGroup" style="display: none;">
+              <button type="button" class="optional-filter-toggle" id="editSubsidiaryFilterToggle" onclick="toggleEditSubsidiaryFilter()">
+                <span class="optional-filter-toggle-text" id="editSubsidiaryFilterToggleText">+ Add Subsidiary Filter</span>
+                <span class="optional-filter-toggle-meta" id="editSubsidiaryFilterToggleMeta">Optional</span>
+              </button>
+            </div>
+
             <div class="form-group" id="editSubsidiaryGroup">
               <label for="editSubsidiaryId" id="editSubsidiaryLabel">Subsidiary</label>
               <select id="editSubsidiaryId" onchange="onEditEntityChange('subsidiary')">
                 <option value="">Select subsidiary...</option>
               </select>
               <div class="form-help" id="editSubsidiaryHelp">Optional: filter by subsidiary, matching the P&L page.</div>
+              <div class="optional-filter-actions" id="editSubsidiaryFilterActions" style="display: none;">
+                <button type="button" class="btn btn-secondary btn-small" onclick="clearEditSubsidiaryFilter()">Remove Filter</button>
+              </div>
             </div>
 
             <div class="form-group" id="editServiceFilterGroup" style="display: none;">
@@ -2065,26 +2276,11 @@
             </div>
           </div>
 
-          <!-- Email Groups Section -->
-          <div style="margin-bottom: 24px;">
-            <h4 style="font-size: 14px; color: #4a5568; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #e2e8f0;">Email Recipients</h4>
-
-            <div class="form-group">
-              <label>Email Groups</label>
-              <div id="editEmailGroupsContainer" style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; min-height: 32px; padding: 8px; background: #f7fafc; border-radius: 6px; border: 1px solid #e2e8f0;">
-                <!-- Tags will be inserted here -->
-              </div>
-              <select id="editEmailGroupSelect" onchange="addEmailGroupInModal(this.value); this.value='';" style="width: 100%;">
-                <option value="">+ Add email group...</option>
-              </select>
-            </div>
-          </div>
-
         </form>
       </div>
       <div class="modal-footer">
         <button class="btn btn-secondary" onclick="closeScheduleEditModal()">Cancel</button>
-        <button class="btn btn-primary" onclick="saveScheduleFromModal()">Save Schedule</button>
+        <button class="btn btn-primary" onclick="saveScheduleFromModal()">Save P&amp;L</button>
       </div>
     </div>
   </div>
@@ -2107,6 +2303,9 @@
     let isScheduleTagInputFocused = false;
     let isScheduleTagPickerOpen = false;
     let scheduleTagBlurTimeout = null;
+    let isReportGroupTagInputFocused = false;
+    let isReportGroupTagPickerOpen = false;
+    let reportGroupTagBlurTimeout = null;
     
     // Hierarchy options
     let districtOptions = [];
@@ -2142,6 +2341,56 @@
           addEmailToList();
         }
       });
+
+      const reportGroupTagInput = document.getElementById('reportGroupTagInput');
+      if (reportGroupTagInput) {
+        reportGroupTagInput.addEventListener('keydown', (e) => {
+          if ((e.key === 'Enter' || e.key === ',') && reportGroupTagInput.value.trim()) {
+            e.preventDefault();
+            addTagToReportGroup();
+            return;
+          }
+
+          if (e.key === 'Backspace' && !reportGroupTagInput.value.trim() && (currentEditingGroup?.tags || []).length > 0) {
+            e.preventDefault();
+            removeTagFromReportGroup(currentEditingGroup.tags[currentEditingGroup.tags.length - 1]);
+            return;
+          }
+
+          if (e.key === 'Escape') {
+            isReportGroupTagInputFocused = false;
+            isReportGroupTagPickerOpen = false;
+            syncReportGroupTagInputShell();
+            renderReportGroupTagSuggestions();
+            reportGroupTagInput.blur();
+          }
+        });
+        reportGroupTagInput.addEventListener('input', () => {
+          isReportGroupTagPickerOpen = true;
+          renderReportGroupTagSuggestions();
+        });
+        reportGroupTagInput.addEventListener('focus', () => {
+          if (reportGroupTagBlurTimeout) {
+            clearTimeout(reportGroupTagBlurTimeout);
+            reportGroupTagBlurTimeout = null;
+          }
+          isReportGroupTagInputFocused = true;
+          isReportGroupTagPickerOpen = true;
+          syncReportGroupTagInputShell();
+          renderReportGroupTagSuggestions();
+        });
+        reportGroupTagInput.addEventListener('blur', () => {
+          reportGroupTagBlurTimeout = window.setTimeout(() => {
+            isReportGroupTagInputFocused = false;
+            syncReportGroupTagInputShell();
+            const tagControl = document.getElementById('reportGroupTagControl');
+            const activeInsideTagControl = tagControl && tagControl.contains(document.activeElement);
+            isReportGroupTagPickerOpen = !!activeInsideTagControl;
+            renderReportGroupTagSuggestions();
+            reportGroupTagBlurTimeout = null;
+          }, 120);
+        });
+      }
 
       const scheduleTagInput = document.getElementById('editScheduleTagInput');
       if (scheduleTagInput) {
@@ -2201,6 +2450,16 @@
         isScheduleTagPickerOpen = false;
         syncScheduleTagInputShell();
         renderScheduleTagSuggestions();
+      });
+
+      document.addEventListener('click', (e) => {
+        const tagControl = document.getElementById('reportGroupTagControl');
+        if (!tagControl || tagControl.contains(e.target)) return;
+
+        isReportGroupTagInputFocused = false;
+        isReportGroupTagPickerOpen = false;
+        syncReportGroupTagInputShell();
+        renderReportGroupTagSuggestions();
       });
 
       // Check for running jobs on page load
@@ -2592,10 +2851,10 @@
           <td>${escapeHtml(group.description || '-')}</td>
           <td><span class="badge">${group.email_count || 0} emails</span></td>
           <td>${formatDate(group.created_at)}</td>
-          <td>
-            <div class="action-buttons">
-              <button class="icon-btn" onclick="editEmailGroup(${group.id})" title="Edit">✏️</button>
-              <button class="icon-btn danger" onclick="deleteEmailGroup(${group.id})" title="Delete">🗑️</button>
+          <td style="width: 160px; text-align: center;">
+            <div class="action-buttons" style="justify-content: center; width: 100%;">
+              <button class="btn btn-small btn-secondary" onclick="editEmailGroup(${group.id})" title="Edit" style="font-size: 11px; padding: 4px 8px;">✏️ Edit</button>
+              <button class="btn btn-small btn-danger" onclick="deleteEmailGroup(${group.id})" title="Delete" style="font-size: 11px; padding: 4px 8px;">🗑️ Delete</button>
             </div>
           </td>
         </tr>
@@ -3562,6 +3821,89 @@
       );
     }
 
+    function updateEditSubsidiaryFilterToggle() {
+      const toggle = document.getElementById('editSubsidiaryFilterToggle');
+      const textEl = document.getElementById('editSubsidiaryFilterToggleText');
+      const metaEl = document.getElementById('editSubsidiaryFilterToggleMeta');
+      const select = document.getElementById('editSubsidiaryId');
+
+      if (!toggle || !textEl || !metaEl || !select) return;
+
+      const expanded = toggle.dataset.expanded === 'true';
+      const selectedOption = select.options[select.selectedIndex];
+      const selectedLabel = select.value ? (selectedOption?.text || 'Selected subsidiary') : '';
+
+      if (expanded) {
+        textEl.textContent = 'Subsidiary Filter';
+        metaEl.textContent = selectedLabel || 'Optional';
+      } else if (selectedLabel) {
+        textEl.textContent = 'Subsidiary Filter Added';
+        metaEl.textContent = selectedLabel;
+      } else {
+        textEl.textContent = '+ Add Subsidiary Filter';
+        metaEl.textContent = 'Optional';
+      }
+
+      toggle.classList.toggle('active', expanded || Boolean(selectedLabel));
+    }
+
+    function setEditSubsidiaryFilterExpanded(expanded, { clearValue = false } = {}) {
+      const type = document.getElementById('editTemplateType')?.value || '';
+      const isDistrictOrRegion = type === 'district' || type === 'region';
+      const isSubsidiary = type === 'subsidiary';
+      const toggle = document.getElementById('editSubsidiaryFilterToggle');
+      const toggleGroup = document.getElementById('editSubsidiaryFilterToggleGroup');
+      const subsidiaryGroup = document.getElementById('editSubsidiaryGroup');
+      const actions = document.getElementById('editSubsidiaryFilterActions');
+      const select = document.getElementById('editSubsidiaryId');
+
+      if (!toggle || !toggleGroup || !subsidiaryGroup || !actions || !select) return;
+
+      if (clearValue) {
+        select.value = '';
+      }
+
+      if (isSubsidiary) {
+        toggleGroup.style.display = 'none';
+        subsidiaryGroup.style.display = 'block';
+        actions.style.display = 'none';
+        toggle.dataset.expanded = 'true';
+        updateEditSubsidiaryFilterToggle();
+        return;
+      }
+
+      if (isDistrictOrRegion) {
+        toggleGroup.style.display = 'block';
+        subsidiaryGroup.style.display = expanded ? 'block' : 'none';
+        actions.style.display = expanded ? 'flex' : 'none';
+        toggle.dataset.expanded = expanded ? 'true' : 'false';
+        updateEditSubsidiaryFilterToggle();
+        return;
+      }
+
+      toggleGroup.style.display = 'none';
+      subsidiaryGroup.style.display = 'none';
+      actions.style.display = 'none';
+      toggle.dataset.expanded = 'false';
+      updateEditSubsidiaryFilterToggle();
+    }
+
+    function toggleEditSubsidiaryFilter() {
+      const toggle = document.getElementById('editSubsidiaryFilterToggle');
+      const select = document.getElementById('editSubsidiaryId');
+      const isExpanded = toggle?.dataset.expanded === 'true';
+
+      setEditSubsidiaryFilterExpanded(!isExpanded);
+
+      if (!isExpanded && select) {
+        window.setTimeout(() => select.focus(), 0);
+      }
+    }
+
+    function clearEditSubsidiaryFilter() {
+      setEditSubsidiaryFilterExpanded(false, { clearValue: true });
+    }
+
     function onEditTemplateTypeChange(preserveSelections = false) {
       const typeSelect = document.getElementById('editTemplateType');
       const type = typeSelect.value;
@@ -3577,7 +3919,6 @@
       const districtGroup = document.getElementById('editDistrictGroup');
       const regionGroup = document.getElementById('editRegionGroup');
       const customerTagGroup = document.getElementById('editCustomerTagGroup');
-      const subsidiaryGroup = document.getElementById('editSubsidiaryGroup');
       const serviceFilterGroup = document.getElementById('editServiceFilterGroup');
       const headerSubsidiaryGroup = document.getElementById('editHeaderSubsidiaryGroup');
 
@@ -3594,7 +3935,6 @@
       districtGroup.style.display = isDistrict ? 'block' : 'none';
       regionGroup.style.display = isRegion ? 'block' : 'none';
       customerTagGroup.style.display = isCustomerTag ? 'block' : 'none';
-      subsidiaryGroup.style.display = (isDistrict || isRegion || isSubsidiary) ? 'block' : 'none';
       serviceFilterGroup.style.display = isSubsidiary ? 'block' : 'none';
       headerSubsidiaryGroup.style.display = type ? 'block' : 'none';
 
@@ -3639,6 +3979,9 @@
         }
       }
 
+      const shouldExpandSubsidiaryFilter = isSubsidiary || ((isDistrict || isRegion) && Boolean(subsidiarySelect.value));
+      setEditSubsidiaryFilterExpanded(shouldExpandSubsidiaryFilter);
+
       typeSelect.dataset.previousType = type;
     }
 
@@ -3648,6 +3991,10 @@
       const select = document.getElementById(selectId);
       const selectedOption = select.options[select.selectedIndex];
       // The name will be saved when we save the schedule
+
+      if (entityType === 'subsidiary') {
+        updateEditSubsidiaryFilterToggle();
+      }
     }
 
     function populateEmailGroupSelect() {
@@ -5430,6 +5777,1255 @@
       const timeZoneName = timeParts.find(part => part.type === 'timeZoneName')?.value || browserTimeZone;
 
       return `${month} ${day}${ordinal} ${hour}:${minute}${dayPeriod} ${timeZoneName}`;
+    }
+
+    // ============================================
+    // Report Group UI Overrides
+    // ============================================
+
+    let reportGroups = [];
+    let currentEditingGroup = null;
+    let currentEditingReportIndex = null;
+
+    async function loadReportSchedules() {
+      try {
+        const response = await authFetch('/api/report-schedules');
+        if (!response.ok) {
+          throw new Error('Failed to load report groups');
+        }
+
+        const groups = await response.json();
+        reportGroups = Array.isArray(groups)
+          ? groups.map(normalizeReportGroup).filter(Boolean)
+          : [];
+        reportSchedules = reportGroups.map(group => ({
+          ...group,
+          template_name: group.name || group.template_name || ''
+        }));
+        filteredSchedules = [...reportSchedules];
+        renderReportSchedulesTable();
+      } catch (error) {
+        console.error('Error loading report groups:', error);
+        reportGroups = [];
+        reportSchedules = [];
+        filteredSchedules = [];
+        showEmptyState('reportSchedulesBody', 'Failed to load report groups', '⚠️');
+      }
+    }
+
+    function normalizeReportGroup(group) {
+      if (!group || typeof group !== 'object') return null;
+
+      const reports = Array.isArray(group.reports) && group.reports.length > 0
+        ? group.reports.map(normalizeReportGroupReport).filter(Boolean)
+        : (
+          group.template_type && group.process
+            ? [normalizeReportGroupReport({
+                id: group.report_id || group.id,
+                template_name: group.report_template_name || group.template_name || group.name || '',
+                template_type: group.template_type,
+                process: group.process,
+                district_id: group.district_id,
+                district_name: group.district_name,
+                region_id: group.region_id,
+                region_name: group.region_name,
+                subsidiary_id: group.subsidiary_id,
+                subsidiary_name: group.subsidiary_name,
+                customer_tag_id: group.customer_tag_id,
+                customer_tag_name: group.customer_tag_name,
+                service_filter_id: group.service_filter_id,
+                service_filter_name: group.service_filter_name,
+                header_subsidiary_id: group.header_subsidiary_id,
+                header_subsidiary_name: group.header_subsidiary_name
+              })].filter(Boolean)
+            : []
+        );
+
+      return {
+        id: group.id || createReportGroupId(),
+        name: String(group.name || group.template_name || '').trim(),
+        template_name: String(group.template_name || group.name || '').trim(),
+        tags: normalizeScheduleTags(group.tags || []),
+        email_group_ids: Array.isArray(group.email_group_ids)
+          ? [...new Set(group.email_group_ids.map(id => parseInt(id)).filter(Number.isFinite))]
+          : [group.email_group_id].map(id => parseInt(id)).filter(Number.isFinite),
+        reports,
+        enabled: group.enabled !== false,
+        updated_at: group.updated_at || new Date().toISOString(),
+        last_run_at: group.last_run_at || null,
+        created_at: group.created_at || null
+      };
+    }
+
+    function normalizeReportGroupReport(report) {
+      if (!report || typeof report !== 'object') return null;
+
+      return {
+        id: report.id || createReportGroupReportId(),
+        template_name: report.template_name || '',
+        template_type: report.template_type || '',
+        process: report.process || '',
+        district_id: report.district_id || null,
+        district_name: report.district_name || null,
+        region_id: report.region_id || null,
+        region_name: report.region_name || null,
+        subsidiary_id: report.subsidiary_id || null,
+        subsidiary_name: report.subsidiary_name || null,
+        customer_tag_id: report.customer_tag_id || null,
+        customer_tag_name: report.customer_tag_name || null,
+        service_filter_id: report.service_filter_id || null,
+        service_filter_name: report.service_filter_name || null,
+        header_subsidiary_id: report.header_subsidiary_id || null,
+        header_subsidiary_name: report.header_subsidiary_name || null
+      };
+    }
+
+    function createEmptyReportGroup() {
+      return {
+        id: createReportGroupId(),
+        name: '',
+        tags: [],
+        email_group_ids: [],
+        reports: [],
+        updated_at: new Date().toISOString(),
+        last_run_at: null
+      };
+    }
+
+    function createEmptyGroupReport() {
+      return {
+        id: createReportGroupReportId(),
+        template_name: '',
+        template_type: '',
+        process: '',
+        district_id: null,
+        district_name: null,
+        region_id: null,
+        region_name: null,
+        subsidiary_id: null,
+        subsidiary_name: null,
+        customer_tag_id: null,
+        customer_tag_name: null,
+        service_filter_id: null,
+        service_filter_name: null,
+        header_subsidiary_id: null,
+        header_subsidiary_name: null
+      };
+    }
+
+    function createReportGroupId() {
+      return `group_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    }
+
+    function createReportGroupReportId() {
+      return `report_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    }
+
+    function cloneReportGroup(group) {
+      return JSON.parse(JSON.stringify(group));
+    }
+
+    function getReportGroupEmailNames(group) {
+      return (group.email_group_ids || []).map(groupId => {
+        const match = emailGroups.find(candidate => String(candidate.id) === String(groupId));
+        return match ? match.name : null;
+      }).filter(Boolean);
+    }
+
+    function getReportGroupReportMeta(report) {
+      const { entityDisplay } = getScheduleEntityDisplay(report);
+      const processLabel = report.process
+        ? report.process.charAt(0).toUpperCase() + report.process.slice(1)
+        : 'Process not selected';
+      return `${getTemplateTypeLabel(report.template_type)} • ${entityDisplay} • ${processLabel}`;
+    }
+
+    function renderReportSchedulesTable() {
+      const tbody = document.getElementById('reportSchedulesBody');
+
+      if (!reportGroups.length) {
+        showEmptyState('reportSchedulesBody', 'No report groups yet. Create one group and start adding multiple P&Ls to it.', '📚');
+        return;
+      }
+
+      tbody.innerHTML = reportGroups.map(group => {
+        const emailNames = getReportGroupEmailNames(group);
+        const tagsDisplay = group.tags.length > 0
+          ? `<div class="report-group-chip-list">${group.tags.map(tag => `<span class="report-group-chip tag">${escapeHtml(tag)}</span>`).join('')}</div>`
+          : '<span class="report-group-empty">No tags</span>';
+        const reportsDisplay = group.reports.length > 0
+          ? `<div class="report-group-chip-list">${group.reports.map(report => `<span class="report-group-chip report">${escapeHtml(report.template_name || 'Untitled P&L')}</span>`).join('')}</div>`
+          : '<span class="report-group-empty">No P&amp;Ls yet</span>';
+        const emailsDisplay = emailNames.length > 0
+          ? `<div class="report-group-chip-list">${emailNames.map(name => `<span class="report-group-chip email">${escapeHtml(name)}</span>`).join('')}</div>`
+          : '<span class="report-group-empty">No email groups</span>';
+        const lastRunDisplay = group.last_run_at
+          ? `<span class="schedule-last-run" title="${escapeHtml(formatDate(group.last_run_at))}">${escapeHtml(formatDate(group.last_run_at))}</span>`
+          : '<span class="report-group-empty">Never run</span>';
+
+        return `
+          <tr>
+            <td>
+              <strong>${escapeHtml(group.name || 'Untitled Group')}</strong>
+              <div style="font-size: 12px; color: #718096; margin-top: 4px;">
+                ${group.reports.length} P&amp;L${group.reports.length === 1 ? '' : 's'} • ${group.email_group_ids.length} email group${group.email_group_ids.length === 1 ? '' : 's'}
+              </div>
+            </td>
+            <td>${tagsDisplay}</td>
+            <td>${reportsDisplay}</td>
+            <td>${emailsDisplay}</td>
+            <td>${lastRunDisplay}</td>
+            <td style="text-align: center;">
+              <div class="action-buttons" style="justify-content: center;">
+                <button class="btn btn-small btn-secondary" onclick="openReportGroupModal('${escapeHtml(group.id)}')" style="font-size: 11px; padding: 4px 8px;">✏️ Edit</button>
+                <button class="btn btn-small btn-danger" onclick="deleteReportGroup('${escapeHtml(group.id)}')" style="font-size: 11px; padding: 4px 8px;">🗑️ Delete</button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function openReportGroupModal(groupId = null) {
+      const group = groupId
+        ? reportGroups.find(candidate => String(candidate.id) === String(groupId))
+        : null;
+
+      currentEditingGroup = group ? cloneReportGroup(group) : createEmptyReportGroup();
+
+      document.getElementById('reportGroupModalTitle').textContent = group ? 'Edit Report Group' : 'Create Report Group';
+      document.getElementById('reportGroupId').value = currentEditingGroup.id;
+      document.getElementById('reportGroupName').value = currentEditingGroup.name || '';
+      document.getElementById('reportGroupTagInput').value = '';
+      isReportGroupTagInputFocused = false;
+      isReportGroupTagPickerOpen = false;
+
+      renderReportGroupTags();
+      renderReportGroupEmailGroups();
+      populateReportGroupEmailGroupSelect();
+      renderReportGroupReports();
+      syncReportGroupTagInputShell();
+      renderReportGroupTagSuggestions();
+
+      document.getElementById('reportGroupModal').classList.add('active');
+    }
+
+    function closeReportGroupModal() {
+      document.getElementById('reportGroupModal').classList.remove('active');
+      currentEditingGroup = null;
+      currentEditingReportIndex = null;
+      if (reportGroupTagBlurTimeout) {
+        clearTimeout(reportGroupTagBlurTimeout);
+        reportGroupTagBlurTimeout = null;
+      }
+      isReportGroupTagInputFocused = false;
+      isReportGroupTagPickerOpen = false;
+      const tagInput = document.getElementById('reportGroupTagInput');
+      if (tagInput) {
+        tagInput.value = '';
+      }
+      syncReportGroupTagInputShell();
+      renderReportGroupTagSuggestions();
+    }
+
+    function renderReportGroupTags() {
+      const container = document.getElementById('reportGroupTagsContainer');
+      if (!container || !currentEditingGroup) return;
+
+      if (!currentEditingGroup.tags.length) {
+        container.innerHTML = '';
+        return;
+      }
+
+      container.innerHTML = currentEditingGroup.tags.map(tag => `
+        <span class="modal-tag">
+          ${escapeHtml(tag)}
+          <button type="button" onclick="removeTagFromReportGroup('${escapeForSingleQuotedJs(tag)}')" title="Remove">&times;</button>
+        </span>
+      `).join('');
+    }
+
+    function getAllExistingReportGroupTags() {
+      const selectedTags = currentEditingGroup?.tags || [];
+      const allTags = reportGroups.flatMap(group => normalizeScheduleTags(group.tags || []));
+      const availableTags = allTags.filter(tag => !selectedTags.some(selected => selected.toLowerCase() === tag.toLowerCase()));
+      return normalizeScheduleTags(availableTags).sort((a, b) => a.localeCompare(b));
+    }
+
+    function getFilteredReportGroupTagSuggestions(query = '') {
+      const normalizedQuery = query.trim().toLowerCase();
+      const availableTags = getAllExistingReportGroupTags();
+
+      if (!normalizedQuery) {
+        return availableTags;
+      }
+
+      return availableTags.filter(tag => tag.toLowerCase().includes(normalizedQuery));
+    }
+
+    function syncReportGroupTagInputShell() {
+      const shell = document.getElementById('reportGroupTagField');
+      if (!shell) return;
+
+      shell.classList.toggle('focused', isReportGroupTagInputFocused);
+    }
+
+    function focusReportGroupTagInput() {
+      const input = document.getElementById('reportGroupTagInput');
+      if (!input) return;
+
+      if (reportGroupTagBlurTimeout) {
+        clearTimeout(reportGroupTagBlurTimeout);
+        reportGroupTagBlurTimeout = null;
+      }
+
+      isReportGroupTagPickerOpen = true;
+      input.focus();
+    }
+
+    function keepReportGroupTagInputActive() {
+      isReportGroupTagInputFocused = true;
+      isReportGroupTagPickerOpen = true;
+      syncReportGroupTagInputShell();
+      renderReportGroupTagSuggestions();
+      focusReportGroupTagInput();
+    }
+
+    function renderReportGroupTagSuggestions() {
+      const panel = document.getElementById('reportGroupTagSuggestions');
+      const input = document.getElementById('reportGroupTagInput');
+      if (!panel || !input) return;
+      if (!currentEditingGroup) {
+        panel.classList.remove('visible');
+        panel.innerHTML = '';
+        return;
+      }
+
+      const suggestions = getFilteredReportGroupTagSuggestions(input.value);
+      const shouldShow = isReportGroupTagPickerOpen && (suggestions.length > 0 || input.value.trim());
+
+      if (!shouldShow) {
+        panel.classList.remove('visible');
+        panel.innerHTML = '';
+        return;
+      }
+
+      panel.classList.add('visible');
+
+      if (suggestions.length === 0) {
+        panel.innerHTML = `
+          <div class="tag-suggestions-label">Existing Tags</div>
+          <div class="tag-suggestion-empty">No matching existing tags. Press Enter to create a new one.</div>
+        `;
+        return;
+      }
+
+      panel.innerHTML = `
+        <div class="tag-suggestions-label">Existing Tags</div>
+        <div class="tag-suggestion-list">
+          ${suggestions.map(tag => `
+            <button
+              type="button"
+              class="tag-suggestion-item"
+              onmousedown="event.preventDefault()"
+              onclick="selectReportGroupTagSuggestion('${escapeForSingleQuotedJs(tag)}')"
+            >
+              ${escapeHtml(tag)}
+            </button>
+          `).join('')}
+        </div>
+      `;
+    }
+
+    function selectReportGroupTagSuggestion(tag) {
+      if (!currentEditingGroup) return;
+
+      currentEditingGroup.tags = normalizeScheduleTags([...(currentEditingGroup.tags || []), tag]);
+      const input = document.getElementById('reportGroupTagInput');
+      if (input) {
+        input.value = '';
+      }
+
+      renderReportGroupTags();
+      renderReportGroupTagSuggestions();
+      keepReportGroupTagInputActive();
+    }
+
+    function addTagToReportGroup() {
+      if (!currentEditingGroup) return;
+      const input = document.getElementById('reportGroupTagInput');
+      if (!input) return;
+
+      const parsedTags = normalizeScheduleTags(input.value.split(/[\n,]+/));
+      if (!parsedTags.length) {
+        input.value = '';
+        keepReportGroupTagInputActive();
+        return;
+      }
+
+      currentEditingGroup.tags = normalizeScheduleTags([...(currentEditingGroup.tags || []), ...parsedTags]);
+      input.value = '';
+      renderReportGroupTags();
+      renderReportGroupTagSuggestions();
+      keepReportGroupTagInputActive();
+    }
+
+    function removeTagFromReportGroup(tagToRemove) {
+      if (!currentEditingGroup) return;
+      currentEditingGroup.tags = (currentEditingGroup.tags || []).filter(tag => tag !== tagToRemove);
+      renderReportGroupTags();
+      renderReportGroupTagSuggestions();
+    }
+
+    function populateReportGroupEmailGroupSelect() {
+      const select = document.getElementById('reportGroupEmailGroupSelect');
+      if (!select) return;
+
+      const selectedIds = currentEditingGroup?.email_group_ids || [];
+      select.innerHTML = '<option value="">+ Add email group...</option>' +
+        emailGroups.map(group => {
+          const disabled = selectedIds.includes(group.id) ? 'disabled' : '';
+          return `<option value="${group.id}" ${disabled}>${escapeHtml(group.name)}</option>`;
+        }).join('');
+    }
+
+    function renderReportGroupEmailGroups() {
+      const container = document.getElementById('reportGroupEmailGroupsContainer');
+      if (!container || !currentEditingGroup) return;
+
+      if (!currentEditingGroup.email_group_ids.length) {
+        container.innerHTML = '<span style="color: #a0aec0; font-size: 12px;">No email groups selected</span>';
+        return;
+      }
+
+      container.innerHTML = currentEditingGroup.email_group_ids.map(groupId => {
+        const group = emailGroups.find(candidate => String(candidate.id) === String(groupId));
+        if (!group) return '';
+        return `
+          <span class="modal-email-tag">
+            ${escapeHtml(group.name)}
+            <button onclick="removeEmailGroupFromReportGroup(${group.id})" title="Remove">&times;</button>
+          </span>
+        `;
+      }).join('');
+    }
+
+    function addEmailGroupToReportGroup(groupId) {
+      if (!currentEditingGroup || !groupId) return;
+
+      const parsedId = parseInt(groupId);
+      if (!Number.isFinite(parsedId) || currentEditingGroup.email_group_ids.includes(parsedId)) return;
+
+      currentEditingGroup.email_group_ids.push(parsedId);
+      renderReportGroupEmailGroups();
+      populateReportGroupEmailGroupSelect();
+    }
+
+    function removeEmailGroupFromReportGroup(groupId) {
+      if (!currentEditingGroup) return;
+      currentEditingGroup.email_group_ids = currentEditingGroup.email_group_ids.filter(id => id !== groupId);
+      renderReportGroupEmailGroups();
+      populateReportGroupEmailGroupSelect();
+    }
+
+    function renderReportGroupReports() {
+      const container = document.getElementById('reportGroupReportsContainer');
+      if (!container || !currentEditingGroup) return;
+
+      if (!currentEditingGroup.reports.length) {
+        container.innerHTML = `
+          <div class="report-group-builder-empty">
+            No P&amp;Ls added yet. Click <strong>Add P&amp;L</strong> to open the detail popup for the first report.
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = currentEditingGroup.reports.map((report, index) => `
+        <div class="report-group-builder-item">
+          <div class="report-group-builder-item-header">
+            <div>
+              <div class="report-group-builder-item-title">${escapeHtml(report.template_name || 'Untitled P&L')}</div>
+              <div class="report-group-builder-item-meta">${escapeHtml(getReportGroupReportMeta(report))}</div>
+            </div>
+            <div class="action-buttons">
+              <button type="button" class="btn btn-small btn-secondary" onclick="openGroupReportModal(${index})" style="font-size: 11px; padding: 4px 8px;">Edit</button>
+              <button type="button" class="btn btn-small btn-danger" onclick="removeReportFromGroup(${index})" style="font-size: 11px; padding: 4px 8px;">Remove</button>
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function openGroupReportModal(reportIndex = null) {
+      if (!currentEditingGroup) return;
+
+      currentEditingReportIndex = Number.isInteger(reportIndex) ? reportIndex : null;
+      const report = currentEditingReportIndex !== null
+        ? currentEditingGroup.reports[currentEditingReportIndex]
+        : null;
+
+      currentEditingSchedule = report ? cloneReportGroup(report) : createEmptyGroupReport();
+      document.getElementById('scheduleEditModalTitle').textContent = report ? 'Edit P&L' : 'Add P&L';
+      document.getElementById('editScheduleId').value = currentEditingSchedule.id || '';
+      document.getElementById('editTemplateName').value = currentEditingSchedule.template_name || '';
+      document.getElementById('editTemplateType').value = currentEditingSchedule.template_type || '';
+      document.getElementById('editProcess').value = currentEditingSchedule.process || '';
+
+      populateEntityDropdowns();
+      document.getElementById('editDistrictId').value = currentEditingSchedule.district_id || '';
+      document.getElementById('editRegionId').value = currentEditingSchedule.region_id || '';
+      document.getElementById('editCustomerTagId').value = currentEditingSchedule.customer_tag_id || '';
+      document.getElementById('editSubsidiaryId').value = currentEditingSchedule.subsidiary_id || '';
+      document.getElementById('editServiceFilterId').value = currentEditingSchedule.service_filter_id || '';
+      document.getElementById('editHeaderSubsidiaryId').value = currentEditingSchedule.header_subsidiary_id || '';
+
+      onEditTemplateTypeChange(true);
+      document.getElementById('scheduleEditModal').classList.add('active');
+    }
+
+    function closeScheduleEditModal() {
+      document.getElementById('scheduleEditModal').classList.remove('active');
+      currentEditingSchedule = null;
+      currentEditingReportIndex = null;
+      const form = document.getElementById('scheduleEditForm');
+      if (form) form.reset();
+    }
+
+    async function saveScheduleFromModal() {
+      if (!currentEditingGroup) return;
+
+      const templateName = document.getElementById('editTemplateName').value.trim();
+      const templateType = document.getElementById('editTemplateType').value;
+      const rawProcess = document.getElementById('editProcess').value;
+      const process = getScheduleProcessValue(rawProcess);
+      const districtSelect = document.getElementById('editDistrictId');
+      const regionSelect = document.getElementById('editRegionId');
+      const customerTagSelect = document.getElementById('editCustomerTagId');
+      const subsidiarySelect = document.getElementById('editSubsidiaryId');
+      const serviceFilterSelect = document.getElementById('editServiceFilterId');
+      const headerSubsidiarySelect = document.getElementById('editHeaderSubsidiaryId');
+
+      if (!templateName) {
+        alert('Please enter a P&L name');
+        return;
+      }
+      if (!templateType) {
+        alert('Please select a report type');
+        return;
+      }
+      if (!rawProcess) {
+        alert('Please select a P&L process');
+        return;
+      }
+
+      let districtId = null, districtName = null;
+      let regionId = null, regionName = null;
+      let subsidiaryId = null, subsidiaryName = null;
+      let customerTagId = null, customerTagName = null;
+      let serviceFilterId = null, serviceFilterName = null;
+      let headerSubsidiaryId = null, headerSubsidiaryName = null;
+
+      if (templateType === 'district') {
+        districtId = districtSelect.value || null;
+        if (districtId) {
+          const option = getOptionById(districtOptions, districtId);
+          districtName = option ? option.label : null;
+        }
+
+        subsidiaryId = subsidiarySelect.value || null;
+        if (subsidiaryId) {
+          const option = getOptionById(subsidiaryOptions, subsidiaryId);
+          subsidiaryName = option ? option.label : null;
+        }
+      } else if (templateType === 'region') {
+        regionId = regionSelect.value || null;
+        if (regionId) {
+          const option = getOptionById(regionOptions, regionId);
+          regionName = option ? option.label : null;
+        }
+
+        subsidiaryId = subsidiarySelect.value || null;
+        if (subsidiaryId) {
+          const option = getOptionById(subsidiaryOptions, subsidiaryId);
+          subsidiaryName = option ? option.label : null;
+        }
+      } else if (templateType === 'subsidiary') {
+        subsidiaryId = subsidiarySelect.value || null;
+        if (subsidiaryId) {
+          const option = getOptionById(subsidiaryOptions, subsidiaryId);
+          subsidiaryName = option ? option.label : null;
+        }
+
+        serviceFilterId = serviceFilterSelect.value || null;
+        if (serviceFilterId) {
+          const option = getOptionById(serviceOptions, serviceFilterId);
+          serviceFilterName = option ? option.label : null;
+        }
+      } else if (templateType === 'customer_tag') {
+        customerTagId = customerTagSelect.value || null;
+        if (customerTagId) {
+          const option = getOptionById(customerTagOptions, customerTagId);
+          customerTagName = option ? option.label : null;
+        }
+      }
+
+      headerSubsidiaryId = headerSubsidiarySelect.value || null;
+      if (headerSubsidiaryId) {
+        const option = getOptionById(subsidiaryOptions, headerSubsidiaryId);
+        headerSubsidiaryName = option ? option.label : null;
+      }
+
+      if (templateType === 'district' && !districtId) {
+        alert('Please select a district');
+        return;
+      }
+      if (templateType === 'region' && !regionId) {
+        alert('Please select a region');
+        return;
+      }
+      if (templateType === 'subsidiary' && !subsidiaryId) {
+        alert('Please select a subsidiary');
+        return;
+      }
+      if (templateType === 'customer_tag' && !customerTagId) {
+        alert('Please select a customer tag');
+        return;
+      }
+      if (!headerSubsidiaryId) {
+        alert('Please select a subsidiary header');
+        return;
+      }
+
+      const reportData = {
+        id: currentEditingSchedule?.id || createReportGroupReportId(),
+        template_name: templateName,
+        template_type: templateType,
+        process,
+        service_filter_id: serviceFilterId,
+        service_filter_name: serviceFilterName,
+        header_subsidiary_id: headerSubsidiaryId,
+        header_subsidiary_name: headerSubsidiaryName,
+        district_id: districtId,
+        district_name: districtName,
+        region_id: regionId,
+        region_name: regionName,
+        subsidiary_id: subsidiaryId,
+        subsidiary_name: subsidiaryName,
+        customer_tag_id: customerTagId,
+        customer_tag_name: customerTagName
+      };
+
+      if (currentEditingReportIndex !== null && currentEditingGroup.reports[currentEditingReportIndex]) {
+        currentEditingGroup.reports[currentEditingReportIndex] = reportData;
+      } else {
+        currentEditingGroup.reports.push(reportData);
+      }
+
+      currentEditingGroup.updated_at = new Date().toISOString();
+      closeScheduleEditModal();
+      renderReportGroupReports();
+    }
+
+    async function saveReportGroup() {
+      if (!currentEditingGroup) return;
+
+      const groupName = document.getElementById('reportGroupName').value.trim();
+
+      if (!groupName) {
+        alert('Please enter a group name');
+        return;
+      }
+
+      if (currentEditingGroup.email_group_ids.length === 0) {
+        alert('Please add at least one email group');
+        return;
+      }
+
+      if (currentEditingGroup.reports.length === 0) {
+        alert('Please add at least one P&L to the group');
+        return;
+      }
+
+      currentEditingGroup.name = groupName;
+      currentEditingGroup.tags = normalizeScheduleTags(currentEditingGroup.tags || []);
+      currentEditingGroup.updated_at = new Date().toISOString();
+
+      const payload = {
+        name: currentEditingGroup.name,
+        tags: currentEditingGroup.tags,
+        email_group_ids: currentEditingGroup.email_group_ids,
+        reports: currentEditingGroup.reports.map(report => ({
+          id: report.id || null,
+          template_name: report.template_name,
+          template_type: report.template_type,
+          process: report.process,
+          service_filter_id: report.service_filter_id || null,
+          service_filter_name: report.service_filter_name || null,
+          header_subsidiary_id: report.header_subsidiary_id || null,
+          header_subsidiary_name: report.header_subsidiary_name || null,
+          district_id: report.district_id || null,
+          district_name: report.district_name || null,
+          region_id: report.region_id || null,
+          region_name: report.region_name || null,
+          subsidiary_id: report.subsidiary_id || null,
+          subsidiary_name: report.subsidiary_name || null,
+          customer_tag_id: report.customer_tag_id || null,
+          customer_tag_name: report.customer_tag_name || null
+        }))
+      };
+
+      const existingGroup = reportGroups.find(group => String(group.id) === String(currentEditingGroup.id));
+
+      try {
+        const response = await authFetch(
+          existingGroup
+            ? `/api/report-schedules/${currentEditingGroup.id}`
+            : '/api/report-schedules',
+          {
+            method: existingGroup ? 'PUT' : 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          }
+        );
+
+        const result = response.status === 204 ? null : await response.json().catch(() => null);
+        if (!response.ok) {
+          throw new Error(result?.message || result?.error || 'Failed to save report group');
+        }
+
+        closeReportGroupModal();
+        await loadReportSchedules();
+      } catch (error) {
+        console.error('Error saving report group:', error);
+        alert('Failed to save report group: ' + error.message);
+      }
+    }
+
+    async function deleteReportGroup(groupId) {
+      const group = reportGroups.find(candidate => String(candidate.id) === String(groupId));
+      if (!group) return;
+
+      if (!confirm(`Delete "${group.name || 'this report group'}"?`)) {
+        return;
+      }
+
+      try {
+        const response = await authFetch(`/api/report-schedules/${groupId}`, {
+          method: 'DELETE'
+        });
+
+        if (!response.ok) {
+          const result = await response.json().catch(() => null);
+          throw new Error(result?.message || result?.error || 'Failed to delete report group');
+        }
+
+        await loadReportSchedules();
+      } catch (error) {
+        console.error('Error deleting report group:', error);
+        alert('Failed to delete report group: ' + error.message);
+      }
+    }
+
+    function removeReportFromGroup(reportIndex) {
+      if (!currentEditingGroup) return;
+      currentEditingGroup.reports.splice(reportIndex, 1);
+      currentEditingGroup.updated_at = new Date().toISOString();
+      renderReportGroupReports();
+    }
+
+    function openNewScheduleModal() {
+      openReportGroupModal();
+    }
+
+    function getAvailableScheduleTags() {
+      const tagsByKey = new Map();
+
+      reportGroups.forEach(group => {
+        (group.tags || []).forEach(tag => {
+          const trimmed = String(tag || '').trim();
+          if (!trimmed) return;
+          const key = trimmed.toLowerCase();
+          if (!tagsByKey.has(key)) {
+            tagsByKey.set(key, trimmed);
+          }
+        });
+      });
+
+      return Array.from(tagsByKey.values()).sort((a, b) => a.localeCompare(b));
+    }
+
+    function populateRunReportsTagOptions() {
+      const tagSelect = document.getElementById('runReportsTag');
+      const currentValue = tagSelect.value;
+      const tags = getAvailableScheduleTags();
+
+      tagSelect.innerHTML = `
+        <option value="">Select a tag</option>
+        ${tags.map(tag => `<option value="${escapeHtml(tag)}">${escapeHtml(tag)}</option>`).join('')}
+      `;
+
+      if (currentValue && tags.some(tag => tag.toLowerCase() === currentValue.toLowerCase())) {
+        tagSelect.value = tags.find(tag => tag.toLowerCase() === currentValue.toLowerCase());
+      } else if (tags.length === 1) {
+        tagSelect.value = tags[0];
+      }
+
+      updateRunReportsSelectionHelp();
+    }
+
+    function getMatchingReportGroupsForTag(tag) {
+      const normalized = String(tag || '').trim().toLowerCase();
+      if (!normalized) return [];
+
+      return reportGroups.filter(group =>
+        (group.tags || []).some(groupTag => String(groupTag || '').trim().toLowerCase() === normalized)
+      );
+    }
+
+    function updateRunReportsSelectionHelp() {
+      const helpEl = document.getElementById('runReportsSelectionHelp');
+      const selectedTag = document.getElementById('runReportsTag').value.trim();
+      const selectedMode = document.getElementById('runReportsMode').value;
+
+      if (!selectedTag) {
+        helpEl.textContent = 'Choose a tag to see how many report groups will run.';
+        return;
+      }
+
+      const matchingGroups = getMatchingReportGroupsForTag(selectedTag);
+      if (!matchingGroups.length) {
+        helpEl.textContent = `No report groups currently use the "${selectedTag}" tag.`;
+        return;
+      }
+
+      const totalReports = matchingGroups.reduce((sum, group) => sum + group.reports.length, 0);
+      const actionLabel = selectedMode === 'generate'
+        ? 'generated as grouped packets'
+        : 'generated and sent as grouped emails';
+      helpEl.textContent = `${matchingGroups.length} report group${matchingGroups.length === 1 ? '' : 's'} with ${totalReports} total P&L${totalReports === 1 ? '' : 's'} will be ${actionLabel} for ${selectedTag}.`;
+    }
+
+    async function openRunReportsModal() {
+      populateRunReportsTagOptions();
+      await populateRunReportsMonthOptions();
+      document.getElementById('runReportsMode').value = 'send';
+      updateRunReportsSelectionHelp();
+      document.getElementById('runReportsModal').classList.add('active');
+    }
+
+    function getReportGroupNamesFromIds(groupIds = []) {
+      return (groupIds || []).map(groupId => {
+        const group = emailGroups.find(candidate => String(candidate.id) === String(groupId));
+        return group ? group.name : null;
+      }).filter(Boolean);
+    }
+
+    function getReportGroupBatchMetrics(batchRun) {
+      const items = batchRun.items || [];
+      let pdfsGenerated = 0;
+      let emailsDelivered = 0;
+      let groupsWithIssues = 0;
+
+      items.forEach(item => {
+        const payload = getBatchItemResultPayload(item);
+        const normalizedStatus = getNormalizedBatchItemStatus(item);
+        pdfsGenerated += Number(payload.generatedAttachmentCount || 0);
+        emailsDelivered += Number(item.emails_sent || 0);
+
+        if (['failed', 'partial', 'skipped'].includes(normalizedStatus)) {
+          groupsWithIssues += 1;
+        }
+      });
+
+      return {
+        processedCount: batchRun.processed_schedules || 0,
+        totalCount: batchRun.total_schedules || 0,
+        pdfsGenerated,
+        emailsDelivered,
+        groupsWithIssues
+      };
+    }
+
+    function getReportGroupGenerateStage(groupRun) {
+      const progress = groupRun.progress || {};
+      const validateStep = getBatchStepState(progress, 'validate');
+      const fetchStep = getBatchStepState(progress, 'fetch_data');
+      const pdfStep = getBatchStepState(progress, 'generate_pdf');
+      const generatedCount = Number(groupRun.generatedAttachmentCount || 0);
+      const reportCount = Number(groupRun.reportCount || 0);
+      const runEnded = ['success', 'partial', 'failed', 'skipped'].includes(groupRun.status);
+
+      if (pdfStep.status === 'success') {
+        return {
+          status: 'success',
+          detail: pdfStep.detail || `${generatedCount} of ${reportCount} attachments generated`
+        };
+      }
+
+      if (validateStep.status === 'failed' || fetchStep.status === 'failed' || pdfStep.status === 'failed') {
+        return {
+          status: 'failed',
+          detail: validateStep.detail || fetchStep.detail || pdfStep.detail || 'Attachment generation failed'
+        };
+      }
+
+      if (validateStep.status === 'running' || fetchStep.status === 'running' || pdfStep.status === 'running' || groupRun.status === 'running') {
+        return {
+          status: 'running',
+          detail: pdfStep.detail || fetchStep.detail || validateStep.detail || 'Generating grouped attachments'
+        };
+      }
+
+      if (runEnded && generatedCount === reportCount && reportCount > 0) {
+        return {
+          status: 'success',
+          detail: `${generatedCount} of ${reportCount} attachments generated`
+        };
+      }
+
+      if (runEnded) {
+        return {
+          status: 'failed',
+          detail: pdfStep.detail || groupRun.error || `Generated ${generatedCount} of ${reportCount} attachments`
+        };
+      }
+
+      return {
+        status: 'queued',
+        detail: `Queued to generate ${reportCount} attachment${reportCount === 1 ? '' : 's'}`
+      };
+    }
+
+    function getReportGroupEmailStage(groupRun) {
+      const progress = groupRun.progress || {};
+      const emailStep = getBatchStepState(progress, 'send_email');
+      const generatedCount = Number(groupRun.generatedAttachmentCount || 0);
+      const reportCount = Number(groupRun.reportCount || 0);
+      const runEnded = ['success', 'partial', 'failed', 'skipped'].includes(groupRun.status);
+
+      if (groupRun.mode === 'generate') {
+        return {
+          status: 'skipped',
+          detail: 'Email step skipped for generate-only runs'
+        };
+      }
+
+      if (emailStep.status === 'success' && (groupRun.emailsFailed || 0) === 0) {
+        return {
+          status: 'success',
+          detail: emailStep.detail || 'Grouped email sent successfully'
+        };
+      }
+
+      if (emailStep.status === 'partial' || groupRun.status === 'partial') {
+        return {
+          status: 'failed',
+          detail: emailStep.detail || `${groupRun.emailsSent || 0} sent • ${groupRun.emailsFailed || 0} failed`
+        };
+      }
+
+      if (emailStep.status === 'failed' || (runEnded && groupRun.status === 'failed')) {
+        return {
+          status: 'failed',
+          detail: emailStep.detail || groupRun.error || 'Grouped email was not sent'
+        };
+      }
+
+      if (emailStep.status === 'running') {
+        return {
+          status: 'running',
+          detail: emailStep.detail || 'Sending grouped email'
+        };
+      }
+
+      if (generatedCount < reportCount) {
+        return {
+          status: 'queued',
+          detail: 'Waiting for all attachments to finish'
+        };
+      }
+
+      return {
+        status: 'queued',
+        detail: 'Queued to send grouped email'
+      };
+    }
+
+    function getReportGroupRowDetail(groupRun) {
+      const reportCount = Number(groupRun.reportCount || 0);
+      const generatedCount = Number(groupRun.generatedAttachmentCount || 0);
+      const attachmentLabel = `${generatedCount} of ${reportCount} attachment${reportCount === 1 ? '' : 's'} ready`;
+      const recipientLabel = groupRun.groupNames.length > 0
+        ? groupRun.groupNames.join(', ')
+        : 'No email groups attached';
+
+      if (groupRun.status === 'running') {
+        const activeStep = [
+          getBatchStepState(groupRun.progress, 'validate'),
+          getBatchStepState(groupRun.progress, 'fetch_data'),
+          getBatchStepState(groupRun.progress, 'generate_pdf'),
+          getBatchStepState(groupRun.progress, 'send_email')
+        ].find(step => step.status === 'running');
+        return activeStep?.detail || `Working on ${attachmentLabel.toLowerCase()}`;
+      }
+
+      if (groupRun.mode === 'generate') {
+        return groupRun.status === 'success'
+          ? `${attachmentLabel} • generate only`
+          : groupRun.error || `${attachmentLabel} • generate only`;
+      }
+
+      if (groupRun.status === 'success') {
+        return `${attachmentLabel} • ${groupRun.recipientCount || 0} recipient${(groupRun.recipientCount || 0) === 1 ? '' : 's'} • ${recipientLabel}`;
+      }
+
+      if (groupRun.status === 'partial') {
+        return groupRun.error || `${attachmentLabel} • ${groupRun.emailsSent || 0} sent • ${groupRun.emailsFailed || 0} failed`;
+      }
+
+      if (groupRun.status === 'failed' || groupRun.status === 'skipped') {
+        return groupRun.error || 'This report group did not complete';
+      }
+
+      return `${reportCount} attachment${reportCount === 1 ? '' : 's'} queued • ${recipientLabel}`;
+    }
+
+    function getReportGroupEmailsSentLabel(groupRun) {
+      if (groupRun.mode === 'generate') {
+        return '—';
+      }
+
+      const sentCount = Number(groupRun.emailsSent || 0);
+      const failedCount = Number(groupRun.emailsFailed || 0);
+      if (failedCount > 0) {
+        return `${sentCount} sent / ${failedCount} failed`;
+      }
+
+      return `${sentCount} sent`;
+    }
+
+    function getReportGroupGeneratedCountLabel(groupRun) {
+      const generatedCount = Number(groupRun.generatedAttachmentCount || 0);
+      const reportCount = Number(groupRun.reportCount || 0);
+      return `${generatedCount} / ${reportCount} P&L${reportCount === 1 ? '' : 's'}`;
+    }
+
+    function updateSchedulerProgressFromJob(batchRun) {
+      currentBatchRunId = batchRun.id;
+
+      schedulesToProcess = (batchRun.items || []).map(item => {
+        const schedule = reportSchedules.find(candidate => String(candidate.id) === String(item.schedule_id));
+        const payload = getBatchItemResultPayload(item);
+        const reportResults = Array.isArray(payload.reportResults) ? payload.reportResults : [];
+        const fallbackReports = Array.isArray(schedule?.reports) ? schedule.reports : [];
+        const reportNames = reportResults.length > 0
+          ? reportResults.map(report => report.templateName || report.template_name).filter(Boolean)
+          : fallbackReports.map(report => report.template_name).filter(Boolean);
+        const emailGroupIds = Array.isArray(payload.emailGroupIds) && payload.emailGroupIds.length > 0
+          ? payload.emailGroupIds
+          : (schedule?.email_group_ids || []);
+        const recipientResults = Array.isArray(payload.recipientResults) ? payload.recipientResults : [];
+
+        return {
+          batchItemId: item.id,
+          scheduleId: item.schedule_id,
+          name: item.schedule_name,
+          status: getNormalizedBatchItemStatus(item),
+          mode: item.run_mode,
+          emailsSent: Number(item.emails_sent || 0),
+          emailsFailed: Number(item.emails_failed || 0),
+          error: item.error_message || payload.error || null,
+          progress: getBatchItemProgress(item),
+          groupNames: getReportGroupNamesFromIds(emailGroupIds),
+          reportNames,
+          reportCount: Number(payload.reportCount || reportResults.length || fallbackReports.length || 0),
+          generatedAttachmentCount: Number(payload.generatedAttachmentCount || 0),
+          recipientCount: Number(payload.recipientCount || recipientResults.length || 0),
+          recipientResults,
+          reportResults,
+          tag: batchRun.tag,
+          reportDate: batchRun.report_date
+        };
+      });
+
+      const metrics = getReportGroupBatchMetrics(batchRun);
+      const hasCompletedWorkWithIssues = metrics.groupsWithIssues > 0 && (metrics.pdfsGenerated > 0 || metrics.emailsDelivered > 0);
+      const displayStatus = (batchRun.status === 'completed' && metrics.groupsWithIssues > 0) || (batchRun.status === 'failed' && hasCompletedWorkWithIssues)
+        ? 'partial'
+        : batchRun.status;
+
+      document.getElementById('schedulesProcessedCount').textContent = `${metrics.processedCount} / ${metrics.totalCount}`;
+      document.getElementById('pdfsGeneratedCount').textContent = metrics.pdfsGenerated;
+      document.getElementById('emailsSentCount').textContent = metrics.emailsDelivered;
+      document.getElementById('errorsCount').textContent = metrics.groupsWithIssues;
+
+      const spinner = document.getElementById('schedulerSpinner');
+      const title = document.getElementById('schedulerTitle');
+      const meta = document.getElementById('schedulerMetaText');
+      const modeLabel = batchRun.run_mode === 'generate' ? 'Generate grouped packets only' : 'Generate and send grouped emails';
+
+      meta.textContent = `${batchRun.tag} · ${formatReportMonth(batchRun.report_date)} · ${modeLabel}`;
+
+      if (displayStatus === 'queued' || displayStatus === 'running') {
+        if (spinner) spinner.style.display = 'inline-block';
+        if (title) title.textContent = '⚙️ Running Report Groups...';
+        document.getElementById('schedulerStatusText').textContent =
+          `Processing ${metrics.processedCount} of ${metrics.totalCount} report group${metrics.totalCount === 1 ? '' : 's'}...`;
+      } else if (displayStatus === 'completed') {
+        if (spinner) spinner.style.display = 'none';
+        if (title) title.textContent = '✅ Report Group Run Complete';
+        document.getElementById('schedulerStatusText').textContent =
+          batchRun.run_mode === 'generate'
+            ? `Generated ${metrics.pdfsGenerated} grouped attachment${metrics.pdfsGenerated === 1 ? '' : 's'} across ${metrics.totalCount} report group${metrics.totalCount === 1 ? '' : 's'}.`
+            : `Generated ${metrics.pdfsGenerated} grouped attachment${metrics.pdfsGenerated === 1 ? '' : 's'} and delivered ${metrics.emailsDelivered} email${metrics.emailsDelivered === 1 ? '' : 's'}.`;
+      } else if (displayStatus === 'partial') {
+        if (spinner) spinner.style.display = 'none';
+        if (title) title.textContent = '⚠️ Report Group Run Complete With Issues';
+        document.getElementById('schedulerStatusText').textContent =
+          `${metrics.pdfsGenerated} grouped attachment${metrics.pdfsGenerated === 1 ? '' : 's'} generated, with ${metrics.groupsWithIssues} report group${metrics.groupsWithIssues === 1 ? '' : 's'} needing attention.`;
+      } else if (displayStatus === 'failed') {
+        if (spinner) spinner.style.display = 'none';
+        if (title) title.textContent = '❌ Report Group Run Failed';
+        document.getElementById('schedulerStatusText').textContent =
+          batchRun.error_message || 'The report group run failed before completion.';
+      }
+
+      renderScheduleProgressList();
+    }
+
+    async function confirmRunReports() {
+      const tag = document.getElementById('runReportsTag').value.trim();
+      const reportDate = document.getElementById('runReportsMonth').value;
+      const mode = document.getElementById('runReportsMode').value;
+      const button = document.getElementById('confirmRunReportsBtn');
+      const originalLabel = button.textContent;
+
+      if (!tag) {
+        alert('Please choose a tag first.');
+        return;
+      }
+
+      if (!reportDate) {
+        alert('Please choose a report month first.');
+        return;
+      }
+
+      const matchingGroups = getMatchingReportGroupsForTag(tag);
+      if (!matchingGroups.length) {
+        alert(`No report groups currently use the "${tag}" tag.`);
+        return;
+      }
+
+      try {
+        button.disabled = true;
+        button.textContent = 'Starting...';
+
+        const response = await authFetch('/api/report-batches', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tag, reportDate, mode })
+        });
+
+        const result = await response.json().catch(() => null);
+        if (!response.ok) {
+          throw new Error(result?.message || result?.error || 'Failed to start report group run');
+        }
+
+        currentBatchRunId = result?.batchRun?.id || null;
+        closeRunReportsModal();
+        showJobIndicator(result?.batchRun);
+        await showJobProgress(currentBatchRunId);
+        startJobPolling(currentBatchRunId);
+      } catch (error) {
+        console.error('❌ Error starting report group batch:', error);
+        alert('Failed to start report run: ' + error.message);
+      } finally {
+        button.disabled = false;
+        button.textContent = originalLabel;
+      }
+    }
+
+    function renderScheduleProgressList() {
+      const container = document.getElementById('scheduleProgressList');
+
+      if (!schedulesToProcess.length) {
+        container.innerHTML = '<div style="padding: 20px; text-align: center; color: #718096;">No report groups in this run</div>';
+        return;
+      }
+
+      const rowsHtml = schedulesToProcess.map(groupRun => {
+        const generateStage = getReportGroupGenerateStage(groupRun);
+        const emailStage = getReportGroupEmailStage(groupRun);
+        const rowDetail = getReportGroupRowDetail(groupRun);
+        const emailsSentLabel = getReportGroupEmailsSentLabel(groupRun);
+        const generatedCountLabel = getReportGroupGeneratedCountLabel(groupRun);
+
+        return `
+          <div class="schedule-progress-row">
+            <div class="schedule-progress-row-main">
+              <div class="schedule-progress-row-title">${escapeHtml(groupRun.name)}</div>
+              <div class="schedule-progress-row-detail${['failed', 'partial', 'skipped'].includes(groupRun.status) ? ' issue' : ''}">${escapeHtml(rowDetail)}</div>
+            </div>
+            <div class="schedule-progress-row-stages">
+              <div class="schedule-stage-cell">
+                <span class="schedule-stage-indicator ${generateStage.status}" title="${escapeHtml(generateStage.detail)}">${getScheduleStageIcon(generateStage.status)}</span>
+                <span class="schedule-stage-metric">${escapeHtml(generatedCountLabel)}</span>
+              </div>
+              <div class="schedule-stage-cell">
+                <span class="schedule-stage-indicator ${emailStage.status}" title="${escapeHtml(emailStage.detail)}">${getScheduleStageIcon(emailStage.status)}</span>
+              </div>
+              <span class="schedule-progress-email-count">${escapeHtml(emailsSentLabel)}</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      container.innerHTML = `
+        <div class="schedule-progress-table-head">
+          <div class="schedule-progress-head-label">Report Group</div>
+          <div class="schedule-progress-head-stages">
+            <span>Generate Attachments</span>
+            <span>Email Group</span>
+            <span>Emails</span>
+          </div>
+        </div>
+        ${rowsHtml}
+      `;
+    }
+
+    async function checkForRunningJob() {
+      try {
+        const response = await authFetch('/api/report-batches/latest');
+        if (response.status === 404 || !response.ok) return;
+
+        const batchRun = await response.json();
+        currentBatchRunId = batchRun.id;
+
+        const terminalStatuses = ['completed', 'partial', 'failed'];
+        const completedAt = batchRun.completed_at || batchRun.updated_at || batchRun.created_at;
+        const isRecentTerminal = terminalStatuses.includes(batchRun.status)
+          && completedAt
+          && (Date.now() - new Date(completedAt).getTime()) < (15 * 60 * 1000);
+
+        if (batchRun.status === 'queued' || batchRun.status === 'running' || isRecentTerminal) {
+          showJobIndicator(batchRun);
+        }
+
+        if (batchRun.status === 'queued' || batchRun.status === 'running') {
+          startJobPolling(batchRun.id);
+        }
+      } catch (error) {
+        console.error('Error checking for running job:', error);
+      }
+    }
+
+    function toggleFilterRow() {
+      // Filters were removed for the simplified report group view.
+    }
+
+    function clearColumnFilters() {
+      // Filters were removed for the simplified report group view.
     }
   </script>
 </body>

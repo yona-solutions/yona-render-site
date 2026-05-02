@@ -427,7 +427,14 @@ class EmailSchedulerService {
    */
   async generateReport(schedule) {
     try {
-      const { pdfBuffer, reportDate } = await scheduleReportService.generateSchedulePdf(schedule);
+      const storedRowHeight = emailConfigService.isAvailable()
+        ? await emailConfigService.getGlobalSetting('pdf_row_height')
+        : null;
+      const parsedRowHeight = parseFloat(storedRowHeight);
+      const pdfRowHeight = Number.isFinite(parsedRowHeight) ? parsedRowHeight : 12.5;
+      const { pdfBuffer, reportDate } = await scheduleReportService.generateSchedulePdf(schedule, {
+        pdfRowHeight
+      });
 
       return {
         pdfBuffer,

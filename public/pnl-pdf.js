@@ -1,9 +1,24 @@
-(function () {
+(function (root, factory) {
+  const api = factory();
+
+  if (typeof module === 'object' && module.exports) {
+    module.exports = api;
+  }
+
+  if (root) {
+    root.pnlPdf = api;
+  }
+})(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   const PDFSHIFT_URL = 'https://api.pdfshift.io/v3/convert/pdf';
-  const PDFSHIFT_API_KEY = 'sk_3df748acf1ce265988e07e04544b6452ece1b20e';
+  const PDFSHIFT_API_KEY = (
+    typeof process !== 'undefined' &&
+    process.env &&
+    process.env.PDFSHIFT_API_KEY
+  ) || 'sk_3df748acf1ce265988e07e04544b6452ece1b20e';
 
   function parseAccountingToNumber(text) {
-    const t = String(text || '').trim();
+    if (!text) return 0;
+    const t = String(text).trim();
     if (t === '-' || t === '') return 0;
     const neg = /^\(.*\)$/.test(t);
     const cleaned = t.replace(/[(),]/g, '');
@@ -29,20 +44,32 @@
         return Math.abs(monthValue) > 0.0001 || Math.abs(ytdValue) > 0.0001;
       }
     }
+
     return false;
   }
 
-  function prepareReportHtml(htmlContent) {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(`<div id="root">${htmlContent}</div>`, 'text/html');
-    const root = doc.getElementById('root');
+  function createHtmlDocument(htmlContent) {
+    const markup = `<div id="root">${htmlContent}</div>`;
 
-    root.querySelectorAll('.page-break:not(.pnl-report-container)').forEach(el => el.remove());
+    if (typeof DOMParser !== 'undefined') {
+      return new DOMParser().parseFromString(markup, 'text/html');
+    }
+
+    const { JSDOM } = require('jsdom');
+    return new JSDOM(markup).window.document;
+  }
+
+  function prepareReportHtml(htmlContent) {
+    const doc = createHtmlDocument(htmlContent);
+    const rootEl = doc.getElementById('root');
+
+    rootEl.querySelectorAll('.page-break:not(.pnl-report-container)').forEach(el => el.remove());
 
     const compactAccountThreshold = 40;
-    root.querySelectorAll('.pnl-report-container').forEach(container => {
+    rootEl.querySelectorAll('.pnl-report-container').forEach(container => {
       const table = container.querySelector('.pnl-report-table');
       if (!table) return;
+
       const accountCount = table.querySelectorAll('tbody tr:not(.section-header-row)').length;
       if (accountCount >= compactAccountThreshold) {
         table.classList.add('pnl-compact-table');
@@ -50,24 +77,34 @@
     });
 
     const kept = [];
-    root.querySelectorAll('.pnl-report-container').forEach(container => {
+    rootEl.querySelectorAll('.pnl-report-container').forEach(container => {
       if (hasNonZeroIncome(container)) {
         kept.push(container.outerHTML);
       }
     });
 
-    const filteredHtml = kept.length
+    const filteredHtmlContent = kept.length
       ? kept.join('\n')
-      : (root.querySelector('.pnl-report-container')?.outerHTML || htmlContent);
+      : (rootEl.querySelector('.pnl-report-container')?.outerHTML || htmlContent);
 
     return {
-      html: filteredHtml,
+      html: filteredHtmlContent,
       keptCount: kept.length
     };
   }
 
+  function resolvePdfRowHeight(options = {}) {
+    const value = options.pdfRowHeight
+      || (typeof window !== 'undefined' ? window.pdfRowHeight : undefined)
+      || (typeof globalThis !== 'undefined' ? globalThis.pdfRowHeight : undefined)
+      || 12.5;
+
+    const parsed = parseFloat(value);
+    return Number.isFinite(parsed) ? parsed : 12.5;
+  }
+
   function buildPdfHtml(content, options = {}) {
-    const rowH = options.pdfRowHeight || window.pdfRowHeight || 12.5;
+    const rowH = resolvePdfRowHeight(options);
     const tblFont = (rowH * 8.5 / 12.5).toFixed(2);
     const compactRowH = (rowH * 11 / 12.5).toFixed(2);
     const compactFont = (rowH * 7.25 / 12.5).toFixed(2);
@@ -317,12 +354,8 @@
     };
   }
 
-  async function requestPdfBlob(fullHTML) {
+  async function requestPdfResponse(fullHTML) {
     const pdfshiftOptions = buildPdfshiftOptions(fullHTML);
-    console.log('🔄 Calling PDFShift API...');
-    console.log('🧪 PDFShift options:', pdfshiftOptions);
-    console.log('🧪 PDF HTML length:', fullHTML.length);
-
     const response = await fetch(PDFSHIFT_URL, {
       method: 'POST',
       headers: {
@@ -334,17 +367,42 @@
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error('PDFShift API returned ' + response.status + ': ' + errorText);
+      throw new Error(`PDFShift API returned ${response.status}: ${errorText}`);
     }
 
+    return response;
+  }
+
+  async function requestPdfBlob(fullHTML) {
+    const response = await requestPdfResponse(fullHTML);
     return response.blob();
+  }
+
+  async function requestPdfBuffer(fullHTML) {
+    const response = await requestPdfResponse(fullHTML);
+    const arrayBuffer = await response.arrayBuffer();
+    if (typeof Buffer !== 'undefined') {
+      return Buffer.from(arrayBuffer);
+    }
+    return new Uint8Array(arrayBuffer);
   }
 
   async function generatePdfBlobFromReportHtml(htmlContent, options = {}) {
     const prepared = prepareReportHtml(htmlContent);
-    console.log(`📊 Filtered to ${prepared.keptCount} reports with non-zero net income`);
     const fullHTML = buildPdfHtml(prepared.html, options);
     return requestPdfBlob(fullHTML);
+  }
+
+  async function generatePdfBufferFromReportHtml(htmlContent, options = {}) {
+    const prepared = prepareReportHtml(htmlContent);
+    const fullHTML = buildPdfHtml(prepared.html, options);
+    const pdfBuffer = await requestPdfBuffer(fullHTML);
+
+    return {
+      pdfBuffer,
+      prepared,
+      fullHTML
+    };
   }
 
   function downloadBlob(blob, filename) {
@@ -362,14 +420,16 @@
     }, 100);
   }
 
-  window.pnlPdf = {
+  return {
     parseAccountingToNumber,
     hasNonZeroIncome,
     prepareReportHtml,
     buildPdfHtml,
     buildPdfshiftOptions,
     requestPdfBlob,
+    requestPdfBuffer,
     generatePdfBlobFromReportHtml,
+    generatePdfBufferFromReportHtml,
     downloadBlob
   };
-})();
+});

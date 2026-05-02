@@ -68,6 +68,16 @@ async function createApp() {
         SELECT to_regclass('public.report_schedules') AS table_name
       `);
       if (reportSchedulesTable.rows[0]?.table_name) {
+        const reportScheduleColumnsResult = await emailConfigService.pool.query(`
+          SELECT column_name
+          FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND table_name = 'report_schedules'
+        `);
+        const reportScheduleColumns = new Set(
+          reportScheduleColumnsResult.rows.map(row => row.column_name)
+        );
+
         await emailConfigService.pool.query(`
           ALTER TABLE report_schedules
           ADD COLUMN IF NOT EXISTS tags TEXT[] DEFAULT ARRAY[]::TEXT[]
@@ -95,11 +105,21 @@ async function createApp() {
           SET tags = ARRAY[]::TEXT[]
           WHERE tags IS NULL
         `);
-        await emailConfigService.pool.query(`
-          UPDATE report_schedules
-          SET last_run_at = COALESCE(last_run_at, GREATEST(last_run_manual, last_run_automated, last_sent_at))
-          WHERE last_run_at IS NULL
-        `);
+
+        const runTimestampColumns = ['last_run_manual', 'last_run_automated', 'last_sent_at']
+          .filter(column => reportScheduleColumns.has(column));
+
+        if (runTimestampColumns.length > 0) {
+          const fallbackExpression = runTimestampColumns.length === 1
+            ? runTimestampColumns[0]
+            : `NULLIF(GREATEST(${runTimestampColumns.map(column => `COALESCE(${column}, '-infinity'::timestamptz)`).join(', ')}), '-infinity'::timestamptz)`;
+
+          await emailConfigService.pool.query(`
+            UPDATE report_schedules
+            SET last_run_at = COALESCE(last_run_at, ${fallbackExpression})
+            WHERE last_run_at IS NULL
+          `);
+        }
 
         const runLogsTable = await emailConfigService.pool.query(`
           SELECT to_regclass('public.run_logs') AS table_name
@@ -125,6 +145,38 @@ async function createApp() {
           ALTER TABLE report_schedules
           DROP COLUMN IF EXISTS last_run_manual,
           DROP COLUMN IF EXISTS last_run_automated
+        `);
+
+        await emailConfigService.pool.query(`
+          CREATE TABLE IF NOT EXISTS report_schedule_reports (
+            id SERIAL PRIMARY KEY,
+            report_schedule_id INTEGER NOT NULL REFERENCES report_schedules(id) ON DELETE CASCADE,
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            template_name VARCHAR(255) NOT NULL,
+            template_type VARCHAR(50) NOT NULL,
+            process VARCHAR(50) NOT NULL,
+            service_filter_id VARCHAR(255),
+            service_filter_name VARCHAR(255),
+            header_subsidiary_id VARCHAR(255),
+            header_subsidiary_name VARCHAR(255),
+            district_id VARCHAR(255),
+            district_name VARCHAR(255),
+            region_id VARCHAR(255),
+            region_name VARCHAR(255),
+            subsidiary_id VARCHAR(255),
+            subsidiary_name VARCHAR(255),
+            customer_tag_id VARCHAR(255),
+            customer_tag_name VARCHAR(255),
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            CONSTRAINT chk_report_schedule_reports_template_type CHECK (template_type IN ('district', 'region', 'subsidiary', 'customer_tag')),
+            CONSTRAINT chk_report_schedule_reports_process CHECK (process IN ('standard', 'operational'))
+          )
+        `);
+
+        await emailConfigService.pool.query(`
+          CREATE INDEX IF NOT EXISTS idx_report_schedule_reports_schedule_id
+            ON report_schedule_reports(report_schedule_id, sort_order, id)
         `);
       }
 

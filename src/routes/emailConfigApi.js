@@ -11,7 +11,6 @@ const emailService = require('../services/emailService');
 const emailSchedulerService = require('../services/emailSchedulerService');
 const reportBatchTaskService = require('../services/reportBatchTaskService');
 const scheduleReportService = require('../services/scheduleReportService');
-const pnlPdfServer = require('../utils/pnlPdfServer');
 
 // Store reference to bigQueryService instance (set via createEmailConfigRoutes)
 let bigQueryServiceInstance = null;
@@ -84,6 +83,173 @@ function normalizeScheduleTags(tags) {
   });
 
   return normalized;
+}
+
+function normalizeIntegerArray(values) {
+  const rawValues = Array.isArray(values)
+    ? values
+    : values === undefined || values === null
+      ? []
+      : [values];
+
+  return [...new Set(
+    rawValues
+      .map(value => parseInt(value, 10))
+      .filter(Number.isFinite)
+  )];
+}
+
+async function getPdfRowHeightSetting() {
+  if (!emailConfigService.isAvailable()) {
+    return 12.5;
+  }
+
+  try {
+    const storedValue = await emailConfigService.getGlobalSetting('pdf_row_height');
+    const parsed = parseFloat(storedValue);
+    return Number.isFinite(parsed) ? parsed : 12.5;
+  } catch (error) {
+    console.warn('Unable to load PDF row height setting, using default 12.5:', error.message);
+    return 12.5;
+  }
+}
+
+function normalizeReportGroupReports(reports) {
+  if (!Array.isArray(reports)) {
+    return [];
+  }
+
+  return reports.map((report, index) => ({
+    id: report?.id || null,
+    sort_order: index,
+    template_name: String(report?.template_name || '').trim(),
+    template_type: String(report?.template_type || '').trim(),
+    process: String(report?.process || '').trim(),
+    service_filter_id: report?.service_filter_id || null,
+    service_filter_name: report?.service_filter_name || null,
+    header_subsidiary_id: report?.header_subsidiary_id || null,
+    header_subsidiary_name: report?.header_subsidiary_name || null,
+    district_id: report?.district_id || null,
+    district_name: report?.district_name || null,
+    region_id: report?.region_id || null,
+    region_name: report?.region_name || null,
+    subsidiary_id: report?.subsidiary_id || null,
+    subsidiary_name: report?.subsidiary_name || null,
+    customer_tag_id: report?.customer_tag_id || null,
+    customer_tag_name: report?.customer_tag_name || null
+  }));
+}
+
+function getLegacyReportFromGroup(group) {
+  const templateType = group?.template_type || group?.hierarchy;
+  const process = group?.process || group?.report_type;
+  if (!templateType || !process) {
+    return null;
+  }
+
+  return {
+    id: group?.report_id || group?.id || null,
+    template_name: String(group?.report_template_name || group?.template_name || group?.name || '').trim(),
+    template_type: templateType,
+    process,
+    service_filter_id: group?.service_filter_id || null,
+    service_filter_name: group?.service_filter_name || null,
+    header_subsidiary_id: group?.header_subsidiary_id || null,
+    header_subsidiary_name: group?.header_subsidiary_name || null,
+    district_id: group?.district_id || null,
+    district_name: group?.district_name || null,
+    region_id: group?.region_id || null,
+    region_name: group?.region_name || null,
+    subsidiary_id: group?.subsidiary_id || null,
+    subsidiary_name: group?.subsidiary_name || null,
+    customer_tag_id: group?.customer_tag_id || null,
+    customer_tag_name: group?.customer_tag_name || null
+  };
+}
+
+function getReportGroupReports(group) {
+  const normalizedReports = normalizeReportGroupReports(group?.reports);
+  if (normalizedReports.length > 0) {
+    return normalizedReports;
+  }
+
+  const legacyReport = getLegacyReportFromGroup(group);
+  return legacyReport ? [legacyReport] : [];
+}
+
+function buildReportGroupPayload(body = {}) {
+  const name = String(body.name || body.template_name || '').trim();
+
+  return {
+    name,
+    tags: normalizeScheduleTags(body.tags) || [],
+    email_group_ids: normalizeIntegerArray(body.email_group_ids ?? body.email_group_id),
+    reports: getReportGroupReports(body),
+    enabled: body.enabled !== undefined ? Boolean(body.enabled) : true,
+    frequency: body.frequency || 'monthly',
+    day_of_week: body.day_of_week || null,
+    day_of_month: body.day_of_month ?? null,
+    time_of_day: body.time_of_day || '08:00:00'
+  };
+}
+
+function validateReportGroupPayload(groupData) {
+  if (!groupData.name) {
+    return 'Group name is required';
+  }
+
+  if (!Array.isArray(groupData.email_group_ids) || groupData.email_group_ids.length === 0) {
+    return 'At least one email group is required';
+  }
+
+  if (!Array.isArray(groupData.reports) || groupData.reports.length === 0) {
+    return 'At least one P&L is required';
+  }
+
+  for (const [index, report] of groupData.reports.entries()) {
+    const label = report.template_name || `P&L ${index + 1}`;
+    if (!report.template_name) {
+      return `P&L ${index + 1} must have a name`;
+    }
+    if (!report.template_type) {
+      return `${label} must have a report type`;
+    }
+    if (!report.process) {
+      return `${label} must have a P&L process`;
+    }
+    if (!report.header_subsidiary_id) {
+      return `${label} must have a subsidiary header`;
+    }
+
+    if (report.template_type === 'district' && !report.district_id) {
+      return `${label} must have a district selected`;
+    }
+    if (report.template_type === 'region' && !report.region_id) {
+      return `${label} must have a region selected`;
+    }
+    if (report.template_type === 'subsidiary' && !report.subsidiary_id) {
+      return `${label} must have a subsidiary selected`;
+    }
+    if (report.template_type === 'customer_tag' && !report.customer_tag_id) {
+      return `${label} must have a customer tag selected`;
+    }
+  }
+
+  return null;
+}
+
+function buildGroupedAttachmentFilename(report, entityName, reportDate) {
+  const safeReportName = (report.template_name || 'P&L')
+    .replace(/[^a-zA-Z0-9_.-]/g, '_')
+    .replace(/_+/g, '_');
+  const safeEntityName = String(entityName || 'entity')
+    .replace(/[^a-zA-Z0-9_.-]/g, '_')
+    .replace(/_+/g, '_');
+  const safeDate = String(reportDate || '')
+    .replace(/[^a-zA-Z0-9_.-]/g, '_')
+    .replace(/_+/g, '_');
+
+  return `${safeReportName}_${safeEntityName}_${safeDate}_PnL.pdf`;
 }
 
 function normalizeBatchMode(mode) {
@@ -492,83 +658,28 @@ router.get('/report-schedules/due', async (req, res) => {
  */
 router.post('/report-schedules', async (req, res) => {
   try {
-    const {
-      template_name,
-      template_type,
-      process,
-      service_filter_id,
-      service_filter_name,
-      header_subsidiary_id,
-      header_subsidiary_name,
-      district_id,
-      district_name,
-      region_id,
-      region_name,
-      subsidiary_id,
-      subsidiary_name,
-      customer_tag_id,
-      customer_tag_name,
-      tags,
-      email_group_ids,  // Now an array
-      frequency,
-      day_of_week,
-      day_of_month,
-      time_of_day,
-      enabled,
-      // Legacy fields for compatibility
-      report_type,
-      hierarchy,
-      entity_id,
-      entity_name,
-      status
-    } = req.body;
-
-    // For inline editing, allow creating with minimal data
-    // Use defaults for required fields that aren't provided
-    const scheduleData = {
-      template_name: template_name || 'New Report Schedule',
-      template_type: template_type || '',
-      process: process || '',
-      service_filter_id: service_filter_id || null,
-      service_filter_name: service_filter_name || null,
-      header_subsidiary_id: header_subsidiary_id || null,
-      header_subsidiary_name: header_subsidiary_name || null,
-      district_id: district_id || null,
-      district_name: district_name || null,
-      region_id: region_id || null,
-      region_name: region_name || null,
-      subsidiary_id: subsidiary_id || null,
-      subsidiary_name: subsidiary_name || null,
-      customer_tag_id: customer_tag_id || null,
-      customer_tag_name: customer_tag_name || null,
-      tags: normalizeScheduleTags(tags) || [],
-      email_group_ids: Array.isArray(email_group_ids) ? email_group_ids.map(id => parseInt(id)) : [],
-      frequency: frequency || 'monthly',
-      day_of_week: day_of_week || null,
-      day_of_month: day_of_month || null,
-      time_of_day: time_of_day || null,
-      enabled: enabled !== undefined ? enabled : true,
-      // Legacy fields
-      report_type: report_type || '',
-      hierarchy: hierarchy || '',
-      entity_id: entity_id || '',
-      entity_name: entity_name || '',
-      status: status || 'active'
-    };
+    const scheduleData = buildReportGroupPayload(req.body);
+    const validationError = validateReportGroupPayload(scheduleData);
+    if (validationError) {
+      return res.status(400).json({
+        error: 'Validation failed',
+        message: validationError
+      });
+    }
 
     // Use mock data if database not available
     if (!emailConfigService.isAvailable()) {
       const schedule = mockEmailData.createMockReportSchedule(scheduleData);
-      console.log(`✅ Created mock report schedule: ${schedule.template_name} (ID: ${schedule.id})`);
+      console.log(`✅ Created mock report group: ${schedule.name || schedule.template_name} (ID: ${schedule.id})`);
       return res.status(201).json(schedule);
     }
 
     const schedule = await emailConfigService.createReportSchedule(scheduleData);
 
-    console.log(`✅ Created report schedule: ${schedule.template_name} (ID: ${schedule.id})`);
+    console.log(`✅ Created report group: ${schedule.name || schedule.template_name} (ID: ${schedule.id})`);
     res.status(201).json(schedule);
   } catch (error) {
-    console.error('Error creating report schedule:', error);
+    console.error('Error creating report group:', error);
 
     // Handle foreign key constraint (email group doesn't exist)
     if (error.code === '23503') {
@@ -579,7 +690,7 @@ router.post('/report-schedules', async (req, res) => {
     }
 
     res.status(500).json({
-      error: 'Failed to create report schedule',
+      error: 'Failed to create report group',
       message: error.message
     });
   }
@@ -592,56 +703,13 @@ router.post('/report-schedules', async (req, res) => {
 router.put('/report-schedules/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    
-    // Extract all possible fields from request body
-    const updateData = {};
-    
-    // Only include fields that are provided in the request
-    const allowedFields = [
-      'template_name',
-      'template_type',
-      'process',
-      'service_filter_id',
-      'service_filter_name',
-      'header_subsidiary_id',
-      'header_subsidiary_name',
-      'district_id',
-      'district_name',
-      'region_id',
-      'region_name',
-      'subsidiary_id',
-      'subsidiary_name',
-      'customer_tag_id',
-      'customer_tag_name',
-      'tags',
-      'email_group_ids',  // Now an array
-      'frequency',
-      'day_of_week',
-      'day_of_month',
-      'time_of_day',
-      'enabled',
-      // Legacy fields
-      'report_type',
-      'hierarchy',
-      'entity_id',
-      'entity_name',
-      'status'
-    ];
-
-    allowedFields.forEach(field => {
-      if (req.body[field] !== undefined) {
-        updateData[field] = req.body[field];
-      }
-    });
-
-    // Convert email_group_ids array to integers if present
-    if (updateData.email_group_ids !== undefined) {
-      updateData.email_group_ids = Array.isArray(updateData.email_group_ids) 
-        ? updateData.email_group_ids.map(id => parseInt(id))
-        : [];
-    }
-    if (updateData.tags !== undefined) {
-      updateData.tags = normalizeScheduleTags(updateData.tags);
+    const updateData = buildReportGroupPayload(req.body);
+    const validationError = validateReportGroupPayload(updateData);
+    if (validationError) {
+      return res.status(400).json({
+        error: 'Validation failed',
+        message: validationError
+      });
     }
 
     // Use mock data if database not available
@@ -650,20 +718,20 @@ router.put('/report-schedules/:id', async (req, res) => {
       if (!schedule) {
         return res.status(404).json({ error: 'Report schedule not found' });
       }
-      console.log(`✅ Updated mock report schedule ID: ${id}`);
+      console.log(`✅ Updated mock report group ID: ${id}`);
       return res.json(schedule);
     }
 
     const schedule = await emailConfigService.updateReportSchedule(parseInt(id), updateData);
 
-    console.log(`✅ Updated report schedule ID: ${id}`);
+    console.log(`✅ Updated report group ID: ${id}`);
     res.json(schedule);
   } catch (error) {
-    console.error('Error updating report schedule:', error);
+    console.error('Error updating report group:', error);
 
     if (error.message === 'Report schedule not found') {
       return res.status(404).json({
-        error: 'Report schedule not found'
+        error: 'Report group not found'
       });
     }
 
@@ -676,7 +744,7 @@ router.put('/report-schedules/:id', async (req, res) => {
     }
 
     res.status(500).json({
-      error: 'Failed to update report schedule',
+      error: 'Failed to update report group',
       message: error.message
     });
   }
@@ -813,6 +881,7 @@ router.post('/report-schedules/:id/send-email', async (req, res) => {
     }
 
     console.log(`📧 Generating and sending email for schedule: ${schedule.template_name}`);
+    const pdfRowHeight = await getPdfRowHeightSetting();
     const {
       entityId,
       entityName,
@@ -822,7 +891,8 @@ router.post('/report-schedules/:id/send-email', async (req, res) => {
       preparedReport
     } = await scheduleReportService.generateSchedulePdf(schedule, {
       reportDate,
-      bigQueryService: bigQueryServiceInstance
+      bigQueryService: bigQueryServiceInstance,
+      pdfRowHeight
     });
 
     console.log(`   Using date: ${resolvedReportDate}${reportDate ? ' (user selected)' : ' (latest available)'}`);
@@ -989,6 +1059,7 @@ router.post('/report-schedules/:id/send-to-groups', async (req, res) => {
       });
     }
 
+    const pdfRowHeight = await getPdfRowHeightSetting();
     const {
       entityId,
       entityName,
@@ -997,7 +1068,8 @@ router.post('/report-schedules/:id/send-to-groups', async (req, res) => {
       preparedReport
     } = await scheduleReportService.generateSchedulePdf(schedule, {
       reportDate,
-      bigQueryService: bigQueryServiceInstance
+      bigQueryService: bigQueryServiceInstance,
+      pdfRowHeight
     });
 
     console.log(`   Using date: ${resolvedReportDate}${reportDate ? ' (user selected)' : ' (latest available)'}`);
@@ -1116,10 +1188,9 @@ router.post('/report-schedules/:id/process', requireApiKey, async (req, res) => 
     });
   };
 
-  console.log(`\n📧 Processing schedule ${id} (trigger: ${triggerType}, mode: ${normalizedMode})`);
+  console.log(`\n📧 Processing report group ${id} (trigger: ${triggerType}, mode: ${normalizedMode})`);
 
   try {
-    // Get report schedule
     let schedule;
     if (!emailConfigService.isAvailable()) {
       schedule = mockEmailData.getMockReportSchedule(parseInt(id));
@@ -1135,12 +1206,18 @@ router.post('/report-schedules/:id/process', requireApiKey, async (req, res) => 
       });
     }
 
+    const reportGroupName = schedule.name || schedule.template_name;
+    const groupReports = getReportGroupReports(schedule);
+
     batchProgress = createInitialBatchProgressPayload({
       scheduleId: parseInt(id),
-      scheduleName: schedule.template_name,
+      scheduleName: reportGroupName,
       mode: normalizedMode,
       reportDate
     });
+    batchProgress.reportCount = groupReports.length;
+    batchProgress.generatedAttachmentCount = 0;
+    batchProgress.reportResults = [];
 
     await persistBatchProgress({
       status: 'running',
@@ -1148,93 +1225,47 @@ router.post('/report-schedules/:id/process', requireApiKey, async (req, res) => 
       steps: {
         validate: {
           status: 'running',
-          detail: 'Checking schedule configuration'
+          detail: 'Checking report group configuration'
         }
       }
     });
 
-    // Check if schedule is enabled
     if (schedule.enabled === false) {
       await persistBatchProgress({
         status: 'skipped',
         steps: {
           validate: {
             status: 'failed',
-            detail: 'Schedule is disabled'
+            detail: 'Report group is disabled'
           }
         }
       });
       return res.status(400).json({
-        error: 'Schedule is disabled',
+        error: 'Report group is disabled',
         scheduleId: parseInt(id),
-        scheduleName: schedule.template_name,
+        scheduleName: reportGroupName,
         status: 'skipped',
-        skipReason: 'Schedule is disabled'
+        skipReason: 'Report group is disabled'
       });
     }
 
-    // Validate schedule configuration
-    if (!schedule.template_type) {
+    if (!groupReports.length) {
       await persistBatchProgress({
         status: 'skipped',
         steps: {
           validate: {
             status: 'failed',
-            detail: 'Template type is required'
+            detail: 'No P&Ls are attached to this report group'
           }
         }
       });
       return res.status(400).json({
-        error: 'Invalid schedule configuration',
-        message: 'Template type is required',
+        error: 'Invalid report group configuration',
+        message: 'Please add at least one P&L to this report group',
         scheduleId: parseInt(id),
-        scheduleName: schedule.template_name,
+        scheduleName: reportGroupName,
         status: 'skipped',
-        skipReason: 'Missing template_type'
-      });
-    }
-
-    if (!schedule.process) {
-      await persistBatchProgress({
-        status: 'skipped',
-        steps: {
-          validate: {
-            status: 'failed',
-            detail: 'Process is required'
-          }
-        }
-      });
-      return res.status(400).json({
-        error: 'Invalid schedule configuration',
-        message: 'Process (standard/operational) is required',
-        scheduleId: parseInt(id),
-        scheduleName: schedule.template_name,
-        status: 'skipped',
-        skipReason: 'Missing process'
-      });
-    }
-
-    let entityId;
-    let entityName;
-    try {
-      ({ entityId, entityName } = scheduleReportService.getScheduleEntity(schedule));
-    } catch (error) {
-      await persistBatchProgress({
-        status: 'skipped',
-        steps: {
-          validate: {
-            status: 'failed',
-            detail: error.message
-          }
-        }
-      });
-      return res.status(400).json({
-        error: 'Invalid schedule configuration',
-        message: error.message,
-        scheduleId: parseInt(id),
-        scheduleName: schedule.template_name,
-        status: 'skipped',
-        skipReason: `No ${schedule.template_type} selected`
+        skipReason: 'No attached P&Ls'
       });
     }
 
@@ -1254,7 +1285,7 @@ router.post('/report-schedules/:id/process', requireApiKey, async (req, res) => 
       return res.status(400).json({
         error: 'No email groups assigned',
         scheduleId: parseInt(id),
-        scheduleName: schedule.template_name,
+        scheduleName: reportGroupName,
         status: 'skipped',
         skipReason: 'No email groups assigned'
       });
@@ -1275,7 +1306,7 @@ router.post('/report-schedules/:id/process', requireApiKey, async (req, res) => 
         error: 'Email service not configured',
         message: 'SendGrid API key not configured',
         scheduleId: parseInt(id),
-        scheduleName: schedule.template_name,
+        scheduleName: reportGroupName,
         status: 'error'
       });
     }
@@ -1299,15 +1330,14 @@ router.post('/report-schedules/:id/process', requireApiKey, async (req, res) => 
       return res.status(400).json({
         error: 'No recipients in email groups',
         scheduleId: parseInt(id),
-        scheduleName: schedule.template_name,
+        scheduleName: reportGroupName,
         status: 'skipped',
         skipReason: 'No recipients in email groups'
       });
     }
 
-    console.log(`   Schedule: ${schedule.template_name}`);
-    console.log(`   Type: ${schedule.template_type} - ${entityName}`);
-    console.log(`   Process: ${schedule.process}`);
+    console.log(`   Report Group: ${reportGroupName}`);
+    console.log(`   Attached P&Ls: ${groupReports.length}`);
     if (normalizedMode === 'send') {
       console.log(`   Recipients: ${recipientList.length}`);
     }
@@ -1321,82 +1351,186 @@ router.post('/report-schedules/:id/process', requireApiKey, async (req, res) => 
         validate: {
           status: 'success',
           detail: normalizedMode === 'send'
-            ? `${emailGroupIds.length} group${emailGroupIds.length === 1 ? '' : 's'} • ${recipientList.length} recipient${recipientList.length === 1 ? '' : 's'}`
-            : 'Configuration valid for generate-only run'
+            ? `${groupReports.length} P&L${groupReports.length === 1 ? '' : 's'} • ${emailGroupIds.length} group${emailGroupIds.length === 1 ? '' : 's'} • ${recipientList.length} recipient${recipientList.length === 1 ? '' : 's'}`
+            : `${groupReports.length} P&L${groupReports.length === 1 ? '' : 's'} ready for generate-only run`
         },
         fetch_data: {
           status: 'running',
-          detail: 'Loading P&L data'
+          detail: `Loading P&L 1 of ${groupReports.length}`
         }
       }
     });
 
     const resolvedReportDate = await scheduleReportService.resolveReportDate(reportDate, bigQueryServiceInstance);
     const normalizedReportDate = scheduleReportService.normalizeReportDateValue(resolvedReportDate);
-    const htmlContent = await scheduleReportService.fetchScheduleReportHtml(schedule, {
-      entityId,
-      reportDate: normalizedReportDate
-    });
-
-    await persistBatchProgress({
-      reportDate: normalizedReportDate,
-      currentStep: 'generate_pdf',
-      steps: {
-        fetch_data: {
-          status: 'success',
-          detail: `Loaded P&L data for ${normalizedReportDate}`
-        },
-        generate_pdf: {
-          status: 'running',
-          detail: 'Building PDF'
-        }
-      }
-    });
-
-    const {
-      pdfBuffer,
-      prepared: preparedReport
-    } = await pnlPdfServer.generatePdfBufferFromReportHtml(htmlContent);
+    const attachments = [];
+    const reportResults = [];
+    let totalPdfSizeBytes = 0;
+    const pdfRowHeight = await getPdfRowHeightSetting();
 
     console.log(`   Using date: ${normalizedReportDate}${reportDate ? ' (user selected)' : ' (latest available)'}`);
-    console.log(`   Filtered to ${preparedReport.keptCount} report(s) with non-zero net income`);
-    console.log(`   PDF generated: ${(pdfBuffer.length / 1024).toFixed(1)} KB`);
 
-    await persistBatchProgress({
-      reportDate: normalizedReportDate,
-      currentStep: normalizedMode === 'send' ? 'send_email' : 'generate_pdf',
-      steps: {
-        generate_pdf: {
-          status: 'success',
-          detail: `${preparedReport.keptCount} report${preparedReport.keptCount === 1 ? '' : 's'} • ${(pdfBuffer.length / 1024).toFixed(1)} KB`
-        },
-        ...(normalizedMode === 'generate' ? {
-          send_email: {
-            status: 'skipped',
-            detail: 'Generate only run'
-          }
-        } : {
-          send_email: {
+    for (const [index, report] of groupReports.entries()) {
+      const reportLabel = report.template_name || `P&L ${index + 1}`;
+
+      await persistBatchProgress({
+        reportDate: normalizedReportDate,
+        currentStep: 'fetch_data',
+        steps: {
+          fetch_data: {
             status: 'running',
-            detail: `Sending to ${recipientList.length} recipient${recipientList.length === 1 ? '' : 's'}`
+            detail: `Loading ${reportLabel} (${index + 1} of ${groupReports.length})`
+          },
+          generate_pdf: {
+            status: 'pending',
+            detail: ''
           }
-        })
+        }
+      });
+
+      try {
+        const {
+          entityName,
+          pdfBuffer,
+          preparedReport
+	        } = await scheduleReportService.generateSchedulePdf(report, {
+	          reportDate: normalizedReportDate,
+	          bigQueryService: bigQueryServiceInstance,
+	          pdfRowHeight
+	        });
+
+        const filename = buildGroupedAttachmentFilename(report, entityName, normalizedReportDate);
+        attachments.push({
+          reportId: report.id,
+          template_name: reportLabel,
+          label: `${reportLabel} • ${entityName}`,
+          entityName,
+          filename,
+          pdfBuffer
+        });
+        totalPdfSizeBytes += pdfBuffer.length;
+
+        reportResults.push({
+          reportId: report.id,
+          templateName: reportLabel,
+          entityName,
+          filename,
+          status: 'success',
+          pdfSizeBytes: pdfBuffer.length,
+          keptCount: preparedReport.keptCount
+        });
+
+        console.log(`   ✓ Generated attachment ${index + 1}/${groupReports.length}: ${filename}`);
+
+        await persistBatchProgress({
+          reportDate: normalizedReportDate,
+          generatedAttachmentCount: attachments.length,
+          reportResults,
+          currentStep: 'generate_pdf',
+          steps: {
+            fetch_data: {
+              status: 'success',
+              detail: `Loaded ${reportLabel}`
+            },
+            generate_pdf: {
+              status: 'running',
+              detail: `Generated ${attachments.length} of ${groupReports.length} attachments`
+            }
+          }
+        });
+      } catch (error) {
+        console.error(`   ✗ Failed to generate ${reportLabel}:`, error.message);
+        reportResults.push({
+          reportId: report.id,
+          templateName: reportLabel,
+          status: 'failed',
+          error: error.message
+        });
+
+        await persistBatchProgress({
+          reportDate: normalizedReportDate,
+          generatedAttachmentCount: attachments.length,
+          reportResults,
+          currentStep: 'generate_pdf',
+          steps: {
+            fetch_data: {
+              status: 'failed',
+              detail: `Failed to load ${reportLabel}`
+            },
+            generate_pdf: {
+              status: 'running',
+              detail: `Generated ${attachments.length} of ${groupReports.length} attachments`
+            }
+          }
+        });
       }
-    });
+    }
+
+    const attachmentFailures = reportResults.filter(result => result.status !== 'success').length;
+    const allAttachmentsGenerated = attachments.length === groupReports.length;
 
     let successCount = 0;
     let failCount = 0;
     const recipientResults = [];
+    let status = 'success';
+    let errorMessage = null;
 
-    if (normalizedMode === 'send') {
-      console.log(`   Sending emails to ${recipientList.length} recipient(s)...`);
+    await persistBatchProgress({
+      reportDate: normalizedReportDate,
+      generatedAttachmentCount: attachments.length,
+      reportResults,
+      currentStep: normalizedMode === 'send' && allAttachmentsGenerated ? 'send_email' : 'generate_pdf',
+      steps: {
+        generate_pdf: {
+          status: allAttachmentsGenerated ? 'success' : 'failed',
+          detail: allAttachmentsGenerated
+            ? `${attachments.length} attachment${attachments.length === 1 ? '' : 's'} ready`
+            : `${attachments.length} of ${groupReports.length} attachments generated`
+        },
+        ...(normalizedMode === 'generate'
+          ? {
+              send_email: {
+                status: 'skipped',
+                detail: 'Generate only run'
+              }
+            }
+          : allAttachmentsGenerated
+            ? {
+                send_email: {
+                  status: 'running',
+                  detail: `Sending grouped packet to ${recipientList.length} recipient${recipientList.length === 1 ? '' : 's'}`
+                }
+              }
+            : {
+                send_email: {
+                  status: 'failed',
+                  detail: 'Grouped email not sent because one or more attachments failed'
+                }
+              })
+      }
+    });
+
+    if (normalizedMode === 'generate') {
+      status = attachmentFailures === 0 ? 'success' : (attachments.length > 0 ? 'partial' : 'failed');
+      if (status !== 'success') {
+        errorMessage = attachmentFailures === groupReports.length
+          ? 'No grouped attachments were generated'
+          : `Generated ${attachments.length} of ${groupReports.length} grouped attachments`;
+      }
+    } else if (!allAttachmentsGenerated) {
+      status = attachments.length > 0 ? 'partial' : 'failed';
+      errorMessage = attachments.length > 0
+        ? `Generated ${attachments.length} of ${groupReports.length} attachments. Grouped email was not sent.`
+        : 'No grouped attachments were generated, so the email was not sent.';
+    } else {
+      console.log(`   Sending grouped emails to ${recipientList.length} recipient(s)...`);
 
       for (const recipientEmail of recipientList) {
         try {
-          await emailService.sendPDFEmail(schedule, pdfBuffer, recipientEmail, normalizedReportDate);
+          await emailService.sendGroupedPDFEmail(schedule, attachments, recipientEmail, normalizedReportDate);
           successCount++;
           recipientResults.push({ email: recipientEmail, status: 'sent' });
-          console.log(`      ✓ Sent to ${recipientEmail}`);
+          console.log(`      ✓ Sent grouped packet to ${recipientEmail}`);
         } catch (error) {
           failCount++;
           recipientResults.push({ email: recipientEmail, status: 'failed', error: error.message });
@@ -1413,57 +1547,58 @@ router.post('/report-schedules/:id/process', requireApiKey, async (req, res) => 
           }
         });
       }
-    }
 
-    // Determine status
-    let status;
-    let errorMessage = null;
-    if (normalizedMode === 'generate') {
-      status = 'success';
-    } else if (successCount === 0) {
-      status = 'failed';
-      errorMessage = `All ${failCount} email(s) failed to send`;
-    } else if (failCount > 0) {
-      status = 'partial';
-    } else {
-      status = 'success';
+      if (successCount === 0) {
+        status = 'failed';
+        errorMessage = `All ${failCount} grouped email(s) failed to send`;
+      } else if (failCount > 0) {
+        status = 'partial';
+      } else {
+        status = 'success';
+      }
     }
 
     await persistBatchProgress({
       status,
       currentStep: status === 'failed' ? 'send_email' : 'complete',
       recipientResults,
+      generatedAttachmentCount: attachments.length,
+      reportResults,
       steps: {
         send_email: normalizedMode === 'generate'
           ? {
               status: 'skipped',
               detail: 'Generate only run'
             }
+          : !allAttachmentsGenerated
+            ? {
+                status: 'failed',
+                detail: errorMessage || 'Grouped email not sent because attachments failed'
+              }
           : {
               status: status === 'success' ? 'success' : (status === 'partial' ? 'partial' : 'failed'),
-              detail: `${successCount} sent • ${failCount} failed`
+              detail: `${successCount} sent • ${failCount} failed • ${attachments.length} attachment${attachments.length === 1 ? '' : 's'}`
             }
       }
     });
 
-    // Log the run
     if (emailConfigService.isAvailable()) {
       const completedAt = new Date();
       await emailConfigService.createRunLog({
         schedule_id: schedule.id,
-        template_name: schedule.template_name,
-        template_type: schedule.template_type,
-        process: schedule.process,
-        entity_id: entityId,
-        entity_name: entityName,
+        template_name: reportGroupName,
+        template_type: 'report_group',
+        process: 'grouped',
+        entity_id: null,
+        entity_name: null,
         report_date: normalizedReportDate,
-        status: status,
+        status,
         error_message: errorMessage,
         emails_sent: successCount,
         emails_failed: failCount,
         recipient_emails: recipientList,
         trigger_type: triggerType,
-        pdf_size_bytes: pdfBuffer.length
+        pdf_size_bytes: totalPdfSizeBytes || null
       });
 
       await emailConfigService.updateScheduleRunTimestamps(schedule.id, {
@@ -1474,21 +1609,24 @@ router.post('/report-schedules/:id/process', requireApiKey, async (req, res) => 
 
     const durationMs = Date.now() - startTime;
     if (normalizedMode === 'generate') {
-      console.log(`   ✅ Complete: PDF generated (${durationMs}ms)`);
+      console.log(`   ✅ Complete: ${attachments.length} grouped attachment(s) generated (${durationMs}ms)`);
     } else {
-      console.log(`   ✅ Complete: ${successCount} sent, ${failCount} failed (${durationMs}ms)`);
+      console.log(`   ✅ Complete: ${attachments.length} attachment(s), ${successCount} sent, ${failCount} failed (${durationMs}ms)`);
     }
 
     res.json({
       success: status !== 'failed',
       scheduleId: parseInt(id),
-      scheduleName: schedule.template_name,
+      scheduleName: reportGroupName,
       status,
       mode: normalizedMode,
       emailsSent: successCount,
       emailsFailed: failCount,
       reportDate: normalizedReportDate,
-      pdfSizeBytes: pdfBuffer.length,
+      pdfSizeBytes: totalPdfSizeBytes || null,
+      generatedAttachmentCount: attachments.length,
+      reportCount: groupReports.length,
+      reportResults,
       durationMs,
       error: errorMessage,
       recipients: recipientResults,
@@ -1619,8 +1757,8 @@ router.post('/report-batches', async (req, res) => {
     const schedules = await emailConfigService.getEnabledReportSchedulesByTag(tag);
     if (!schedules.length) {
       return res.status(400).json({
-        error: 'No matching schedules',
-        message: `No enabled report schedules were found for the tag "${tag}".`
+        error: 'No matching report groups',
+        message: `No report groups were found for the tag "${tag}".`
       });
     }
 

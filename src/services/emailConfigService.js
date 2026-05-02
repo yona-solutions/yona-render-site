@@ -66,6 +66,22 @@ class EmailConfigService {
     }
   }
 
+  /**
+   * Get a single global app setting value
+   */
+  async getGlobalSetting(key) {
+    if (!this.isAvailable()) {
+      throw new Error('Database not initialized');
+    }
+
+    const result = await this.pool.query(
+      'SELECT value FROM global_settings WHERE key = $1',
+      [key]
+    );
+
+    return result.rows[0]?.value ?? null;
+  }
+
   // ============================================
   // Email Groups
   // ============================================
@@ -244,6 +260,20 @@ class EmailConfigService {
       throw new Error('Database not initialized');
     }
 
+    const usageCheck = await this.pool.query(`
+      SELECT id
+      FROM report_schedules
+      WHERE email_group_id = $1
+         OR $1 = ANY(COALESCE(email_group_ids, ARRAY[]::INTEGER[]))
+      LIMIT 1
+    `, [id]);
+
+    if (usageCheck.rows.length > 0) {
+      const error = new Error('Email group is used by one or more report schedules');
+      error.code = '23503';
+      throw error;
+    }
+
     const query = 'DELETE FROM email_groups WHERE id = $1 RETURNING *';
     const result = await this.pool.query(query, [id]);
 
@@ -258,6 +288,210 @@ class EmailConfigService {
   // Report Schedules
   // ============================================
 
+  normalizeEmailGroupIds(emailGroupIds = [], fallbackId = null) {
+    const rawIds = Array.isArray(emailGroupIds)
+      ? emailGroupIds
+      : [fallbackId].filter(Boolean);
+
+    return [...new Set(
+      rawIds
+        .map(id => parseInt(id, 10))
+        .filter(Number.isFinite)
+    )];
+  }
+
+  getReportItemsFromPayload(data = {}) {
+    if (Array.isArray(data.reports) && data.reports.length > 0) {
+      return data.reports.filter(Boolean);
+    }
+
+    const templateType = data.template_type || data.hierarchy;
+    const process = data.process || data.report_type;
+    if (!templateType || !process) {
+      return [];
+    }
+
+    return [{
+      id: data.report_id || data.id || null,
+      template_name: data.report_template_name || data.template_name || 'Untitled P&L',
+      template_type: templateType,
+      process,
+      service_filter_id: data.service_filter_id || null,
+      service_filter_name: data.service_filter_name || null,
+      header_subsidiary_id: data.header_subsidiary_id || null,
+      header_subsidiary_name: data.header_subsidiary_name || null,
+      district_id: data.district_id || null,
+      district_name: data.district_name || null,
+      region_id: data.region_id || null,
+      region_name: data.region_name || null,
+      subsidiary_id: data.subsidiary_id || null,
+      subsidiary_name: data.subsidiary_name || null,
+      customer_tag_id: data.customer_tag_id || null,
+      customer_tag_name: data.customer_tag_name || null
+    }];
+  }
+
+  mapReportScheduleReportRow(row) {
+    if (!row) {
+      return null;
+    }
+
+    return {
+      id: row.id,
+      template_name: row.template_name || '',
+      template_type: row.template_type || '',
+      process: row.process || '',
+      service_filter_id: row.service_filter_id || null,
+      service_filter_name: row.service_filter_name || null,
+      header_subsidiary_id: row.header_subsidiary_id || null,
+      header_subsidiary_name: row.header_subsidiary_name || null,
+      district_id: row.district_id || null,
+      district_name: row.district_name || null,
+      region_id: row.region_id || null,
+      region_name: row.region_name || null,
+      subsidiary_id: row.subsidiary_id || null,
+      subsidiary_name: row.subsidiary_name || null,
+      customer_tag_id: row.customer_tag_id || null,
+      customer_tag_name: row.customer_tag_name || null,
+      sort_order: row.sort_order || 0,
+      created_at: row.created_at,
+      updated_at: row.updated_at
+    };
+  }
+
+  mapReportScheduleGroup(row, reportRows = []) {
+    const fallbackReports = reportRows.length > 0
+      ? reportRows
+      : this.getReportItemsFromPayload(row);
+
+    return {
+      ...row,
+      name: row.template_name || '',
+      email_group_ids: this.normalizeEmailGroupIds(row.email_group_ids, row.email_group_id),
+      reports: fallbackReports.map(report => this.mapReportScheduleReportRow(report) || report).filter(Boolean)
+    };
+  }
+
+  buildReportScheduleMirrorFromGroup(data = {}) {
+    const reports = this.getReportItemsFromPayload(data);
+    const primaryReport = reports[0] || {};
+    const emailGroupIds = this.normalizeEmailGroupIds(data.email_group_ids, data.email_group_id);
+
+    return {
+      template_name: String(data.name || data.template_name || '').trim() || 'Untitled Report Group',
+      template_type: primaryReport.template_type || data.template_type || data.hierarchy || 'district',
+      process: primaryReport.process || data.process || data.report_type || 'standard',
+      tags: Array.isArray(data.tags) ? data.tags : [],
+      service_filter_id: primaryReport.service_filter_id || data.service_filter_id || null,
+      service_filter_name: primaryReport.service_filter_name || data.service_filter_name || null,
+      header_subsidiary_id: primaryReport.header_subsidiary_id || data.header_subsidiary_id || null,
+      header_subsidiary_name: primaryReport.header_subsidiary_name || data.header_subsidiary_name || null,
+      district_id: primaryReport.district_id || data.district_id || null,
+      district_name: primaryReport.district_name || data.district_name || null,
+      region_id: primaryReport.region_id || data.region_id || null,
+      region_name: primaryReport.region_name || data.region_name || null,
+      subsidiary_id: primaryReport.subsidiary_id || data.subsidiary_id || null,
+      subsidiary_name: primaryReport.subsidiary_name || data.subsidiary_name || null,
+      customer_tag_id: primaryReport.customer_tag_id || data.customer_tag_id || null,
+      customer_tag_name: primaryReport.customer_tag_name || data.customer_tag_name || null,
+      email_group_id: emailGroupIds[0] || null,
+      email_group_ids: emailGroupIds,
+      frequency: data.frequency || 'monthly',
+      day_of_week: data.day_of_week || null,
+      day_of_month: data.day_of_month ?? null,
+      time_of_day: data.time_of_day || '08:00:00',
+      enabled: data.enabled !== undefined ? Boolean(data.enabled) : true
+    };
+  }
+
+  async getReportScheduleReportsMap(scheduleIds, client = this.pool) {
+    const normalizedIds = Array.isArray(scheduleIds)
+      ? scheduleIds.map(id => parseInt(id, 10)).filter(Number.isFinite)
+      : [parseInt(scheduleIds, 10)].filter(Number.isFinite);
+
+    const reportsByScheduleId = new Map();
+    normalizedIds.forEach(id => reportsByScheduleId.set(id, []));
+
+    if (normalizedIds.length === 0) {
+      return reportsByScheduleId;
+    }
+
+    const query = `
+      SELECT *
+      FROM report_schedule_reports
+      WHERE report_schedule_id = ANY($1::INTEGER[])
+      ORDER BY report_schedule_id ASC, sort_order ASC, id ASC
+    `;
+
+    const result = await client.query(query, [normalizedIds]);
+    result.rows.forEach(row => {
+      const report = this.mapReportScheduleReportRow(row);
+      if (!reportsByScheduleId.has(row.report_schedule_id)) {
+        reportsByScheduleId.set(row.report_schedule_id, []);
+      }
+      reportsByScheduleId.get(row.report_schedule_id).push(report);
+    });
+
+    return reportsByScheduleId;
+  }
+
+  async replaceReportScheduleReports(client, scheduleId, reports = []) {
+    await client.query('DELETE FROM report_schedule_reports WHERE report_schedule_id = $1', [scheduleId]);
+
+    const normalizedReports = this.getReportItemsFromPayload({ reports });
+    if (!normalizedReports.length) {
+      return;
+    }
+
+    const insertQuery = `
+      INSERT INTO report_schedule_reports (
+        report_schedule_id,
+        sort_order,
+        template_name,
+        template_type,
+        process,
+        service_filter_id,
+        service_filter_name,
+        header_subsidiary_id,
+        header_subsidiary_name,
+        district_id,
+        district_name,
+        region_id,
+        region_name,
+        subsidiary_id,
+        subsidiary_name,
+        customer_tag_id,
+        customer_tag_name
+      )
+      VALUES (
+        $1, $2, $3, $4, $5, $6, $7, $8, $9,
+        $10, $11, $12, $13, $14, $15, $16, $17
+      )
+    `;
+
+    for (const [index, report] of normalizedReports.entries()) {
+      await client.query(insertQuery, [
+        scheduleId,
+        index,
+        report.template_name || 'Untitled P&L',
+        report.template_type || null,
+        report.process || null,
+        report.service_filter_id || null,
+        report.service_filter_name || null,
+        report.header_subsidiary_id || null,
+        report.header_subsidiary_name || null,
+        report.district_id || null,
+        report.district_name || null,
+        report.region_id || null,
+        report.region_name || null,
+        report.subsidiary_id || null,
+        report.subsidiary_name || null,
+        report.customer_tag_id || null,
+        report.customer_tag_name || null
+      ]);
+    }
+  }
+
   /**
    * Get all report schedules with email group info
    */
@@ -267,16 +501,16 @@ class EmailConfigService {
     }
 
     const query = `
-      SELECT 
-        rs.*,
-        eg.name as email_group_name
+      SELECT rs.*
       FROM report_schedules rs
-      LEFT JOIN email_groups eg ON rs.email_group_id = eg.id
-      ORDER BY rs.created_at DESC
+      ORDER BY COALESCE(rs.updated_at, rs.created_at) DESC, rs.id DESC
     `;
 
     const result = await this.pool.query(query);
-    return result.rows;
+    const scheduleIds = result.rows.map(row => row.id);
+    const reportsByScheduleId = await this.getReportScheduleReportsMap(scheduleIds);
+
+    return result.rows.map(row => this.mapReportScheduleGroup(row, reportsByScheduleId.get(row.id) || []));
   }
 
   /**
@@ -288,16 +522,19 @@ class EmailConfigService {
     }
 
     const query = `
-      SELECT 
-        rs.*,
-        eg.name as email_group_name
+      SELECT rs.*
       FROM report_schedules rs
-      LEFT JOIN email_groups eg ON rs.email_group_id = eg.id
       WHERE rs.id = $1
     `;
 
     const result = await this.pool.query(query, [id]);
-    return result.rows[0] || null;
+    const row = result.rows[0];
+    if (!row) {
+      return null;
+    }
+
+    const reportsByScheduleId = await this.getReportScheduleReportsMap([id]);
+    return this.mapReportScheduleGroup(row, reportsByScheduleId.get(id) || []);
   }
 
   /**
@@ -309,18 +546,19 @@ class EmailConfigService {
     }
 
     const query = `
-      SELECT 
-        rs.*,
-        eg.name as email_group_name
+      SELECT rs.*
       FROM report_schedules rs
-      LEFT JOIN email_groups eg ON rs.email_group_id = eg.id
       WHERE rs.enabled = true
-        AND (rs.next_send_at IS NULL OR rs.next_send_at <= CURRENT_TIMESTAMP)
-      ORDER BY rs.next_send_at ASC NULLS FIRST
+        AND rs.next_send_at IS NOT NULL
+        AND rs.next_send_at <= CURRENT_TIMESTAMP
+      ORDER BY rs.next_send_at ASC
     `;
 
     const result = await this.pool.query(query);
-    return result.rows;
+    const scheduleIds = result.rows.map(row => row.id);
+    const reportsByScheduleId = await this.getReportScheduleReportsMap(scheduleIds);
+
+    return result.rows.map(row => this.mapReportScheduleGroup(row, reportsByScheduleId.get(row.id) || []));
   }
 
   /**
@@ -330,87 +568,67 @@ class EmailConfigService {
     if (!this.isAvailable()) {
       throw new Error('Database not initialized');
     }
+    const client = await this.pool.connect();
 
-    const {
-      template_name,
-      template_type,
-      process,
-      tags,
-      service_filter_id,
-      service_filter_name,
-      header_subsidiary_id,
-      header_subsidiary_name,
-      district_id,
-      district_name,
-      region_id,
-      region_name,
-      subsidiary_id,
-      subsidiary_name,
-      customer_tag_id,
-      customer_tag_name,
-      email_group_id,
-      email_group_ids,
-      frequency,
-      day_of_week,
-      day_of_month,
-      time_of_day,
-      enabled = true,
-      // Legacy support
-      report_type,
-      hierarchy,
-      entity_id,
-      entity_name,
-      status
-    } = data;
+    try {
+      await client.query('BEGIN');
 
-    // Map legacy fields to new fields if provided
-    const finalTemplateName = template_name || `${hierarchy || template_type} ${report_type || process} Report`;
-    const finalTemplateType = template_type || hierarchy;
-    const finalProcess = process || report_type;
-    const finalEnabled = enabled !== undefined ? enabled : (status === 'active');
+      const scheduleRecord = this.buildReportScheduleMirrorFromGroup(data);
+      const insertQuery = `
+        INSERT INTO report_schedules (
+          template_name, template_type, process,
+          tags,
+          service_filter_id, service_filter_name,
+          header_subsidiary_id, header_subsidiary_name,
+          district_id, district_name, region_id, region_name,
+          subsidiary_id, subsidiary_name, customer_tag_id, customer_tag_name,
+          email_group_id, email_group_ids, frequency,
+          day_of_week, day_of_month, time_of_day, enabled
+        )
+        VALUES (
+          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
+          $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23
+        )
+        RETURNING id
+      `;
 
-    const query = `
-      INSERT INTO report_schedules (
-        template_name, template_type, process,
-        tags,
-        service_filter_id, service_filter_name,
-        header_subsidiary_id, header_subsidiary_name,
-        district_id, district_name, region_id, region_name,
-        subsidiary_id, subsidiary_name, customer_tag_id, customer_tag_name,
-        email_group_id, email_group_ids, frequency,
-        day_of_week, day_of_month, time_of_day, enabled
-      )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
-      RETURNING *
-    `;
+      const result = await client.query(insertQuery, [
+        scheduleRecord.template_name,
+        scheduleRecord.template_type,
+        scheduleRecord.process,
+        scheduleRecord.tags,
+        scheduleRecord.service_filter_id,
+        scheduleRecord.service_filter_name,
+        scheduleRecord.header_subsidiary_id,
+        scheduleRecord.header_subsidiary_name,
+        scheduleRecord.district_id,
+        scheduleRecord.district_name,
+        scheduleRecord.region_id,
+        scheduleRecord.region_name,
+        scheduleRecord.subsidiary_id,
+        scheduleRecord.subsidiary_name,
+        scheduleRecord.customer_tag_id,
+        scheduleRecord.customer_tag_name,
+        scheduleRecord.email_group_id,
+        scheduleRecord.email_group_ids,
+        scheduleRecord.frequency,
+        scheduleRecord.day_of_week,
+        scheduleRecord.day_of_month,
+        scheduleRecord.time_of_day,
+        scheduleRecord.enabled
+      ]);
 
-    const result = await this.pool.query(query, [
-      finalTemplateName,
-      finalTemplateType,
-      finalProcess,
-      tags || [],
-      service_filter_id || null,
-      service_filter_name || null,
-      header_subsidiary_id || null,
-      header_subsidiary_name || null,
-      district_id || (finalTemplateType === 'district' ? entity_id : null),
-      district_name || (finalTemplateType === 'district' ? entity_name : null),
-      region_id || (finalTemplateType === 'region' ? entity_id : null),
-      region_name || (finalTemplateType === 'region' ? entity_name : null),
-      subsidiary_id || (finalTemplateType === 'subsidiary' ? entity_id : null),
-      subsidiary_name || (finalTemplateType === 'subsidiary' ? entity_name : null),
-      customer_tag_id || (finalTemplateType === 'customer_tag' ? entity_id : null),
-      customer_tag_name || (finalTemplateType === 'customer_tag' ? entity_name : null),
-      email_group_id || null,
-      email_group_ids || null,
-      frequency,
-      day_of_week || null,
-      day_of_month || null,
-      time_of_day || '08:00:00',
-      finalEnabled
-    ]);
+      const scheduleId = result.rows[0].id;
+      await this.replaceReportScheduleReports(client, scheduleId, data.reports || []);
 
-    return result.rows[0];
+      await client.query('COMMIT');
+      return this.getReportSchedule(scheduleId);
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   /**
@@ -420,167 +638,110 @@ class EmailConfigService {
     if (!this.isAvailable()) {
       throw new Error('Database not initialized');
     }
+    const client = await this.pool.connect();
 
-    console.log('📝 Updating schedule with data:', JSON.stringify(data, null, 2));
-    console.log('   day_of_month in data:', data.day_of_month, '| hasOwnProperty:', data.hasOwnProperty('day_of_month'));
+    try {
+      await client.query('BEGIN');
 
-    const {
-      template_name,
-      template_type,
-      process,
-      tags,
-      service_filter_id,
-      service_filter_name,
-      header_subsidiary_id,
-      header_subsidiary_name,
-      district_id,
-      district_name,
-      region_id,
-      region_name,
-      subsidiary_id,
-      subsidiary_name,
-      customer_tag_id,
-      customer_tag_name,
-      email_group_id,
-      email_group_ids,
-      frequency,
-      day_of_week,
-      day_of_month,
-      time_of_day,
-      enabled,
-      // Legacy support
-      report_type,
-      hierarchy,
-      entity_id,
-      entity_name,
-      status
-    } = data;
+      const existingResult = await client.query(`
+        SELECT *
+        FROM report_schedules
+        WHERE id = $1
+      `, [id]);
 
-    // Map legacy fields to new fields if provided
-    const finalTemplateType = template_type || hierarchy;
-    const finalProcess = process || report_type;
-    // Only set enabled if explicitly provided, otherwise keep existing value (via COALESCE in SQL)
-    const finalEnabled = enabled !== undefined ? enabled : (status !== undefined ? (status === 'active') : undefined);
+      if (existingResult.rows.length === 0) {
+        throw new Error('Report schedule not found');
+      }
 
-    // Build dynamic query - only update fields that were explicitly provided
-    const setClauses = [];
-    const values = [];
-    let paramIndex = 1;
+      const existingRow = existingResult.rows[0];
+      const existingReportsMap = await this.getReportScheduleReportsMap([id], client);
+      const existingReports = existingReportsMap.get(id)?.length
+        ? existingReportsMap.get(id)
+        : this.getReportItemsFromPayload(existingRow);
 
-    if (template_name !== undefined) {
-      setClauses.push(`template_name = $${paramIndex++}`);
-      values.push(template_name);
-    }
-    if (finalTemplateType !== undefined) {
-      setClauses.push(`template_type = $${paramIndex++}`);
-      values.push(finalTemplateType);
-    }
-    if (finalProcess !== undefined) {
-      setClauses.push(`process = $${paramIndex++}`);
-      values.push(finalProcess);
-    }
-    if (tags !== undefined) {
-      setClauses.push(`tags = $${paramIndex++}`);
-      values.push(tags);
-    }
-    if (service_filter_id !== undefined) {
-      setClauses.push(`service_filter_id = $${paramIndex++}`);
-      values.push(service_filter_id);
-    }
-    if (service_filter_name !== undefined) {
-      setClauses.push(`service_filter_name = $${paramIndex++}`);
-      values.push(service_filter_name);
-    }
-    if (header_subsidiary_id !== undefined) {
-      setClauses.push(`header_subsidiary_id = $${paramIndex++}`);
-      values.push(header_subsidiary_id);
-    }
-    if (header_subsidiary_name !== undefined) {
-      setClauses.push(`header_subsidiary_name = $${paramIndex++}`);
-      values.push(header_subsidiary_name);
-    }
-    // Entity fields - only update if explicitly provided
-    if (district_id !== undefined || (finalTemplateType === 'district' && entity_id !== undefined)) {
-      setClauses.push(`district_id = $${paramIndex++}`);
-      values.push(district_id !== undefined ? district_id : entity_id);
-    }
-    if (district_name !== undefined || (finalTemplateType === 'district' && entity_name !== undefined)) {
-      setClauses.push(`district_name = $${paramIndex++}`);
-      values.push(district_name !== undefined ? district_name : entity_name);
-    }
-    if (region_id !== undefined || (finalTemplateType === 'region' && entity_id !== undefined)) {
-      setClauses.push(`region_id = $${paramIndex++}`);
-      values.push(region_id !== undefined ? region_id : entity_id);
-    }
-    if (region_name !== undefined || (finalTemplateType === 'region' && entity_name !== undefined)) {
-      setClauses.push(`region_name = $${paramIndex++}`);
-      values.push(region_name !== undefined ? region_name : entity_name);
-    }
-    if (subsidiary_id !== undefined || (finalTemplateType === 'subsidiary' && entity_id !== undefined)) {
-      setClauses.push(`subsidiary_id = $${paramIndex++}`);
-      values.push(subsidiary_id !== undefined ? subsidiary_id : entity_id);
-    }
-    if (subsidiary_name !== undefined || (finalTemplateType === 'subsidiary' && entity_name !== undefined)) {
-      setClauses.push(`subsidiary_name = $${paramIndex++}`);
-      values.push(subsidiary_name !== undefined ? subsidiary_name : entity_name);
-    }
-    if (customer_tag_id !== undefined || (finalTemplateType === 'customer_tag' && entity_id !== undefined)) {
-      setClauses.push(`customer_tag_id = $${paramIndex++}`);
-      values.push(customer_tag_id !== undefined ? customer_tag_id : entity_id);
-    }
-    if (customer_tag_name !== undefined || (finalTemplateType === 'customer_tag' && entity_name !== undefined)) {
-      setClauses.push(`customer_tag_name = $${paramIndex++}`);
-      values.push(customer_tag_name !== undefined ? customer_tag_name : entity_name);
-    }
-    if (email_group_id !== undefined) {
-      setClauses.push(`email_group_id = $${paramIndex++}`);
-      values.push(email_group_id);
-    }
-    if (email_group_ids !== undefined) {
-      setClauses.push(`email_group_ids = $${paramIndex++}`);
-      values.push(email_group_ids);
-    }
-    if (frequency !== undefined) {
-      setClauses.push(`frequency = $${paramIndex++}`);
-      values.push(frequency);
-    }
-    if (day_of_week !== undefined) {
-      setClauses.push(`day_of_week = $${paramIndex++}`);
-      values.push(day_of_week);
-    }
-    if (day_of_month !== undefined) {
-      setClauses.push(`day_of_month = $${paramIndex++}`);
-      values.push(day_of_month);
-    }
-    if (time_of_day !== undefined) {
-      setClauses.push(`time_of_day = $${paramIndex++}`);
-      values.push(time_of_day);
-    }
-    if (finalEnabled !== undefined) {
-      setClauses.push(`enabled = $${paramIndex++}`);
-      values.push(finalEnabled);
-    }
+      const mergedData = {
+        name: data.name !== undefined ? data.name : existingRow.template_name,
+        template_name: data.template_name !== undefined ? data.template_name : existingRow.template_name,
+        tags: data.tags !== undefined ? data.tags : (existingRow.tags || []),
+        email_group_ids: data.email_group_ids !== undefined
+          ? data.email_group_ids
+          : this.normalizeEmailGroupIds(existingRow.email_group_ids, existingRow.email_group_id),
+        reports: data.reports !== undefined ? data.reports : existingReports,
+        frequency: data.frequency !== undefined ? data.frequency : existingRow.frequency,
+        day_of_week: data.day_of_week !== undefined ? data.day_of_week : existingRow.day_of_week,
+        day_of_month: data.day_of_month !== undefined ? data.day_of_month : existingRow.day_of_month,
+        time_of_day: data.time_of_day !== undefined ? data.time_of_day : existingRow.time_of_day,
+        enabled: data.enabled !== undefined ? data.enabled : existingRow.enabled
+      };
 
-    // Always update updated_at
-    setClauses.push('updated_at = CURRENT_TIMESTAMP');
+      const scheduleRecord = this.buildReportScheduleMirrorFromGroup(mergedData);
+      const updateQuery = `
+        UPDATE report_schedules
+        SET
+          template_name = $1,
+          template_type = $2,
+          process = $3,
+          tags = $4,
+          service_filter_id = $5,
+          service_filter_name = $6,
+          header_subsidiary_id = $7,
+          header_subsidiary_name = $8,
+          district_id = $9,
+          district_name = $10,
+          region_id = $11,
+          region_name = $12,
+          subsidiary_id = $13,
+          subsidiary_name = $14,
+          customer_tag_id = $15,
+          customer_tag_name = $16,
+          email_group_id = $17,
+          email_group_ids = $18,
+          frequency = $19,
+          day_of_week = $20,
+          day_of_month = $21,
+          time_of_day = $22,
+          enabled = $23,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = $24
+      `;
 
-    // Add the id as the last parameter
-    values.push(id);
+      await client.query(updateQuery, [
+        scheduleRecord.template_name,
+        scheduleRecord.template_type,
+        scheduleRecord.process,
+        scheduleRecord.tags,
+        scheduleRecord.service_filter_id,
+        scheduleRecord.service_filter_name,
+        scheduleRecord.header_subsidiary_id,
+        scheduleRecord.header_subsidiary_name,
+        scheduleRecord.district_id,
+        scheduleRecord.district_name,
+        scheduleRecord.region_id,
+        scheduleRecord.region_name,
+        scheduleRecord.subsidiary_id,
+        scheduleRecord.subsidiary_name,
+        scheduleRecord.customer_tag_id,
+        scheduleRecord.customer_tag_name,
+        scheduleRecord.email_group_id,
+        scheduleRecord.email_group_ids,
+        scheduleRecord.frequency,
+        scheduleRecord.day_of_week,
+        scheduleRecord.day_of_month,
+        scheduleRecord.time_of_day,
+        scheduleRecord.enabled,
+        id
+      ]);
 
-    const query = `
-      UPDATE report_schedules
-      SET ${setClauses.join(', ')}
-      WHERE id = $${paramIndex}
-      RETURNING *
-    `;
+      await this.replaceReportScheduleReports(client, id, mergedData.reports);
 
-    const result = await this.pool.query(query, values);
-
-    if (result.rows.length === 0) {
-      throw new Error('Report schedule not found');
+      await client.query('COMMIT');
+      return this.getReportSchedule(id);
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
     }
-
-    return result.rows[0];
   }
 
   /**
@@ -870,10 +1031,8 @@ class EmailConfigService {
 
     const query = `
       SELECT
-        rs.*,
-        eg.name as email_group_name
+        rs.*
       FROM report_schedules rs
-      LEFT JOIN email_groups eg ON rs.email_group_id = eg.id
       WHERE rs.enabled = true
         AND EXISTS (
           SELECT 1
@@ -884,7 +1043,10 @@ class EmailConfigService {
     `;
 
     const result = await this.pool.query(query, [tag]);
-    return result.rows;
+    const scheduleIds = result.rows.map(row => row.id);
+    const reportsByScheduleId = await this.getReportScheduleReportsMap(scheduleIds);
+
+    return result.rows.map(row => this.mapReportScheduleGroup(row, reportsByScheduleId.get(row.id) || []));
   }
 
   async getDistinctScheduleTags() {
