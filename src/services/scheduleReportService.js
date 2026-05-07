@@ -1,6 +1,6 @@
 const emailConfigService = require('./emailConfigService');
 const mockEmailData = require('./mockEmailData');
-const { buildSchedulePnlDataUrl } = require('../utils/schedulePnlRequest');
+const { buildSchedulePnlDataUrl, buildSchedulePnlDataStreamUrl } = require('../utils/schedulePnlRequest');
 const pnlPdfServer = require('../utils/pnlPdfServer');
 
 function getScheduleEntity(schedule) {
@@ -65,6 +65,22 @@ function getApplicationBaseUrl() {
     : `http://127.0.0.1:${process.env.PORT || 3000}`;
 }
 
+function shouldUseStreamingPnlEndpoint(schedule) {
+  return schedule?.template_type === 'subsidiary';
+}
+
+async function parseErrorDetail(response) {
+  const errorText = await response.text();
+  let detail = errorText;
+  try {
+    const parsed = JSON.parse(errorText);
+    detail = parsed.message || parsed.error || errorText;
+  } catch (error) {
+    // Keep raw response text.
+  }
+  return detail;
+}
+
 async function resolveReportDate(providedReportDate, bigQueryService) {
   if (providedReportDate) {
     return normalizeReportDateValue(providedReportDate);
@@ -96,19 +112,105 @@ async function resolveReportDate(providedReportDate, bigQueryService) {
   return dates[0].time || dates[0].formatted;
 }
 
-async function fetchScheduleReportHtml(schedule, { entityId, reportDate, baseUrl = getApplicationBaseUrl() } = {}) {
+async function fetchScheduleReportHtmlFromStream(schedule, {
+  entityId,
+  reportDate,
+  baseUrl = getApplicationBaseUrl(),
+  onProgress
+} = {}) {
+  const streamUrl = buildSchedulePnlDataStreamUrl(baseUrl, schedule, { entityId, reportDate });
+  const response = await fetch(streamUrl, { headers: getInternalApiHeaders() });
+
+  if (!response.ok) {
+    const detail = await parseErrorDetail(response);
+    throw new Error(`Failed to stream P&L data: ${response.status} - ${detail}`);
+  }
+
+  if (!response.body) {
+    throw new Error('P&L stream returned no body');
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let finalResult = null;
+
+  const processEvent = async (eventBlock) => {
+    const lines = String(eventBlock || '')
+      .split('\n')
+      .map(line => line.trimEnd())
+      .filter(Boolean);
+    const dataLines = lines
+      .filter(line => line.startsWith('data:'))
+      .map(line => line.slice(5).trimStart());
+
+    if (!dataLines.length) {
+      return;
+    }
+
+    const payload = JSON.parse(dataLines.join('\n'));
+    if (payload.type === 'progress' && typeof onProgress === 'function') {
+      await onProgress(payload);
+      return;
+    }
+
+    if (payload.type === 'error') {
+      throw new Error(payload.error || 'P&L stream failed');
+    }
+
+    if (payload.type === 'complete') {
+      finalResult = payload.result || null;
+    }
+  };
+
+  while (true) {
+    const { value, done } = await reader.read();
+    buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+
+    const events = buffer.split('\n\n');
+    buffer = events.pop() || '';
+
+    for (const eventBlock of events) {
+      await processEvent(eventBlock);
+    }
+
+    if (done) {
+      break;
+    }
+  }
+
+  if (buffer.trim()) {
+    await processEvent(buffer);
+  }
+
+  const htmlContent = finalResult?.html;
+  if (!htmlContent || !htmlContent.trim()) {
+    throw new Error('No report data available');
+  }
+
+  return htmlContent;
+}
+
+async function fetchScheduleReportHtml(schedule, {
+  entityId,
+  reportDate,
+  baseUrl = getApplicationBaseUrl(),
+  onProgress
+} = {}) {
+  if (shouldUseStreamingPnlEndpoint(schedule)) {
+    return fetchScheduleReportHtmlFromStream(schedule, {
+      entityId,
+      reportDate,
+      baseUrl,
+      onProgress
+    });
+  }
+
   const dataUrl = buildSchedulePnlDataUrl(baseUrl, schedule, { entityId, reportDate });
   const response = await fetch(dataUrl, { headers: getInternalApiHeaders() });
 
   if (!response.ok) {
-    const errorText = await response.text();
-    let detail = errorText;
-    try {
-      const parsed = JSON.parse(errorText);
-      detail = parsed.message || parsed.error || errorText;
-    } catch (error) {
-      // Keep raw response text.
-    }
+    const detail = await parseErrorDetail(response);
     throw new Error(`Failed to fetch P&L data: ${response.status} - ${detail}`);
   }
 
@@ -121,12 +223,13 @@ async function fetchScheduleReportHtml(schedule, { entityId, reportDate, baseUrl
   return htmlContent;
 }
 
-async function generateSchedulePdf(schedule, { reportDate, bigQueryService, pdfRowHeight } = {}) {
+async function generateSchedulePdf(schedule, { reportDate, bigQueryService, pdfRowHeight, onProgress } = {}) {
   const { entityId, entityName } = getScheduleEntity(schedule);
   const resolvedReportDate = await resolveReportDate(reportDate, bigQueryService);
   const htmlContent = await fetchScheduleReportHtml(schedule, {
     entityId,
-    reportDate: normalizeReportDateValue(resolvedReportDate)
+    reportDate: normalizeReportDateValue(resolvedReportDate),
+    onProgress
   });
 
   const { pdfBuffer, prepared } = await pnlPdfServer.generatePdfBufferFromReportHtml(htmlContent, {
@@ -169,6 +272,7 @@ module.exports = {
   normalizeReportDateValue,
   resolveReportDate,
   fetchScheduleReportHtml,
+  shouldUseStreamingPnlEndpoint,
   generateSchedulePdf,
   getScheduleRecipients
 };

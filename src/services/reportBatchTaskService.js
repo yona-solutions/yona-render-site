@@ -52,6 +52,20 @@ function getQueueUrl() {
   return `https://cloudtasks.googleapis.com/v2/${getQueuePath()}`;
 }
 
+function getDesiredQueueConfig() {
+  return {
+    rateLimits: {
+      maxDispatchesPerSecond: Number(process.env.GCP_CLOUD_TASKS_MAX_DISPATCHES_PER_SECOND || 3),
+      // Default to serial execution so large report groups do not overlap on the same Render instance.
+      maxConcurrentDispatches: Number(process.env.GCP_CLOUD_TASKS_MAX_CONCURRENT_DISPATCHES || 1)
+    },
+    retryConfig: {
+      maxAttempts: Number(process.env.GCP_CLOUD_TASKS_MAX_ATTEMPTS || 3),
+      maxRetryDuration: '3600s'
+    }
+  };
+}
+
 async function getAccessToken() {
   const credentials = getServiceAccountCredentials();
   const auth = new GoogleAuth({
@@ -82,6 +96,29 @@ async function fetchCloudTasks(url, options = {}) {
   });
 }
 
+async function syncQueueConfiguration(queueUrl) {
+  const updateMask = [
+    'rateLimits.maxDispatchesPerSecond',
+    'rateLimits.maxConcurrentDispatches',
+    'retryConfig.maxAttempts',
+    'retryConfig.maxRetryDuration'
+  ].join(',');
+  const response = await fetchCloudTasks(`${queueUrl}?updateMask=${encodeURIComponent(updateMask)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({
+      name: getQueuePath(),
+      ...getDesiredQueueConfig()
+    })
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to update Cloud Tasks queue: ${response.status} ${errorText}`);
+  }
+
+  return response.json();
+}
+
 async function ensureQueueExists() {
   if (shouldUseLocalDispatch()) {
     return { dispatchType: 'local' };
@@ -100,6 +137,7 @@ async function ensureQueueExists() {
     const existingResponse = await fetchCloudTasks(queueUrl, { method: 'GET' });
 
     if (existingResponse.ok) {
+      await syncQueueConfiguration(queueUrl);
       queueEnsured = true;
       return { dispatchType: 'cloud-tasks', queuePath: getQueuePath() };
     }
@@ -114,14 +152,7 @@ async function ensureQueueExists() {
       method: 'POST',
       body: JSON.stringify({
         name: getQueuePath(),
-        rateLimits: {
-          maxDispatchesPerSecond: Number(process.env.GCP_CLOUD_TASKS_MAX_DISPATCHES_PER_SECOND || 3),
-          maxConcurrentDispatches: Number(process.env.GCP_CLOUD_TASKS_MAX_CONCURRENT_DISPATCHES || 5)
-        },
-        retryConfig: {
-          maxAttempts: Number(process.env.GCP_CLOUD_TASKS_MAX_ATTEMPTS || 3),
-          maxRetryDuration: '3600s'
-        }
+        ...getDesiredQueueConfig()
       })
     });
 

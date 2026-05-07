@@ -256,6 +256,11 @@ function normalizeBatchMode(mode) {
   return String(mode || '').trim().toLowerCase() === 'generate' ? 'generate' : 'send';
 }
 
+function getBatchItemHeartbeatTimeoutMs() {
+  const parsed = Number(process.env.REPORT_BATCH_ITEM_STALE_TIMEOUT_MS || 2 * 60 * 1000);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 2 * 60 * 1000;
+}
+
 function createInitialBatchProgressPayload({
   scheduleId = null,
   scheduleName = '',
@@ -1389,15 +1394,35 @@ router.post('/report-schedules/:id/process', requireApiKey, async (req, res) => 
       });
 
       try {
+        const reportProgressPrefix = groupReports.length > 1 ? `${reportLabel}: ` : '';
         const {
           entityName,
           pdfBuffer,
           preparedReport
-	        } = await scheduleReportService.generateSchedulePdf(report, {
-	          reportDate: normalizedReportDate,
-	          bigQueryService: bigQueryServiceInstance,
-	          pdfRowHeight
-	        });
+        } = await scheduleReportService.generateSchedulePdf(report, {
+          reportDate: normalizedReportDate,
+          bigQueryService: bigQueryServiceInstance,
+          pdfRowHeight,
+          onProgress: batchItemId
+            ? async (progressEvent) => {
+                const detail = [progressEvent.detail || progressEvent.message]
+                  .filter(Boolean)
+                  .map(text => `${reportProgressPrefix}${text}`)
+                  .join('');
+
+                await persistBatchProgress({
+                  reportDate: normalizedReportDate,
+                  currentStep: 'fetch_data',
+                  steps: {
+                    fetch_data: {
+                      status: 'running',
+                      detail: detail || `Loading ${reportLabel} (${index + 1} of ${groupReports.length})`
+                    }
+                  }
+                });
+              }
+            : undefined
+        });
 
         const filename = buildGroupedAttachmentFilename(report, entityName, normalizedReportDate);
         attachments.push({
@@ -1854,14 +1879,18 @@ router.post('/report-batches/items/:itemId/execute', requireApiKey, async (req, 
     }
 
     if (item.status === 'running' && item.last_attempt_at) {
-      const lastAttemptAgeMs = Date.now() - new Date(item.last_attempt_at).getTime();
-      if (lastAttemptAgeMs < 30 * 60 * 1000) {
-        return res.status(202).json({
+      const heartbeatAt = item.updated_at || item.last_attempt_at;
+      const heartbeatAgeMs = Date.now() - new Date(heartbeatAt).getTime();
+      if (heartbeatAgeMs < getBatchItemHeartbeatTimeoutMs()) {
+        res.set('Retry-After', '30');
+        return res.status(429).json({
           success: true,
           alreadyProcessing: true,
           status: 'running'
         });
       }
+
+      console.warn(`⚠️  Reclaiming stale batch item ${itemId}; last heartbeat was ${Math.round(heartbeatAgeMs / 1000)}s ago`);
     }
 
     await emailConfigService.markReportBatchRunStarted(item.batch_run_id);

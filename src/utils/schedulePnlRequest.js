@@ -9,7 +9,7 @@ function getScheduleOrgLabel(schedule) {
   return trimmed || null;
 }
 
-function buildSchedulePnlDataPath(schedule, { entityId, reportDate }) {
+function buildSchedulePnlQueryParams(schedule, { entityId, reportDate }) {
   const params = new URLSearchParams({
     hierarchy: schedule.template_type,
     selectedId: String(entityId),
@@ -30,16 +30,33 @@ function buildSchedulePnlDataPath(schedule, { entityId, reportDate }) {
     params.set('serviceFilter', schedule.service_filter_id);
   }
 
+  return params;
+}
+
+function buildSchedulePnlDataPath(schedule, { entityId, reportDate }) {
+  const params = buildSchedulePnlQueryParams(schedule, { entityId, reportDate });
   return `/api/pl/data?${params.toString()}`;
+}
+
+function buildSchedulePnlDataStreamPath(schedule, { entityId, reportDate }) {
+  const params = buildSchedulePnlQueryParams(schedule, { entityId, reportDate });
+  return `/api/pl/data-stream?${params.toString()}`;
 }
 
 function buildSchedulePnlDataUrl(baseUrl, schedule, { entityId, reportDate }) {
   return `${baseUrl}${buildSchedulePnlDataPath(schedule, { entityId, reportDate })}`;
 }
 
+function buildSchedulePnlDataStreamUrl(baseUrl, schedule, { entityId, reportDate }) {
+  return `${baseUrl}${buildSchedulePnlDataStreamPath(schedule, { entityId, reportDate })}`;
+}
+
 module.exports = {
   normalizeScheduleProcess,
   getScheduleOrgLabel,
+  buildSchedulePnlQueryParams,
   buildSchedulePnlDataPath,
-  buildSchedulePnlDataUrl
+  buildSchedulePnlDataUrl,
+  buildSchedulePnlDataStreamPath,
+  buildSchedulePnlDataStreamUrl
 };
