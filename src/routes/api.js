@@ -20,6 +20,12 @@ function normalizeCensusMonth(date) {
   return `${date.substring(0, 7)}-01`;
 }
 
+function normalizeCensusService(service) {
+  if (service == null) return null;
+  const normalized = String(service).trim().toUpperCase();
+  return normalized || null;
+}
+
 function getCustomerCodeFromLabel(label) {
   if (!label) return null;
   // Match uppercase letters followed by digits at the start (e.g. RED41, BAR91, FFB91)
@@ -54,8 +60,9 @@ function uniqueCustomersById(customers) {
   return unique;
 }
 
-function sumCensusForCodes(censusRecords, customerCodes, date) {
+function sumCensusForCodes(censusRecords, customerCodes, date, options = {}) {
   const month = normalizeCensusMonth(date);
+  const serviceFilter = normalizeCensusService(options.service);
   if (!month || !censusRecords || censusRecords.length === 0 || !customerCodes || customerCodes.length === 0) {
     return { actual: null, budget: null, headcount: null };
   }
@@ -71,6 +78,7 @@ function sumCensusForCodes(censusRecords, customerCodes, date) {
   for (const record of censusRecords) {
     if (!record || record.month !== month) continue;
     if (!codeSet.has(record.customerCode)) continue;
+    if (serviceFilter && normalizeCensusService(record.service) !== serviceFilter) continue;
     if (record.type === 'Actuals') {
       actualTotal += Number(record.value) || 0;
       actualFound = true;
@@ -90,9 +98,18 @@ function sumCensusForCodes(censusRecords, customerCodes, date) {
   };
 }
 
-function sumCensusForCustomers(censusRecords, customers, date) {
+function sumCensusForCustomers(censusRecords, customers, date, options = {}) {
   const codes = collectCustomerCodes(customers);
-  return sumCensusForCodes(censusRecords, codes, date);
+  return sumCensusForCodes(censusRecords, codes, date, options);
+}
+
+function sumSubsidiarySummaryCensus(censusRecords, customers, date, serviceLabel = null) {
+  // When the Subsidiary page has no explicit service filter, default the
+  // top-level census rollup to Dietary instead of combining EVS + Dietary.
+  const effectiveService = serviceLabel || 'Dietary';
+  return sumCensusForCustomers(censusRecords, customers, date, {
+    service: effectiveService
+  });
 }
 
 function isCustomerPnlHidden(customer) {
@@ -675,10 +692,11 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
         console.log(`   Region ${r.region}: ${r.customers.length} customers [${r.customers.join(', ')}]`);
       }
 
-      const subsidiaryCensus = sumCensusForCustomers(
+      const subsidiaryCensus = sumSubsidiarySummaryCensus(
         censusRecords,
         uniqueCustomersById(regionGroups.flatMap(r => r.districts.filter(d => !d.districtSummaryExcluded).flatMap(d => d.customers))),
-        date
+        date,
+        serviceLabel
       );
 
       // Step 2: Fetch subsidiary summary.
@@ -1806,7 +1824,12 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
             region.districts.filter(d => !d.districtSummaryExcluded).flatMap(district => district.customers)
           )
         );
-        const subsidiaryCensus = sumCensusForCustomers(censusRecords, subsidiaryCustomersForCensus, date);
+        const subsidiaryCensus = sumSubsidiarySummaryCensus(
+          censusRecords,
+          subsidiaryCustomersForCensus,
+          date,
+          queryParams.serviceLabel || null
+        );
 
         // Subsidiary summaries include census rollup
         const subsidiaryMeta = {
