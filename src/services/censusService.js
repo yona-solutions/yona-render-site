@@ -13,7 +13,7 @@ class CensusService {
     this.lastFetch = null;
     this.cacheExpiry = 0; // No caching - always fetch fresh data
     this.spreadsheetId = '1P4uAVda140WUwGf6L5-oJqklhqHhWGUJ3XPawYa4GpE';
-    this.sheetRange = 'census_flattened_safe!A:F';
+    this.sheetRange = 'census_flattened_safe!A:H';
   }
 
   /**
@@ -48,6 +48,8 @@ class CensusService {
       this.censusData = censusRecords.map(record => ({
         type: record.type?.trim(), // 'Actuals' or 'Budget'
         customerCode: record.customer_code?.trim(),
+        subsidiary: record.subsidiary?.trim(),
+        service: record.service?.trim(),
         month: this.parseMonth(record.month),
         value: parseFloat(record.value) || 0,
         customerName: record.customer_name?.trim(),
