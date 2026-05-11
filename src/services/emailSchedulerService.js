@@ -174,7 +174,7 @@ class EmailSchedulerService {
     // Initialize run log data
     let runLogId = null;
     let entityId, entityName;
-    let allRecipients = new Set();
+    let allRecipientContacts = [];
     let reportDate = null;
     let pdfSizeBytes = null;
 
@@ -242,10 +242,11 @@ class EmailSchedulerService {
       console.log(`   Process: ${schedule.process}`);
       console.log(`   Email Groups: ${emailGroupIds.length}`);
 
-      const recipientList = await scheduleReportService.getScheduleRecipients(schedule);
-      recipientList.forEach(recipient => allRecipients.add(recipient));
+      const recipientList = await scheduleReportService.getScheduleRecipientContacts(schedule);
+      allRecipientContacts = recipientList;
+      const recipientEmails = recipientList.map(recipient => recipient.email);
 
-      if (allRecipients.size === 0) {
+      if (recipientList.length === 0) {
         const reason = 'No recipients in email groups';
         console.log(`   ⚠️  Skipping: ${reason}`);
         result.status = 'skipped';
@@ -264,7 +265,7 @@ class EmailSchedulerService {
         return result;
       }
 
-      console.log(`   Recipients: ${allRecipients.size} total`);
+      console.log(`   Recipients: ${recipientList.length} total`);
 
       // Generate the report once (to be sent to all recipients)
       console.log(`   📊 Generating P&L report...`);
@@ -284,7 +285,7 @@ class EmailSchedulerService {
           entity_name: entityName,
           status: 'failed',
           error_message: errorMsg,
-          recipient_emails: Array.from(allRecipients),
+          recipient_emails: recipientEmails,
           trigger_type: triggerType
         });
 
@@ -300,19 +301,19 @@ class EmailSchedulerService {
       let failCount = 0;
 
       console.log(`   📧 Sending emails...`);
-      for (const recipientEmail of allRecipients) {
+      for (const recipient of recipientList) {
         try {
           await emailService.sendPDFEmail(
             schedule,
             reportData.pdfBuffer,
-            recipientEmail,
+            recipient,
             reportData.date
           );
           successCount++;
-          console.log(`      ✓ Sent to ${recipientEmail}`);
+          console.log(`      ✓ Sent to ${recipient.email}`);
         } catch (error) {
           failCount++;
-          console.log(`      ✗ Failed to send to ${recipientEmail}: ${error.message}`);
+          console.log(`      ✗ Failed to send to ${recipient.email}: ${error.message}`);
         }
       }
 
@@ -344,7 +345,7 @@ class EmailSchedulerService {
         error_message: result.error,
         emails_sent: successCount,
         emails_failed: failCount,
-        recipient_emails: Array.from(allRecipients),
+        recipient_emails: recipientEmails,
         trigger_type: triggerType,
         pdf_size_bytes: pdfSizeBytes
       });
@@ -371,7 +372,7 @@ class EmailSchedulerService {
         report_date: reportDate,
         status: 'failed',
         error_message: error.message,
-        recipient_emails: Array.from(allRecipients),
+        recipient_emails: allRecipientContacts.map(recipient => recipient.email),
         trigger_type: triggerType,
         pdf_size_bytes: pdfSizeBytes
       });

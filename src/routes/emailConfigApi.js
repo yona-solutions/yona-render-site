@@ -11,6 +11,12 @@ const emailService = require('../services/emailService');
 const emailSchedulerService = require('../services/emailSchedulerService');
 const reportBatchTaskService = require('../services/reportBatchTaskService');
 const scheduleReportService = require('../services/scheduleReportService');
+const {
+  buildAttachmentFilename,
+  buildReportEmailMessage,
+  normalizeEmailTemplateType,
+  splitNameParts
+} = require('../services/reportEmailTemplateService');
 
 // Store reference to bigQueryService instance (set via createEmailConfigRoutes)
 let bigQueryServiceInstance = null;
@@ -99,6 +105,51 @@ function normalizeIntegerArray(values) {
   )];
 }
 
+function normalizeEmailGroupContacts(body = {}) {
+  const inputs = Array.isArray(body.contacts)
+    ? body.contacts
+    : Array.isArray(body.emails)
+      ? body.emails.map(email => ({ email }))
+      : [];
+
+  const seenEmails = new Set();
+  const contacts = [];
+
+  inputs.forEach(contact => {
+    if (!contact) return;
+
+    const input = typeof contact === 'string' ? { email: contact } : contact;
+    const email = String(input.email || '').trim();
+    if (!email) {
+      return;
+    }
+
+    const dedupeKey = email.toLowerCase();
+    if (seenEmails.has(dedupeKey)) {
+      return;
+    }
+    seenEmails.add(dedupeKey);
+
+    const fullName = String(input.name || '').trim();
+    const firstName = String(input.first_name || input.firstName || '').trim();
+    const lastName = String(input.last_name || input.lastName || '').trim();
+    const derivedNames = (!firstName || !lastName) && fullName
+      ? splitNameParts(fullName)
+      : { firstName: '', lastName: '' };
+    const resolvedFirstName = firstName || derivedNames.firstName;
+    const resolvedLastName = lastName || derivedNames.lastName;
+
+    contacts.push({
+      email,
+      name: fullName || [resolvedFirstName, resolvedLastName].filter(Boolean).join(' ').trim() || null,
+      first_name: resolvedFirstName || null,
+      last_name: resolvedLastName || null
+    });
+  });
+
+  return contacts;
+}
+
 async function getPdfRowHeightSetting() {
   if (!emailConfigService.isAvailable()) {
     return 12.5;
@@ -182,6 +233,7 @@ function buildReportGroupPayload(body = {}) {
 
   return {
     name,
+    email_template_type: normalizeEmailTemplateType(body.email_template_type),
     tags: normalizeScheduleTags(body.tags) || [],
     email_group_ids: normalizeIntegerArray(body.email_group_ids ?? body.email_group_id),
     reports: getReportGroupReports(body),
@@ -196,6 +248,10 @@ function buildReportGroupPayload(body = {}) {
 function validateReportGroupPayload(groupData) {
   if (!groupData.name) {
     return 'Group name is required';
+  }
+
+  if (!groupData.email_template_type) {
+    return 'Email template type is required';
   }
 
   if (!Array.isArray(groupData.email_group_ids) || groupData.email_group_ids.length === 0) {
@@ -235,21 +291,56 @@ function validateReportGroupPayload(groupData) {
     }
   }
 
+  if (groupData.email_template_type === 'district') {
+    if (groupData.reports.length !== 1) {
+      return 'District email template type requires exactly one attached P&L';
+    }
+    if (groupData.reports[0]?.template_type !== 'district') {
+      return 'District email template type requires a district P&L';
+    }
+  }
+
+  if (groupData.email_template_type === 'multiple_districts') {
+    if (groupData.reports.length < 2) {
+      return 'Multiple Districts email template type requires at least two attached P&Ls';
+    }
+    if (groupData.reports.some(report => report?.template_type !== 'district')) {
+      return 'Multiple Districts email template type only supports district P&Ls';
+    }
+  }
+
+  if (groupData.email_template_type === 'subsidiary_dietary') {
+    if (groupData.reports.length !== 1) {
+      return 'Subsidiary (Dietary Only) email template type requires exactly one attached P&L';
+    }
+    if (groupData.reports[0]?.template_type !== 'subsidiary') {
+      return 'Subsidiary (Dietary Only) email template type requires a subsidiary P&L';
+    }
+    if (String(groupData.reports[0]?.service_filter_name || '').trim().toLowerCase() !== 'dietary') {
+      return 'Subsidiary (Dietary Only) email template type requires the attached P&L to be filtered to Dietary';
+    }
+  }
+
+  if (groupData.email_template_type === 'subsidiary') {
+    if (groupData.reports.length !== 1) {
+      return 'Subsidiary (All) email template type requires exactly one attached P&L';
+    }
+    if (groupData.reports[0]?.template_type !== 'subsidiary') {
+      return 'Subsidiary (All) email template type requires a subsidiary P&L';
+    }
+  }
+
   return null;
 }
 
 function buildGroupedAttachmentFilename(report, entityName, reportDate) {
-  const safeReportName = (report.template_name || 'P&L')
-    .replace(/[^a-zA-Z0-9_.-]/g, '_')
-    .replace(/_+/g, '_');
-  const safeEntityName = String(entityName || 'entity')
-    .replace(/[^a-zA-Z0-9_.-]/g, '_')
-    .replace(/_+/g, '_');
-  const safeDate = String(reportDate || '')
-    .replace(/[^a-zA-Z0-9_.-]/g, '_')
-    .replace(/_+/g, '_');
-
-  return `${safeReportName}_${safeEntityName}_${safeDate}_PnL.pdf`;
+  return buildAttachmentFilename({
+    name: report?.template_name || entityName,
+    template_name: report?.template_name || entityName,
+    template_type: report?.template_type,
+    process: report?.process,
+    reports: [report]
+  }, reportDate, report);
 }
 
 function normalizeBatchMode(mode) {
@@ -401,7 +492,8 @@ router.get('/email-groups/:id/contacts', async (req, res) => {
  */
 router.post('/email-groups', async (req, res) => {
   try {
-    const { name, description, emails } = req.body;
+    const { name, description } = req.body;
+    const contacts = normalizeEmailGroupContacts(req.body);
 
     // Validation
     if (!name || !name.trim()) {
@@ -411,16 +503,18 @@ router.post('/email-groups', async (req, res) => {
       });
     }
 
-    if (!emails || !Array.isArray(emails) || emails.length === 0) {
+    if (contacts.length === 0) {
       return res.status(400).json({
         error: 'Validation failed',
-        message: 'At least one email address is required'
+        message: 'At least one contact is required'
       });
     }
 
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    const invalidEmails = emails.filter(email => !emailRegex.test(email));
+    const invalidEmails = contacts
+      .map(contact => contact.email)
+      .filter(email => !emailRegex.test(email));
     
     if (invalidEmails.length > 0) {
       return res.status(400).json({
@@ -434,7 +528,7 @@ router.post('/email-groups', async (req, res) => {
       const group = mockEmailData.createMockEmailGroup({
         name: name.trim(),
         description: description?.trim() || null,
-        emails
+        contacts
       });
       console.log(`✅ Created mock email group: ${group.name} (ID: ${group.id})`);
       return res.status(201).json(group);
@@ -443,7 +537,7 @@ router.post('/email-groups', async (req, res) => {
     const group = await emailConfigService.createEmailGroup({
       name: name.trim(),
       description: description?.trim() || null,
-      emails
+      contacts
     });
 
     console.log(`✅ Created email group: ${group.name} (ID: ${group.id})`);
@@ -473,7 +567,9 @@ router.post('/email-groups', async (req, res) => {
 router.put('/email-groups/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, description, emails } = req.body;
+    const { name, description } = req.body;
+    const contactsProvided = req.body.contacts !== undefined || req.body.emails !== undefined;
+    const contacts = contactsProvided ? normalizeEmailGroupContacts(req.body) : undefined;
 
     // Validation
     if (!name || !name.trim()) {
@@ -483,24 +579,19 @@ router.put('/email-groups/:id', async (req, res) => {
       });
     }
 
-    if (emails !== undefined) {
-      if (!Array.isArray(emails)) {
+    if (contactsProvided) {
+      if (contacts.length === 0) {
         return res.status(400).json({
           error: 'Validation failed',
-          message: 'Emails must be an array'
-        });
-      }
-
-      if (emails.length === 0) {
-        return res.status(400).json({
-          error: 'Validation failed',
-          message: 'At least one email address is required'
+          message: 'At least one contact is required'
         });
       }
 
       // Validate email format
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      const invalidEmails = emails.filter(email => !emailRegex.test(email));
+      const invalidEmails = contacts
+        .map(contact => contact.email)
+        .filter(email => !emailRegex.test(email));
       
       if (invalidEmails.length > 0) {
         return res.status(400).json({
@@ -510,10 +601,27 @@ router.put('/email-groups/:id', async (req, res) => {
       }
     }
 
+    if (!emailConfigService.isAvailable()) {
+      const group = mockEmailData.updateMockEmailGroup(parseInt(id), {
+        name: name.trim(),
+        description: description?.trim() || null,
+        contacts
+      });
+
+      if (!group) {
+        return res.status(404).json({
+          error: 'Email group not found'
+        });
+      }
+
+      console.log(`✅ Updated mock email group: ${group.name} (ID: ${group.id})`);
+      return res.json(group);
+    }
+
     const group = await emailConfigService.updateEmailGroup(parseInt(id), {
       name: name.trim(),
       description: description?.trim() || null,
-      emails
+      contacts
     });
 
     console.log(`✅ Updated email group: ${group.name} (ID: ${group.id})`);
@@ -1039,7 +1147,7 @@ router.post('/report-schedules/:id/send-to-groups', async (req, res) => {
       });
     }
 
-    const recipientList = await scheduleReportService.getScheduleRecipients(schedule);
+    const recipientList = await scheduleReportService.getScheduleRecipientContacts(schedule);
     console.log(`   Email groups: ${emailGroupIds.length}, Total recipients: ${recipientList.length}`);
 
     if (recipientList.length === 0) {
@@ -1081,14 +1189,9 @@ router.post('/report-schedules/:id/send-to-groups', async (req, res) => {
     console.log(`   Filtered to ${preparedReport.keptCount} report(s) with non-zero net income`);
     console.log(`   PDF generated: ${(pdfBuffer.length / 1024).toFixed(1)} KB`);
 
-    // Format date for email subject
-    const dateObj = new Date(resolvedReportDate + 'T00:00:00');
-    const monthName = dateObj.toLocaleString('en-US', { month: 'long' });
-    const year = dateObj.getFullYear();
-
-    // Create email content
-    const subject = `${schedule.template_name || entityName} - ${monthName} ${year} P&L Report`;
-    const filename = `${schedule.template_name || entityName}_${resolvedReportDate}_PnL.pdf`.replace(/[^a-zA-Z0-9_.-]/g, '_');
+    const previewMessage = buildReportEmailMessage(schedule, recipientList[0], resolvedReportDate);
+    const subject = previewMessage.subject;
+    const filename = buildAttachmentFilename(schedule, resolvedReportDate);
 
     // Send to all recipients
     console.log(`   Sending to ${recipientList.length} recipients...`);
@@ -1096,16 +1199,16 @@ router.post('/report-schedules/:id/send-to-groups', async (req, res) => {
     let emailsFailed = 0;
     const results = [];
 
-    for (const recipientEmail of recipientList) {
+    for (const recipient of recipientList) {
       try {
-        await emailService.sendPDFEmail(schedule, pdfBuffer, recipientEmail, resolvedReportDate);
+        await emailService.sendPDFEmail(schedule, pdfBuffer, recipient, resolvedReportDate);
         emailsSent++;
-        results.push({ email: recipientEmail, status: 'sent' });
-        console.log(`      ✅ Sent to ${recipientEmail}`);
+        results.push({ email: recipient.email, name: recipient.name, status: 'sent' });
+        console.log(`      ✅ Sent to ${recipient.email}`);
       } catch (sendError) {
         emailsFailed++;
-        results.push({ email: recipientEmail, status: 'failed', error: sendError.message });
-        console.error(`      ❌ Failed to send to ${recipientEmail}:`, sendError.message);
+        results.push({ email: recipient.email, name: recipient.name, status: 'failed', error: sendError.message });
+        console.error(`      ❌ Failed to send to ${recipient.email}:`, sendError.message);
       }
     }
 
@@ -1127,7 +1230,7 @@ router.post('/report-schedules/:id/send-to-groups', async (req, res) => {
         error_message: emailsFailed > 0 ? `${emailsFailed} of ${recipientList.length} emails failed` : null,
         emails_sent: emailsSent,
         emails_failed: emailsFailed,
-        recipient_emails: recipientList,
+        recipient_emails: recipientList.map(recipient => recipient.email),
         trigger_type: 'manual',
         pdf_size_bytes: pdfBuffer.length,
         duration_ms: duration
@@ -1317,7 +1420,7 @@ router.post('/report-schedules/:id/process', requireApiKey, async (req, res) => 
     }
 
     const recipientList = normalizedMode === 'send'
-      ? await scheduleReportService.getScheduleRecipients(schedule)
+      ? await scheduleReportService.getScheduleRecipientContacts(schedule)
       : [];
 
     if (normalizedMode === 'send' && recipientList.length === 0) {
@@ -1550,16 +1653,16 @@ router.post('/report-schedules/:id/process', requireApiKey, async (req, res) => 
     } else {
       console.log(`   Sending grouped emails to ${recipientList.length} recipient(s)...`);
 
-      for (const recipientEmail of recipientList) {
+      for (const recipient of recipientList) {
         try {
-          await emailService.sendGroupedPDFEmail(schedule, attachments, recipientEmail, normalizedReportDate);
+          await emailService.sendGroupedPDFEmail(schedule, attachments, recipient, normalizedReportDate);
           successCount++;
-          recipientResults.push({ email: recipientEmail, status: 'sent' });
-          console.log(`      ✓ Sent grouped packet to ${recipientEmail}`);
+          recipientResults.push({ email: recipient.email, name: recipient.name, status: 'sent' });
+          console.log(`      ✓ Sent grouped packet to ${recipient.email}`);
         } catch (error) {
           failCount++;
-          recipientResults.push({ email: recipientEmail, status: 'failed', error: error.message });
-          console.log(`      ✗ Failed: ${recipientEmail} - ${error.message}`);
+          recipientResults.push({ email: recipient.email, name: recipient.name, status: 'failed', error: error.message });
+          console.log(`      ✗ Failed: ${recipient.email} - ${error.message}`);
         }
 
         await persistBatchProgress({
@@ -1621,7 +1724,7 @@ router.post('/report-schedules/:id/process', requireApiKey, async (req, res) => 
         error_message: errorMessage,
         emails_sent: successCount,
         emails_failed: failCount,
-        recipient_emails: recipientList,
+        recipient_emails: recipientList.map(recipient => recipient.email),
         trigger_type: triggerType,
         pdf_size_bytes: totalPdfSizeBytes || null
       });

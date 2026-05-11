@@ -6,6 +6,59 @@
  * UI flow without requiring database setup.
  */
 
+function splitMockNameParts(name = '') {
+  const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+  return {
+    first_name: parts[0] || null,
+    last_name: parts.length > 1 ? parts[parts.length - 1] : null
+  };
+}
+
+function withMockNameParts(contact) {
+  const parsedNames = splitMockNameParts(contact?.name);
+  return {
+    ...contact,
+    first_name: contact?.first_name ?? parsedNames.first_name,
+    last_name: contact?.last_name ?? parsedNames.last_name
+  };
+}
+
+function normalizeMockContacts(input = []) {
+  const contacts = Array.isArray(input) ? input : [];
+  const seenEmails = new Set();
+  const normalized = [];
+
+  contacts.forEach(contact => {
+    if (!contact) return;
+
+    const value = typeof contact === 'string' ? { email: contact } : contact;
+    const email = String(value.email || '').trim();
+    if (!email) return;
+
+    const dedupeKey = email.toLowerCase();
+    if (seenEmails.has(dedupeKey)) return;
+    seenEmails.add(dedupeKey);
+
+    const name = String(value.name || '').trim();
+    const firstName = String(value.first_name || value.firstName || '').trim();
+    const lastName = String(value.last_name || value.lastName || '').trim();
+    const derivedNames = (!firstName || !lastName) && name
+      ? splitMockNameParts(name)
+      : { first_name: null, last_name: null };
+    const resolvedFirstName = firstName || derivedNames.first_name;
+    const resolvedLastName = lastName || derivedNames.last_name;
+
+    normalized.push({
+      email,
+      name: name || [resolvedFirstName, resolvedLastName].filter(Boolean).join(' ').trim() || null,
+      first_name: resolvedFirstName || null,
+      last_name: resolvedLastName || null
+    });
+  });
+
+  return normalized;
+}
+
 // Mock Email Groups
 const mockEmailGroups = [
   {
@@ -59,7 +112,7 @@ const mockEmailGroups = [
 ];
 
 // Mock Email Group Contacts
-const mockEmailContacts = [
+const rawMockEmailContacts = [
   // District Managers
   { id: 1, email_group_id: 1, email: 'john.smith@yona.com', name: 'John Smith', created_at: new Date('2026-01-15T10:00:00Z') },
   { id: 2, email_group_id: 1, email: 'jane.doe@yona.com', name: 'Jane Doe', created_at: new Date('2026-01-15T10:01:00Z') },
@@ -101,6 +154,8 @@ const mockEmailContacts = [
   { id: 28, email_group_id: 6, email: 'ne.analyst@yona.com', name: 'NE Business Analyst', created_at: new Date('2026-01-20T08:34:00Z') },
   { id: 29, email_group_id: 6, email: 'ne.support@yona.com', name: 'NE Support Team', created_at: new Date('2026-01-20T08:35:00Z') }
 ];
+
+const mockEmailContacts = rawMockEmailContacts.map(withMockNameParts);
 
 // Mock Report Schedules - Updated with new structure and REAL IDs from configs
 const mockReportSchedules = [
@@ -358,11 +413,12 @@ function getMockReportSchedule(id) {
  */
 function createMockEmailGroup(data) {
   const newId = Math.max(...mockEmailGroups.map(g => g.id)) + 1;
+  const contacts = normalizeMockContacts(data.contacts || data.emails || []);
   const newGroup = {
     id: newId,
     name: data.name,
     description: data.description || null,
-    email_count: data.emails ? data.emails.length : 0,
+    email_count: contacts.length,
     created_at: new Date(),
     updated_at: new Date()
   };
@@ -370,23 +426,69 @@ function createMockEmailGroup(data) {
   mockEmailGroups.push(newGroup);
   
   // Add contacts
-  if (data.emails && data.emails.length > 0) {
+  if (contacts.length > 0) {
     const startContactId = mockEmailContacts.length > 0 
       ? Math.max(...mockEmailContacts.map(c => c.id)) + 1 
       : 1;
     
-    data.emails.forEach((email, index) => {
+    contacts.forEach((contact, index) => {
       mockEmailContacts.push({
         id: startContactId + index,
         email_group_id: newId,
-        email: email,
-        name: null,
+        email: contact.email,
+        name: contact.name,
+        first_name: contact.first_name,
+        last_name: contact.last_name,
         created_at: new Date()
       });
     });
   }
   
   return newGroup;
+}
+
+/**
+ * Update mock email group (simulated)
+ */
+function updateMockEmailGroup(id, updates) {
+  const group = mockEmailGroups.find(g => g.id === parseInt(id));
+  if (!group) {
+    return null;
+  }
+
+  group.name = updates.name;
+  group.description = updates.description || null;
+  group.updated_at = new Date();
+
+  if (updates.contacts !== undefined || updates.emails !== undefined) {
+    const contacts = normalizeMockContacts(updates.contacts || updates.emails || []);
+
+    for (let index = mockEmailContacts.length - 1; index >= 0; index -= 1) {
+      if (mockEmailContacts[index].email_group_id === parseInt(id)) {
+        mockEmailContacts.splice(index, 1);
+      }
+    }
+
+    const startContactId = mockEmailContacts.length > 0
+      ? Math.max(...mockEmailContacts.map(contact => contact.id)) + 1
+      : 1;
+
+    contacts.forEach((contact, index) => {
+      mockEmailContacts.push({
+        id: startContactId + index,
+        email_group_id: parseInt(id),
+        email: contact.email,
+        name: contact.name,
+        first_name: contact.first_name,
+        last_name: contact.last_name,
+        created_at: new Date()
+      });
+    });
+
+    group.email_count = contacts.length;
+  }
+
+  return JSON.parse(JSON.stringify(group));
 }
 
 /**
@@ -397,7 +499,8 @@ function createMockReportSchedule(data) {
   
   const newSchedule = {
     id: newId,
-    template_name: data.template_name,
+    template_name: data.template_name || data.name,
+    email_template_type: data.email_template_type || null,
     template_type: data.template_type,
     process: data.process,
     tags: data.tags || [],
@@ -485,6 +588,7 @@ module.exports = {
   getMockReportSchedules,
   getMockReportSchedule,
   createMockEmailGroup,
+  updateMockEmailGroup,
   createMockReportSchedule,
   updateMockReportSchedule,
   deleteMockEmailGroup,

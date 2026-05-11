@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/png" href="/yona-sphere-blue-glow.png">
+  <title>SPHERE - Email Templates</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+      display: flex;
+      min-height: 100vh;
+      background: #f8f9fa;
+      color: #2d3748;
+    }
+
+    .sidebar {
+      width: 195px;
+      background: #ffffff;
+      border-right: 1px solid #dfe3e8;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 1px 0 0 rgba(0, 0, 0, 0.02);
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 100vh;
+      overflow-y: auto;
+      z-index: 100;
+    }
+
+    .logo {
+      padding: 18px 20px;
+      border-bottom: 1px solid #dfe3e8;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 27px;
+      font-weight: 600;
+      color: #4a7a9b;
+      letter-spacing: -0.3px;
+    }
+
+    .logo-icon {
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .logo-icon img {
+      width: 28px;
+      height: 28px;
+      object-fit: contain;
+    }
+
+    .nav-menu {
+      flex: 1;
+      padding: 8px 0;
+    }
+
+    .nav-item {
+      padding: 11px 20px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      color: #4a5568;
+      font-size: 13.5px;
+      font-weight: 400;
+      border-left: 3px solid transparent;
+      text-decoration: none;
+      display: block;
+    }
+
+    .nav-item:hover:not(.disabled) {
+      background: #f7fafc;
+      color: #2d3748;
+    }
+
+    .nav-item.active {
+      background: #e6f0f8;
+      color: #2d4a68;
+      font-weight: 500;
+      border-left-color: #4a7c9e;
+    }
+
+    .main-content {
+      flex: 1;
+      margin-left: 195px;
+      min-height: 100vh;
+    }
+
+    .header {
+      background: white;
+      padding: 20px 35px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .header h1 {
+      font-size: 24px;
+      color: #1a202c;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .header p {
+      color: #718096;
+      font-size: 14px;
+    }
+
+    .content {
+      padding: 25px 35px;
+    }
+
+    .template-list {
+      display: grid;
+      gap: 20px;
+    }
+
+    .template-card {
+      background: white;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 24px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+    }
+
+    .template-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .template-card h2 {
+      font-size: 18px;
+      color: #1a202c;
+      margin-bottom: 0;
+    }
+
+    .template-toggle {
+      border: none;
+      background: transparent;
+      color: #4a5568;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 0;
+    }
+
+    .template-toggle:hover {
+      color: #2d4a68;
+    }
+
+    .template-toggle-icon {
+      display: inline-flex;
+      transition: transform 0.18s ease;
+    }
+
+    .template-card.expanded .template-toggle-icon {
+      transform: rotate(90deg);
+    }
+
+    .template-field {
+      margin-bottom: 16px;
+    }
+
+    .template-field:last-child {
+      margin-bottom: 0;
+    }
+
+    .template-label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: #4a5568;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      margin-bottom: 6px;
+    }
+
+    .template-value {
+      font-size: 14px;
+      line-height: 1.6;
+      color: #2d3748;
+      background: #f7fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 12px 14px;
+      white-space: pre-line;
+    }
+
+    .template-example {
+      max-height: 0;
+      overflow: hidden;
+      opacity: 0;
+      transition: max-height 0.22s ease, opacity 0.18s ease, margin-top 0.18s ease;
+      margin-top: 0;
+    }
+
+    .template-card.expanded .template-example {
+      max-height: 900px;
+      opacity: 1;
+      margin-top: 18px;
+    }
+
+    .template-example-inner {
+      border-top: 1px solid #e2e8f0;
+      padding-top: 18px;
+    }
+
+    @media (max-width: 760px) {
+      body {
+        flex-direction: column;
+      }
+
+      .sidebar {
+        position: static;
+        width: 100%;
+        height: auto;
+      }
+
+      .main-content {
+        margin-left: 0;
+      }
+
+      .header,
+      .content {
+        padding-left: 20px;
+        padding-right: 20px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="sidebar">
+    <div class="logo">
+      <div class="logo-icon"><img src="yona-sphere-blue-glow.png" alt="Sphere"></div>
+      <span>SPHERE</span>
+    </div>
+
+    <nav class="nav-menu">
+      <a href="/" class="nav-item">P&amp;L View</a>
+      <a href="/customer-explorer" class="nav-item">Customer Explorer</a>
+      <a href="/pl-logic" class="nav-item">P&amp;L Logic</a>
+      <a href="/dimension-config" class="nav-item">Dimension Config</a>
+      <a href="/email-config" class="nav-item">Email Config</a>
+      <a href="/email-templates" class="nav-item active">Email Templates</a>
+      <a href="/run-log" class="nav-item">Run Log</a>
+      <a href="/gcs-import" class="nav-item">NetSuite Sync</a>
+      <a href="/settings" class="nav-item">Settings</a>
+    </nav>
+  </div>
+
+  <div class="main-content">
+    <div class="header">
+      <h1>Email Templates</h1>
+      <p>Simple reference for what each template type sends.</p>
+    </div>
+
+    <div class="content">
+      <div class="template-list">
+        <section class="template-card" data-template-card>
+          <div class="template-card-header">
+            <h2>District</h2>
+            <button class="template-toggle" type="button" onclick="toggleTemplateExample(this)" aria-expanded="false">
+              <span>Example</span>
+              <span class="template-toggle-icon">▶</span>
+            </button>
+          </div>
+          <div class="template-field">
+            <span class="template-label">Subject</span>
+            <div class="template-value">{MONTH} {YEAR} Financial Reports - {DISTRICT MANAGER}</div>
+          </div>
+          <div class="template-field">
+            <span class="template-label">Attachment Text</span>
+            <div class="template-value">{DISTRICT NUMBER} - {DISTRICT MANAGER} ({MONTH} {YEAR})</div>
+          </div>
+          <div class="template-field">
+            <span class="template-label">Body Text</span>
+            <div class="template-value">Hi {FIRST NAME},
+
+Attached are the {MONTH} Financial Reports for your District.
+
+Please let us know of any questions.
+
+Thank you,
+Yona Finance Team</div>
+          </div>
+          <div class="template-example">
+            <div class="template-example-inner">
+              <div class="template-field">
+                <span class="template-label">Example Subject</span>
+                <div class="template-value">April 2026 Financial Reports - John Miller</div>
+              </div>
+              <div class="template-field">
+                <span class="template-label">Example Attachment Text</span>
+                <div class="template-value">District 101 - John Miller (April 2026)</div>
+              </div>
+              <div class="template-field">
+                <span class="template-label">Example Body Text</span>
+                <div class="template-value">Hi John,
+
+Attached are the April Financial Reports for your District.
+
+Please let us know of any questions.
+
+Thank you,
+Yona Finance Team</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="template-card" data-template-card>
+          <div class="template-card-header">
+            <h2>Multiple Districts</h2>
+            <button class="template-toggle" type="button" onclick="toggleTemplateExample(this)" aria-expanded="false">
+              <span>Example</span>
+              <span class="template-toggle-icon">▶</span>
+            </button>
+          </div>
+          <div class="template-field">
+            <span class="template-label">Subject</span>
+            <div class="template-value">{MONTH} {YEAR} Financial Reports - {ENTITY NAME}</div>
+          </div>
+          <div class="template-field">
+            <span class="template-label">Attachment Text</span>
+            <div class="template-value">{DISTRICT NUMBER} - {DISTRICT MANAGER} ({MONTH} {YEAR})</div>
+          </div>
+          <div class="template-field">
+            <span class="template-label">Body Text</span>
+            <div class="template-value">Hi {FIRST NAME},
+
+Attached are the {MONTH} Financial Reports for {ENTITY NAME}.
+
+Please let us know of any questions.
+
+Thank you,
+Yona Finance Team</div>
+          </div>
+          <div class="template-example">
+            <div class="template-example-inner">
+              <div class="template-field">
+                <span class="template-label">Example Subject</span>
+                <div class="template-value">April 2026 Financial Reports - Yona Solutions</div>
+              </div>
+              <div class="template-field">
+                <span class="template-label">Example Attachment Text</span>
+                <div class="template-value">District 101 - John Miller (April 2026)
+District 102 - Michelle King (April 2026)
+District 103 - Matt Crabtree (April 2026)</div>
+              </div>
+              <div class="template-field">
+                <span class="template-label">Example Body Text</span>
+                <div class="template-value">Hi Justin,
+
+Attached are the April Financial Reports for Yona Solutions.
+
+Please let us know of any questions.
+
+Thank you,
+Yona Finance Team</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="template-card" data-template-card>
+          <div class="template-card-header">
+            <h2>Subsidiary (Dietary Only)</h2>
+            <button class="template-toggle" type="button" onclick="toggleTemplateExample(this)" aria-expanded="false">
+              <span>Example</span>
+              <span class="template-toggle-icon">▶</span>
+            </button>
+          </div>
+          <div class="template-field">
+            <span class="template-label">Subject</span>
+            <div class="template-value">{MONTH} {YEAR} Financial Reports - {ENTITY NAME} (Dietary)</div>
+          </div>
+          <div class="template-field">
+            <span class="template-label">Attachment Text</span>
+            <div class="template-value">{ENTITY NAME} Dietary Accounts ({MONTH} {YEAR})</div>
+          </div>
+          <div class="template-field">
+            <span class="template-label">Body Text</span>
+            <div class="template-value">Hi {FIRST NAME},
+
+Attached are the {MONTH} Financial Reports for all {ENTITY NAME} dietary accounts.
+
+Please let us know of any questions.
+
+Thank you,
+Yona Finance Team</div>
+          </div>
+          <div class="template-example">
+            <div class="template-example-inner">
+              <div class="template-field">
+                <span class="template-label">Example Subject</span>
+                <div class="template-value">April 2026 Financial Reports - Yona Solutions (Dietary)</div>
+              </div>
+              <div class="template-field">
+                <span class="template-label">Example Attachment Text</span>
+                <div class="template-value">Yona Solutions Dietary Accounts (April 2026)</div>
+              </div>
+              <div class="template-field">
+                <span class="template-label">Example Body Text</span>
+                <div class="template-value">Hi Michael,
+
+Attached are the April Financial Reports for all Yona Solutions dietary accounts.
+
+Please let us know of any questions.
+
+Thank you,
+Yona Finance Team</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="template-card" data-template-card>
+          <div class="template-card-header">
+            <h2>Subsidiary (All)</h2>
+            <button class="template-toggle" type="button" onclick="toggleTemplateExample(this)" aria-expanded="false">
+              <span>Example</span>
+              <span class="template-toggle-icon">▶</span>
+            </button>
+          </div>
+          <div class="template-field">
+            <span class="template-label">Subject</span>
+            <div class="template-value">{MONTH} {YEAR} Financial Reports - {ENTITY NAME}</div>
+          </div>
+          <div class="template-field">
+            <span class="template-label">Attachment Text</span>
+            <div class="template-value">{ENTITY NAME} ({MONTH} {YEAR})</div>
+          </div>
+          <div class="template-field">
+            <span class="template-label">Body Text</span>
+            <div class="template-value">Hi {FIRST NAME},
+
+Attached are the {MONTH} Financial Reports for {ENTITY NAME}.
+
+Please let us know of any questions.
+
+Thank you,
+Yona Finance Team</div>
+          </div>
+          <div class="template-example">
+            <div class="template-example-inner">
+              <div class="template-field">
+                <span class="template-label">Example Subject</span>
+                <div class="template-value">April 2026 Financial Reports - Yona Solutions</div>
+              </div>
+              <div class="template-field">
+                <span class="template-label">Example Attachment Text</span>
+                <div class="template-value">Yona Solutions (April 2026)</div>
+              </div>
+              <div class="template-field">
+                <span class="template-label">Example Body Text</span>
+                <div class="template-value">Hi Dan,
+
+Attached are the April Financial Reports for Yona Solutions.
+
+Please let us know of any questions.
+
+Thank you,
+Yona Finance Team</div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="/auth.js"></script>
+  <script>
+    function toggleTemplateExample(button) {
+      const card = button.closest('[data-template-card]');
+      if (!card) return;
+
+      const isExpanded = card.classList.toggle('expanded');
+      button.setAttribute('aria-expanded', String(isExpanded));
+    }
+  </script>
+</body>
+</html>

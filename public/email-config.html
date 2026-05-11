@@ -474,6 +474,19 @@
       margin-bottom: 0;
     }
 
+    .email-item-details {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+    }
+
+    .email-item-details strong {
+      font-size: 13px;
+      color: #1a202c;
+      font-weight: 600;
+    }
+
     .email-item span {
       font-size: 13px;
       color: #2d3748;
@@ -502,6 +515,19 @@
 
     .email-input-group input {
       flex: 1;
+    }
+
+    .contact-input-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1.4fr auto;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    @media (max-width: 900px) {
+      .contact-input-grid {
+        grid-template-columns: 1fr;
+      }
     }
 
     /* Action Buttons in Table */
@@ -571,6 +597,7 @@
     .column-filter-row th {
       padding: 6px 8px;
       background: #f1f5f9;
+      vertical-align: top;
     }
 
     .column-filter {
@@ -592,25 +619,41 @@
       font-size: 11px;
     }
 
-    .filter-toolbar {
+    .column-filter-clear {
+      width: 100%;
+      justify-content: center;
+      min-height: 32px;
+    }
+
+    .section-header-actions {
       display: flex;
       align-items: center;
-      gap: 12px;
-      margin-bottom: 12px;
-      padding: 12px;
-      background: #f7fafc;
-      border-radius: 6px;
-      border: 1px solid #e2e8f0;
+      gap: 10px;
+      flex-wrap: wrap;
     }
 
-    .filter-toolbar label {
-      font-size: 12px;
-      color: #4a5568;
-      font-weight: 500;
+    .filter-toggle-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
     }
 
-    .clear-filters-btn {
-      margin-left: auto;
+    .filter-toggle-icon {
+      display: inline-flex;
+      font-size: 11px;
+      line-height: 1;
+      transition: transform 0.15s ease;
+    }
+
+    .filter-toggle-btn[aria-expanded="true"] .filter-toggle-icon {
+      transform: rotate(180deg);
+    }
+
+    @media (max-width: 900px) {
+      .section-header-actions {
+        width: 100%;
+        justify-content: flex-start;
+      }
     }
 
     /* Process Badge */
@@ -1822,6 +1865,7 @@
       <div class="nav-item" onclick="window.location.href='/pl-logic'">P&amp;L Logic</div>
       <div class="nav-item" onclick="window.location.href='/dimension-config'">Dimension Config</div>
       <div class="nav-item active">Email Config</div>
+      <div class="nav-item" onclick="window.location.href='/email-templates'">Email Templates</div>
       <div class="nav-item" onclick="window.location.href='/run-log'">Run Log</div>
       <div class="nav-item" onclick="window.location.href='/gcs-import'">NetSuite Sync</div>
       <div class="nav-item" onclick="window.location.href='/settings'">Settings</div>
@@ -1892,9 +1936,15 @@
             <h2>📚 Report Groups</h2>
             <div class="subtitle">Each group can hold multiple P&amp;Ls and one shared set of email groups</div>
           </div>
-          <button class="btn btn-primary" onclick="openReportGroupModal()">
-            ➕ New Report Group
-          </button>
+          <div class="section-header-actions">
+            <button class="btn btn-secondary filter-toggle-btn" id="filterToggleBtn" type="button" onclick="toggleFilterRow()" aria-expanded="true">
+              <span>Filters</span>
+              <span class="filter-toggle-icon">▾</span>
+            </button>
+            <button class="btn btn-primary" onclick="openReportGroupModal()">
+              ➕ New Report Group
+            </button>
+          </div>
         </div>
         
         <div class="table-container">
@@ -1907,6 +1957,24 @@
                 <th style="width: 220px;">Email Groups</th>
                 <th style="width: 170px;">Last Run</th>
                 <th style="width: 160px; text-align: center;">Actions</th>
+              </tr>
+              <tr class="column-filter-row visible" id="reportGroupFilterRow">
+                <th>
+                  <input type="text" id="filterTemplateName" class="column-filter" placeholder="Search group name" oninput="applyColumnFilters()">
+                </th>
+                <th>
+                  <input type="text" id="filterTags" class="column-filter" placeholder="Search tags" oninput="applyColumnFilters()">
+                </th>
+                <th>
+                  <input type="text" id="filterEntity" class="column-filter" placeholder="Search P&amp;Ls or entities" oninput="applyColumnFilters()">
+                </th>
+                <th>
+                  <input type="text" id="filterEmailGroup" class="column-filter" placeholder="Search email group" oninput="applyColumnFilters()">
+                </th>
+                <th></th>
+                <th>
+                  <button class="btn btn-secondary column-filter-clear" type="button" onclick="clearColumnFilters()">Clear</button>
+                </th>
               </tr>
             </thead>
             <tbody id="reportSchedulesBody">
@@ -2075,17 +2143,19 @@
           </div>
 
           <div class="form-group">
-            <label>Email Addresses</label>
+            <label>Email Recipients</label>
             <div class="email-list" id="emailList">
               <div class="empty-state" style="padding: 24px;">
-                <p>No emails added yet</p>
+                <p>No recipients added yet</p>
               </div>
             </div>
-            <div class="email-input-group">
-              <input type="email" id="newEmail" placeholder="Enter email address">
-              <button type="button" class="btn btn-secondary btn-small" onclick="addEmailToList()">Add</button>
+            <div class="contact-input-grid">
+              <input type="text" id="newEmailFirstName" placeholder="First name">
+              <input type="text" id="newEmailLastName" placeholder="Last name">
+              <input type="email" id="newEmail" placeholder="Email address">
+              <button type="button" class="btn btn-secondary btn-small" onclick="addEmailContactToList()">Add Contact</button>
             </div>
-            <div class="form-help">Press Enter or click Add to include an email in this group</div>
+            <div class="form-help">Add one contact at a time with first name, last name, and email address.</div>
           </div>
         </form>
       </div>
@@ -2115,6 +2185,17 @@
             <div class="form-group">
               <label for="reportGroupName">Group Name <span style="color: #e53e3e;">*</span></label>
               <input type="text" id="reportGroupName" required placeholder="e.g., Monthly Leadership Packet">
+            </div>
+            <div class="form-group" style="margin-top: 16px;">
+              <label for="reportGroupEmailTemplateType">Email Template Type <span style="color: #e53e3e;">*</span></label>
+              <select id="reportGroupEmailTemplateType" required>
+                <option value="">Select template type...</option>
+                <option value="district">District</option>
+                <option value="multiple_districts">Multiple Districts</option>
+                <option value="subsidiary_dietary">Subsidiary (Dietary Only)</option>
+                <option value="subsidiary">Subsidiary (All)</option>
+              </select>
+              <div class="form-help">Choose the email/PDF template this report group should use when sending.</div>
             </div>
             <div class="form-group" style="margin-top: 16px;">
               <label>Tags</label>
@@ -2296,7 +2377,7 @@
     // ============================================
     let emailGroups = [];
     let reportSchedules = [];
-    let currentEmailList = [];
+    let currentEmailContacts = [];
     let editingEmailGroupId = null;
     let editingScheduleId = null;
     let modalScheduleTags = [];
@@ -2334,12 +2415,17 @@
       // Initialize resizable columns
       initResizableColumns();
 
-      // Allow adding email with Enter key
-      document.getElementById('newEmail').addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-          e.preventDefault();
-          addEmailToList();
-        }
+      // Allow adding contacts with Enter key
+      ['newEmailFirstName', 'newEmailLastName', 'newEmail'].forEach(id => {
+        const input = document.getElementById(id);
+        if (!input) return;
+
+        input.addEventListener('keypress', (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            addEmailContactToList();
+          }
+        });
       });
 
       const reportGroupTagInput = document.getElementById('reportGroupTagInput');
@@ -2866,8 +2952,6 @@
       const hasActiveFilter =
         document.getElementById('filterTemplateName')?.value ||
         document.getElementById('filterTags')?.value ||
-        document.getElementById('filterType')?.value ||
-        document.getElementById('filterProcess')?.value ||
         document.getElementById('filterEntity')?.value ||
         document.getElementById('filterEmailGroup')?.value;
 
@@ -2973,52 +3057,35 @@
     // ============================================
 
     function applyColumnFilters() {
-      const templateNameFilter = document.getElementById('filterTemplateName').value.toLowerCase();
-      const tagsFilter = document.getElementById('filterTags').value.toLowerCase();
-      const typeFilter = document.getElementById('filterType').value;
-      const processFilter = document.getElementById('filterProcess').value;
-      const entityFilter = document.getElementById('filterEntity').value.toLowerCase();
-      const emailGroupFilter = document.getElementById('filterEmailGroup').value.toLowerCase();
+      const templateNameFilter = (document.getElementById('filterTemplateName')?.value || '').toLowerCase();
+      const tagsFilter = (document.getElementById('filterTags')?.value || '').toLowerCase();
+      const entityFilter = (document.getElementById('filterEntity')?.value || '').toLowerCase();
+      const emailGroupFilter = (document.getElementById('filterEmailGroup')?.value || '').toLowerCase();
 
-      filteredSchedules = reportSchedules.filter(schedule => {
-        // Template name filter
-        if (templateNameFilter && !(schedule.template_name || '').toLowerCase().includes(templateNameFilter)) {
+      filteredSchedules = reportGroups.filter(group => {
+        if (templateNameFilter && !(group.name || group.template_name || '').toLowerCase().includes(templateNameFilter)) {
           return false;
         }
 
-        // Tags filter
         if (tagsFilter) {
-          const tagMatch = getScheduleTags(schedule).some(tag => tag.toLowerCase().includes(tagsFilter));
+          const tagMatch = (group.tags || []).some(tag => tag.toLowerCase().includes(tagsFilter));
           if (!tagMatch) return false;
         }
 
-        // Type filter
-        if (typeFilter && schedule.template_type !== typeFilter) {
-          return false;
-        }
-
-        // Process filter
-        if (processFilter && schedule.process !== processFilter) {
-          return false;
-        }
-
-        // Entity filter - check all entity fields
         if (entityFilter) {
-          const entityMatch =
-            (schedule.district_name || '').toLowerCase().includes(entityFilter) ||
-            (schedule.region_name || '').toLowerCase().includes(entityFilter) ||
-            (schedule.subsidiary_name || '').toLowerCase().includes(entityFilter) ||
-            (schedule.customer_tag_name || '').toLowerCase().includes(entityFilter);
+          const entityMatch = (group.reports || []).some(report =>
+            (report.template_name || '').toLowerCase().includes(entityFilter) ||
+            (report.district_name || '').toLowerCase().includes(entityFilter) ||
+            (report.region_name || '').toLowerCase().includes(entityFilter) ||
+            (report.subsidiary_name || '').toLowerCase().includes(entityFilter) ||
+            (report.customer_tag_name || '').toLowerCase().includes(entityFilter)
+          );
           if (!entityMatch) return false;
         }
 
-        // Email group filter
         if (emailGroupFilter) {
-          const groupNames = (schedule.email_group_ids || []).map(gid => {
-            const group = emailGroups.find(g => g.id === gid);
-            return group ? group.name.toLowerCase() : '';
-          });
-          const groupMatch = groupNames.some(name => name.includes(emailGroupFilter));
+          const groupMatch = getReportGroupEmailNames(group)
+            .some(name => name.toLowerCase().includes(emailGroupFilter));
           if (!groupMatch) return false;
         }
 
@@ -3029,29 +3096,25 @@
     }
 
     function clearColumnFilters() {
-      document.getElementById('filterTemplateName').value = '';
-      document.getElementById('filterTags').value = '';
-      document.getElementById('filterType').value = '';
-      document.getElementById('filterProcess').value = '';
-      document.getElementById('filterEntity').value = '';
-      document.getElementById('filterEmailGroup').value = '';
+      const filterIds = ['filterTemplateName', 'filterTags', 'filterEntity', 'filterEmailGroup'];
+      filterIds.forEach(id => {
+        const input = document.getElementById(id);
+        if (input) input.value = '';
+      });
 
-      filteredSchedules = [...reportSchedules];
+      filteredSchedules = [...reportGroups];
       renderReportSchedulesTable();
     }
 
     function toggleFilterRow() {
-      const filterRow = document.querySelector('.column-filter-row');
+      const filterRow = document.getElementById('reportGroupFilterRow');
       const toggleBtn = document.getElementById('filterToggleBtn');
+      if (!filterRow) return;
 
-      if (filterRow.classList.contains('visible')) {
-        filterRow.classList.remove('visible');
-        toggleBtn.innerHTML = '🔍 Show Filters';
-        // Clear filters when hiding
-        clearColumnFilters();
-      } else {
-        filterRow.classList.add('visible');
-        toggleBtn.innerHTML = '🔍 Hide Filters';
+      const willShow = !filterRow.classList.contains('visible');
+      filterRow.classList.toggle('visible', willShow);
+      if (toggleBtn) {
+        toggleBtn.setAttribute('aria-expanded', String(willShow));
       }
     }
 
@@ -3100,16 +3163,50 @@
     // ============================================
     // Email Group Modal Functions
     // ============================================
+
+    function splitContactName(name) {
+      const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+      return {
+        firstName: parts[0] || '',
+        lastName: parts.length > 1 ? parts[parts.length - 1] : ''
+      };
+    }
+
+    function normalizeEmailContact(contact) {
+      const email = String(contact?.email || '').trim();
+      const firstName = String(contact?.first_name || contact?.firstName || '').trim();
+      const lastName = String(contact?.last_name || contact?.lastName || '').trim();
+      const fullName = String(contact?.name || '').trim();
+      const derivedNames = (!firstName || !lastName) && fullName
+        ? splitContactName(fullName)
+        : { firstName: '', lastName: '' };
+      const resolvedFirstName = firstName || derivedNames.firstName;
+      const resolvedLastName = lastName || derivedNames.lastName;
+
+      return {
+        email,
+        firstName: resolvedFirstName,
+        lastName: resolvedLastName,
+        name: fullName || [resolvedFirstName, resolvedLastName].filter(Boolean).join(' ').trim()
+      };
+    }
+
+    function clearEmailContactInputs() {
+      document.getElementById('newEmailFirstName').value = '';
+      document.getElementById('newEmailLastName').value = '';
+      document.getElementById('newEmail').value = '';
+    }
     
     function openEmailGroupModal() {
       editingEmailGroupId = null;
-      currentEmailList = [];
+      currentEmailContacts = [];
       
       document.getElementById('emailGroupModalTitle').textContent = 'Create Email Group';
       document.getElementById('emailGroupForm').reset();
       document.getElementById('emailGroupId').value = '';
       
       renderEmailList();
+      clearEmailContactInputs();
       document.getElementById('emailGroupModal').classList.add('active');
     }
 
@@ -3132,7 +3229,7 @@
       authFetch(`/api/email-groups/${id}/contacts`)
         .then(r => r.json())
         .then(contacts => {
-          currentEmailList = contacts.map(c => c.email);
+          currentEmailContacts = contacts.map(normalizeEmailContact);
           renderEmailList();
         });
       
@@ -3148,15 +3245,20 @@
         return;
       }
 
-      if (currentEmailList.length === 0) {
-        alert('Please add at least one email address');
+      if (currentEmailContacts.length === 0) {
+        alert('Please add at least one contact');
         return;
       }
 
       const data = {
         name,
         description,
-        emails: currentEmailList
+        contacts: currentEmailContacts.map(contact => ({
+          first_name: contact.firstName || null,
+          last_name: contact.lastName || null,
+          email: contact.email,
+          name: contact.name || [contact.firstName, contact.lastName].filter(Boolean).join(' ').trim() || null
+        }))
       };
 
       try {
@@ -3207,9 +3309,13 @@
     // Email List Functions
     // ============================================
     
-    function addEmailToList() {
-      const input = document.getElementById('newEmail');
-      const email = input.value.trim();
+    function addEmailContactToList() {
+      const firstNameInput = document.getElementById('newEmailFirstName');
+      const lastNameInput = document.getElementById('newEmailLastName');
+      const emailInput = document.getElementById('newEmail');
+      const firstName = firstNameInput.value.trim();
+      const lastName = lastNameInput.value.trim();
+      const email = emailInput.value.trim();
       
       if (!email) return;
       
@@ -3218,33 +3324,41 @@
         return;
       }
 
-      if (currentEmailList.includes(email)) {
+      if (currentEmailContacts.some(contact => contact.email.toLowerCase() === email.toLowerCase())) {
         alert('This email is already in the list');
         return;
       }
 
-      currentEmailList.push(email);
-      input.value = '';
+      currentEmailContacts.push({
+        firstName,
+        lastName,
+        email,
+        name: [firstName, lastName].filter(Boolean).join(' ').trim()
+      });
+      clearEmailContactInputs();
       renderEmailList();
     }
 
-    function removeEmailFromList(email) {
-      currentEmailList = currentEmailList.filter(e => e !== email);
+    function removeEmailContact(index) {
+      currentEmailContacts = currentEmailContacts.filter((_, contactIndex) => contactIndex !== index);
       renderEmailList();
     }
 
     function renderEmailList() {
       const container = document.getElementById('emailList');
       
-      if (currentEmailList.length === 0) {
-        container.innerHTML = '<div class="empty-state" style="padding: 24px;"><p>No emails added yet</p></div>';
+      if (currentEmailContacts.length === 0) {
+        container.innerHTML = '<div class="empty-state" style="padding: 24px;"><p>No recipients added yet</p></div>';
         return;
       }
 
-      container.innerHTML = currentEmailList.map(email => `
+      container.innerHTML = currentEmailContacts.map((contact, index) => `
         <div class="email-item">
-          <span>${escapeHtml(email)}</span>
-          <button onclick="removeEmailFromList('${escapeHtml(email)}')">×</button>
+          <div class="email-item-details">
+            <strong>${escapeHtml(contact.name || [contact.firstName, contact.lastName].filter(Boolean).join(' ').trim() || contact.email)}</strong>
+            <span>${escapeHtml(contact.email)}</span>
+          </div>
+          <button onclick="removeEmailContact(${index})">×</button>
         </div>
       `).join('');
     }
@@ -5747,6 +5861,42 @@
       return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
     }
 
+    function normalizeEmailTemplateType(value) {
+      const normalized = String(value || '').trim().toLowerCase();
+
+      switch (normalized) {
+        case 'district':
+          return 'district';
+        case 'multiple_districts':
+        case 'multi_district':
+        case 'multi_districts':
+          return 'multiple_districts';
+        case 'subsidiary_dietary':
+        case 'subsidiary_dietary_only':
+          return 'subsidiary_dietary';
+        case 'subsidiary':
+        case 'subsidiary_all':
+          return 'subsidiary';
+        default:
+          return '';
+      }
+    }
+
+    function getEmailTemplateTypeLabel(value) {
+      switch (normalizeEmailTemplateType(value)) {
+        case 'district':
+          return 'District';
+        case 'multiple_districts':
+          return 'Multiple Districts';
+        case 'subsidiary_dietary':
+          return 'Subsidiary (Dietary Only)';
+        case 'subsidiary':
+          return 'Subsidiary (All)';
+        default:
+          return 'Not selected';
+      }
+    }
+
     function formatDate(dateString) {
       if (!dateString) return '-';
       const date = new Date(dateString);
@@ -5844,6 +5994,7 @@
         id: group.id || createReportGroupId(),
         name: String(group.name || group.template_name || '').trim(),
         template_name: String(group.template_name || group.name || '').trim(),
+        email_template_type: normalizeEmailTemplateType(group.email_template_type),
         tags: normalizeScheduleTags(group.tags || []),
         email_group_ids: Array.isArray(group.email_group_ids)
           ? [...new Set(group.email_group_ids.map(id => parseInt(id)).filter(Number.isFinite))]
@@ -5883,6 +6034,7 @@
       return {
         id: createReportGroupId(),
         name: '',
+        email_template_type: '',
         tags: [],
         email_group_ids: [],
         reports: [],
@@ -5947,7 +6099,22 @@
         return;
       }
 
-      tbody.innerHTML = reportGroups.map(group => {
+      const schedulesToRender = Array.isArray(filteredSchedules) ? filteredSchedules : [];
+      const hasActiveFilter =
+        (document.getElementById('filterTemplateName')?.value || '').trim() ||
+        (document.getElementById('filterTags')?.value || '').trim() ||
+        (document.getElementById('filterEntity')?.value || '').trim() ||
+        (document.getElementById('filterEmailGroup')?.value || '').trim();
+
+      if (!schedulesToRender.length) {
+        const message = hasActiveFilter
+          ? 'No report groups match your filters. Try adjusting the filter values or click Clear.'
+          : 'No report groups yet. Create one group and start adding multiple P&Ls to it.';
+        showEmptyState('reportSchedulesBody', message, '📚');
+        return;
+      }
+
+      tbody.innerHTML = schedulesToRender.map(group => {
         const emailNames = getReportGroupEmailNames(group);
         const tagsDisplay = group.tags.length > 0
           ? `<div class="report-group-chip-list">${group.tags.map(tag => `<span class="report-group-chip tag">${escapeHtml(tag)}</span>`).join('')}</div>`
@@ -5967,7 +6134,7 @@
             <td>
               <strong>${escapeHtml(group.name || 'Untitled Group')}</strong>
               <div style="font-size: 12px; color: #718096; margin-top: 4px;">
-                ${group.reports.length} P&amp;L${group.reports.length === 1 ? '' : 's'} • ${group.email_group_ids.length} email group${group.email_group_ids.length === 1 ? '' : 's'}
+                ${escapeHtml(getEmailTemplateTypeLabel(group.email_template_type))} • ${group.reports.length} P&amp;L${group.reports.length === 1 ? '' : 's'} • ${group.email_group_ids.length} email group${group.email_group_ids.length === 1 ? '' : 's'}
               </div>
             </td>
             <td>${tagsDisplay}</td>
@@ -5995,6 +6162,7 @@
       document.getElementById('reportGroupModalTitle').textContent = group ? 'Edit Report Group' : 'Create Report Group';
       document.getElementById('reportGroupId').value = currentEditingGroup.id;
       document.getElementById('reportGroupName').value = currentEditingGroup.name || '';
+      document.getElementById('reportGroupEmailTemplateType').value = normalizeEmailTemplateType(currentEditingGroup.email_template_type);
       document.getElementById('reportGroupTagInput').value = '';
       isReportGroupTagInputFocused = false;
       isReportGroupTagPickerOpen = false;
@@ -6424,9 +6592,15 @@
       if (!currentEditingGroup) return;
 
       const groupName = document.getElementById('reportGroupName').value.trim();
+      const emailTemplateType = normalizeEmailTemplateType(document.getElementById('reportGroupEmailTemplateType').value);
 
       if (!groupName) {
         alert('Please enter a group name');
+        return;
+      }
+
+      if (!emailTemplateType) {
+        alert('Please select an email template type');
         return;
       }
 
@@ -6441,11 +6615,13 @@
       }
 
       currentEditingGroup.name = groupName;
+      currentEditingGroup.email_template_type = emailTemplateType;
       currentEditingGroup.tags = normalizeScheduleTags(currentEditingGroup.tags || []);
       currentEditingGroup.updated_at = new Date().toISOString();
 
       const payload = {
         name: currentEditingGroup.name,
+        email_template_type: currentEditingGroup.email_template_type,
         tags: currentEditingGroup.tags,
         email_group_ids: currentEditingGroup.email_group_ids,
         reports: currentEditingGroup.reports.map(report => ({
@@ -7013,13 +7189,6 @@
       }
     }
 
-    function toggleFilterRow() {
-      // Filters were removed for the simplified report group view.
-    }
-
-    function clearColumnFilters() {
-      // Filters were removed for the simplified report group view.
-    }
   </script>
 </body>
 </html>

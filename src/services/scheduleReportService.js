@@ -1,5 +1,6 @@
 const emailConfigService = require('./emailConfigService');
 const mockEmailData = require('./mockEmailData');
+const { normalizeRecipientContact } = require('./reportEmailTemplateService');
 const { buildSchedulePnlDataUrl, buildSchedulePnlDataStreamUrl } = require('../utils/schedulePnlRequest');
 const pnlPdfServer = require('../utils/pnlPdfServer');
 
@@ -246,22 +247,28 @@ async function generateSchedulePdf(schedule, { reportDate, bigQueryService, pdfR
   };
 }
 
-async function getScheduleRecipients(schedule) {
+async function getScheduleRecipientContacts(schedule) {
   const groupIds = getScheduleEmailGroupIds(schedule);
-  const allRecipients = new Set();
+  const allRecipients = new Map();
 
   for (const groupId of groupIds) {
     const contacts = emailConfigService.isAvailable()
       ? await emailConfigService.getEmailGroupContacts(groupId)
       : mockEmailData.getMockEmailGroupContacts(groupId);
     contacts.forEach(contact => {
-      if (contact?.email) {
-        allRecipients.add(contact.email);
+      const normalizedContact = normalizeRecipientContact(contact);
+      if (normalizedContact.email) {
+        allRecipients.set(normalizedContact.email.toLowerCase(), normalizedContact);
       }
     });
   }
 
-  return Array.from(allRecipients);
+  return Array.from(allRecipients.values());
+}
+
+async function getScheduleRecipients(schedule) {
+  const contacts = await getScheduleRecipientContacts(schedule);
+  return contacts.map(contact => contact.email);
 }
 
 module.exports = {
@@ -274,5 +281,6 @@ module.exports = {
   fetchScheduleReportHtml,
   shouldUseStreamingPnlEndpoint,
   generateSchedulePdf,
+  getScheduleRecipientContacts,
   getScheduleRecipients
 };

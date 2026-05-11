@@ -6,6 +6,11 @@
  */
 
 const sgMail = require('@sendgrid/mail');
+const {
+  buildAttachmentFilename,
+  buildReportEmailMessage,
+  normalizeRecipientContact
+} = require('./reportEmailTemplateService');
 
 class EmailService {
   constructor() {
@@ -52,101 +57,34 @@ class EmailService {
    * 
    * @param {Object} schedule - Report schedule configuration
    * @param {Buffer} pdfBuffer - PDF file as buffer
-   * @param {string} recipientEmail - Email address to send to
+   * @param {Object|string} recipient - Recipient contact or email
    * @param {string} reportDate - Report date (formatted)
    * @returns {Promise<Object>} Send result with success status
    */
-  async sendPDFEmail(schedule, pdfBuffer, recipientEmail, reportDate) {
+  async sendPDFEmail(schedule, pdfBuffer, recipient, reportDate) {
     if (!this.isAvailable()) {
       throw new Error('Email service not initialized');
     }
 
     try {
-      // Determine entity name based on template type
-      let entityName = '';
-      let entityType = '';
-      
-      switch (schedule.template_type) {
-        case 'district':
-          entityName = schedule.district_name || schedule.district_id;
-          entityType = 'District';
-          break;
-        case 'region':
-          entityName = schedule.region_name || schedule.region_id;
-          entityType = 'Region';
-          break;
-        case 'subsidiary':
-          entityName = schedule.subsidiary_name || schedule.subsidiary_id;
-          entityType = 'Subsidiary';
-          break;
-        case 'customer_tag':
-          entityName = schedule.customer_tag_name || schedule.customer_tag_id;
-          entityType = 'Customer Tag';
-          break;
-        default:
-          entityName = 'Unknown';
-          entityType = schedule.template_type;
+      const normalizedRecipient = normalizeRecipientContact(recipient);
+      if (!normalizedRecipient.email) {
+        throw new Error('Recipient email is required');
       }
 
-      const processType = schedule.process === 'standard' ? 'Standard' : 'Operational';
-      
-      // Create subject line
-      const subject = `P&L Report - ${schedule.template_name} - ${reportDate}`;
-      
-      // Create HTML email body
-      const htmlContent = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="utf-8">
-          <style>
-            body {
-              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
-              line-height: 1.6;
-              color: #333;
-              max-width: 600px;
-              margin: 0 auto;
-              padding: 20px;
-            }
-          </style>
-        </head>
-        <body>
-          <p>Hello,</p>
-
-          <p>This is Yona Solutions. Your P&L for <strong>${entityType}: ${entityName}</strong> is ready.</p>
-
-          <p>Please find your ${processType} P&L report for <strong>${reportDate}</strong> attached to this email.</p>
-
-          <p>Best regards,<br>Yona Solutions</p>
-        </body>
-        </html>
-      `;
-
-      // Create plain text version
-      const textContent = `
-Hello,
-
-This is Yona Solutions. Your P&L for ${entityType}: ${entityName} is ready.
-
-Please find your ${processType} P&L report for ${reportDate} attached to this email.
-
-Best regards,
-Yona Solutions
-      `.trim();
-
-      // Create filename for PDF attachment
-      const filename = `PNL_${entityType}_${entityName.replace(/[^a-zA-Z0-9]/g, '_')}_${reportDate.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
+      const emailMessage = buildReportEmailMessage(schedule, normalizedRecipient, reportDate);
+      const filename = buildAttachmentFilename(schedule, reportDate);
 
       // Prepare email message
       const msg = {
-        to: recipientEmail,
+        to: normalizedRecipient.email,
         from: {
           email: this.senderEmail,
-          name: 'Yona Solutions SPHERE'
+          name: 'Yona Finance Team'
         },
-        subject: subject,
-        text: textContent,
-        html: htmlContent,
+        subject: emailMessage.subject,
+        text: emailMessage.text,
+        html: emailMessage.html,
         attachments: [
           {
             content: pdfBuffer.toString('base64'),
@@ -158,19 +96,19 @@ Yona Solutions
       };
 
       // Send email
-      console.log(`📧 Sending email to ${recipientEmail}...`);
-      console.log(`   Subject: ${subject}`);
+      console.log(`📧 Sending email to ${normalizedRecipient.email}...`);
+      console.log(`   Subject: ${emailMessage.subject}`);
       console.log(`   Attachment: ${filename} (${(pdfBuffer.length / 1024).toFixed(1)} KB)`);
 
       await sgMail.send(msg);
 
-      console.log(`✅ Email sent successfully to ${recipientEmail}`);
+      console.log(`✅ Email sent successfully to ${normalizedRecipient.email}`);
 
       return {
         success: true,
-        recipient: recipientEmail,
-        subject: subject,
-        filename: filename
+        recipient: normalizedRecipient.email,
+        subject: emailMessage.subject,
+        filename
       };
 
     } catch (error) {
@@ -190,11 +128,11 @@ Yona Solutions
    *
    * @param {Object} reportGroup - Report group configuration
    * @param {Array} attachments - Attachment objects with filename + pdfBuffer
-   * @param {string} recipientEmail - Recipient email address
+   * @param {Object|string} recipient - Recipient contact or email
    * @param {string} reportDate - Report date (formatted)
    * @returns {Promise<Object>} Send result with success status
    */
-  async sendGroupedPDFEmail(reportGroup, attachments, recipientEmail, reportDate) {
+  async sendGroupedPDFEmail(reportGroup, attachments, recipient, reportDate) {
     if (!this.isAvailable()) {
       throw new Error('Email service not initialized');
     }
@@ -204,72 +142,23 @@ Yona Solutions
     }
 
     try {
-      const groupName = reportGroup?.name || reportGroup?.template_name || 'P&L Report Group';
+      const normalizedRecipient = normalizeRecipientContact(recipient);
+      if (!normalizedRecipient.email) {
+        throw new Error('Recipient email is required');
+      }
+
+      const emailMessage = buildReportEmailMessage(reportGroup, normalizedRecipient, reportDate);
       const attachmentCount = attachments.length;
-      const subject = `${groupName} - ${reportDate} P&L Packet`;
-      const attachmentListHtml = attachments.map(attachment => (
-        `<li><strong>${attachment.label || attachment.template_name || attachment.filename}</strong></li>`
-      )).join('');
-
-      const htmlContent = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="utf-8">
-          <style>
-            body {
-              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
-              line-height: 1.6;
-              color: #333;
-              max-width: 600px;
-              margin: 0 auto;
-              padding: 20px;
-            }
-            ul {
-              margin: 12px 0 18px 20px;
-              padding: 0;
-            }
-          </style>
-        </head>
-        <body>
-          <p>Hello,</p>
-
-          <p>This is Yona Solutions. Your grouped P&amp;L packet for <strong>${groupName}</strong> is ready.</p>
-
-          <p>The attached email includes ${attachmentCount} P&amp;L attachment${attachmentCount === 1 ? '' : 's'} for <strong>${reportDate}</strong>:</p>
-
-          <ul>${attachmentListHtml}</ul>
-
-          <p>Best regards,<br>Yona Solutions</p>
-        </body>
-        </html>
-      `;
-
-      const textAttachmentList = attachments
-        .map(attachment => `- ${attachment.label || attachment.template_name || attachment.filename}`)
-        .join('\n');
-
-      const textContent = `
-Hello,
-
-This is Yona Solutions. Your grouped P&L packet for ${groupName} is ready.
-
-The attached email includes ${attachmentCount} P&L attachment${attachmentCount === 1 ? '' : 's'} for ${reportDate}:
-${textAttachmentList}
-
-Best regards,
-Yona Solutions
-      `.trim();
 
       const msg = {
-        to: recipientEmail,
+        to: normalizedRecipient.email,
         from: {
           email: this.senderEmail,
-          name: 'Yona Solutions SPHERE'
+          name: 'Yona Finance Team'
         },
-        subject,
-        text: textContent,
-        html: htmlContent,
+        subject: emailMessage.subject,
+        text: emailMessage.text,
+        html: emailMessage.html,
         attachments: attachments.map(attachment => ({
           content: attachment.pdfBuffer.toString('base64'),
           filename: attachment.filename,
@@ -278,18 +167,18 @@ Yona Solutions
         }))
       };
 
-      console.log(`📧 Sending grouped email to ${recipientEmail}...`);
-      console.log(`   Subject: ${subject}`);
+      console.log(`📧 Sending grouped email to ${normalizedRecipient.email}...`);
+      console.log(`   Subject: ${emailMessage.subject}`);
       console.log(`   Attachments: ${attachments.map(attachment => attachment.filename).join(', ')}`);
 
       await sgMail.send(msg);
 
-      console.log(`✅ Grouped email sent successfully to ${recipientEmail}`);
+      console.log(`✅ Grouped email sent successfully to ${normalizedRecipient.email}`);
 
       return {
         success: true,
-        recipient: recipientEmail,
-        subject,
+        recipient: normalizedRecipient.email,
+        subject: emailMessage.subject,
         attachmentCount
       };
     } catch (error) {

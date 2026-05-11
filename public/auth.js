@@ -107,7 +107,7 @@ async function getAuthToken() {
 function applyRoleToNav(role) {
   if (role !== 'viewer') return;
 
-  const adminPages = ['Dimension Config', 'Email Config', 'Run Log', 'Storage Browser', 'NetSuite Sync'];
+  const adminPages = ['Dimension Config', 'Email Config', 'Email Templates', 'Run Log', 'Storage Browser', 'NetSuite Sync'];
   document.querySelectorAll('.nav-item').forEach(item => {
     const text = item.textContent.trim();
     if (adminPages.includes(text)) {

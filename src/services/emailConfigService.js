@@ -7,6 +7,53 @@
 
 const { Pool } = require('pg');
 
+function splitNameParts(name = '') {
+  const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+  return {
+    first_name: parts[0] || null,
+    last_name: parts.length > 1 ? parts[parts.length - 1] : null
+  };
+}
+
+function normalizeEmailGroupContacts(rawContacts = []) {
+  const inputs = Array.isArray(rawContacts) ? rawContacts : [];
+  const seenEmails = new Set();
+  const normalized = [];
+
+  inputs.forEach(contact => {
+    if (!contact) return;
+
+    const input = typeof contact === 'string' ? { email: contact } : contact;
+    const email = String(input.email || '').trim();
+    if (!email) {
+      return;
+    }
+
+    const dedupeKey = email.toLowerCase();
+    if (seenEmails.has(dedupeKey)) {
+      return;
+    }
+    seenEmails.add(dedupeKey);
+
+    const name = String(input.name || '').trim();
+    const firstName = String(input.first_name || input.firstName || '').trim();
+    const lastName = String(input.last_name || input.lastName || '').trim();
+    const derivedNames = (!firstName || !lastName) && name ? splitNameParts(name) : { first_name: null, last_name: null };
+    const resolvedFirstName = firstName || derivedNames.first_name;
+    const resolvedLastName = lastName || derivedNames.last_name;
+    const fullName = name || [resolvedFirstName, resolvedLastName].filter(Boolean).join(' ').trim() || null;
+
+    normalized.push({
+      email,
+      name: fullName,
+      first_name: resolvedFirstName || null,
+      last_name: resolvedLastName || null
+    });
+  });
+
+  return normalized;
+}
+
 class EmailConfigService {
   constructor() {
     this.pool = null;
@@ -139,7 +186,7 @@ class EmailConfigService {
     }
 
     const query = `
-      SELECT id, email, name, created_at
+      SELECT id, email, name, first_name, last_name, created_at
       FROM email_group_contacts
       WHERE email_group_id = $1
       ORDER BY created_at ASC
@@ -157,7 +204,8 @@ class EmailConfigService {
       throw new Error('Database not initialized');
     }
 
-    const { name, description, emails } = data;
+    const { name, description } = data;
+    const contacts = normalizeEmailGroupContacts(data.contacts || data.emails || []);
     const client = await this.pool.connect();
 
     try {
@@ -173,14 +221,20 @@ class EmailConfigService {
       const group = groupResult.rows[0];
 
       // Insert contacts
-      if (emails && emails.length > 0) {
+      if (contacts.length > 0) {
         const contactQuery = `
-          INSERT INTO email_group_contacts (email_group_id, email)
-          VALUES ($1, $2)
+          INSERT INTO email_group_contacts (email_group_id, email, name, first_name, last_name)
+          VALUES ($1, $2, $3, $4, $5)
         `;
 
-        for (const email of emails) {
-          await client.query(contactQuery, [group.id, email]);
+        for (const contact of contacts) {
+          await client.query(contactQuery, [
+            group.id,
+            contact.email,
+            contact.name,
+            contact.first_name,
+            contact.last_name
+          ]);
         }
       }
 
@@ -202,7 +256,10 @@ class EmailConfigService {
       throw new Error('Database not initialized');
     }
 
-    const { name, description, emails } = data;
+    const { name, description } = data;
+    const contacts = data.contacts !== undefined || data.emails !== undefined
+      ? normalizeEmailGroupContacts(data.contacts || data.emails || [])
+      : undefined;
     const client = await this.pool.connect();
 
     try {
@@ -224,19 +281,25 @@ class EmailConfigService {
       const group = groupResult.rows[0];
 
       // Update contacts if provided
-      if (emails) {
+      if (contacts) {
         // Delete existing contacts
         await client.query('DELETE FROM email_group_contacts WHERE email_group_id = $1', [id]);
 
         // Insert new contacts
-        if (emails.length > 0) {
+        if (contacts.length > 0) {
           const contactQuery = `
-            INSERT INTO email_group_contacts (email_group_id, email)
-            VALUES ($1, $2)
+            INSERT INTO email_group_contacts (email_group_id, email, name, first_name, last_name)
+            VALUES ($1, $2, $3, $4, $5)
           `;
 
-          for (const email of emails) {
-            await client.query(contactQuery, [id, email]);
+          for (const contact of contacts) {
+            await client.query(contactQuery, [
+              id,
+              contact.email,
+              contact.name,
+              contact.first_name,
+              contact.last_name
+            ]);
           }
         }
       }
@@ -367,6 +430,7 @@ class EmailConfigService {
     return {
       ...row,
       name: row.template_name || '',
+      email_template_type: row.email_template_type || null,
       email_group_ids: this.normalizeEmailGroupIds(row.email_group_ids, row.email_group_id),
       reports: fallbackReports.map(report => this.mapReportScheduleReportRow(report) || report).filter(Boolean)
     };
@@ -379,6 +443,7 @@ class EmailConfigService {
 
     return {
       template_name: String(data.name || data.template_name || '').trim() || 'Untitled Report Group',
+      email_template_type: data.email_template_type || null,
       template_type: primaryReport.template_type || data.template_type || data.hierarchy || 'district',
       process: primaryReport.process || data.process || data.report_type || 'standard',
       tags: Array.isArray(data.tags) ? data.tags : [],
@@ -576,7 +641,7 @@ class EmailConfigService {
       const scheduleRecord = this.buildReportScheduleMirrorFromGroup(data);
       const insertQuery = `
         INSERT INTO report_schedules (
-          template_name, template_type, process,
+          template_name, email_template_type, template_type, process,
           tags,
           service_filter_id, service_filter_name,
           header_subsidiary_id, header_subsidiary_name,
@@ -586,14 +651,15 @@ class EmailConfigService {
           day_of_week, day_of_month, time_of_day, enabled
         )
         VALUES (
-          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
-          $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23
+          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
+          $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24
         )
         RETURNING id
       `;
 
       const result = await client.query(insertQuery, [
         scheduleRecord.template_name,
+        scheduleRecord.email_template_type,
         scheduleRecord.template_type,
         scheduleRecord.process,
         scheduleRecord.tags,
@@ -661,6 +727,7 @@ class EmailConfigService {
 
       const mergedData = {
         name: data.name !== undefined ? data.name : existingRow.template_name,
+        email_template_type: data.email_template_type !== undefined ? data.email_template_type : existingRow.email_template_type,
         template_name: data.template_name !== undefined ? data.template_name : existingRow.template_name,
         tags: data.tags !== undefined ? data.tags : (existingRow.tags || []),
         email_group_ids: data.email_group_ids !== undefined
@@ -679,34 +746,36 @@ class EmailConfigService {
         UPDATE report_schedules
         SET
           template_name = $1,
-          template_type = $2,
-          process = $3,
-          tags = $4,
-          service_filter_id = $5,
-          service_filter_name = $6,
-          header_subsidiary_id = $7,
-          header_subsidiary_name = $8,
-          district_id = $9,
-          district_name = $10,
-          region_id = $11,
-          region_name = $12,
-          subsidiary_id = $13,
-          subsidiary_name = $14,
-          customer_tag_id = $15,
-          customer_tag_name = $16,
-          email_group_id = $17,
-          email_group_ids = $18,
-          frequency = $19,
-          day_of_week = $20,
-          day_of_month = $21,
-          time_of_day = $22,
-          enabled = $23,
+          email_template_type = $2,
+          template_type = $3,
+          process = $4,
+          tags = $5,
+          service_filter_id = $6,
+          service_filter_name = $7,
+          header_subsidiary_id = $8,
+          header_subsidiary_name = $9,
+          district_id = $10,
+          district_name = $11,
+          region_id = $12,
+          region_name = $13,
+          subsidiary_id = $14,
+          subsidiary_name = $15,
+          customer_tag_id = $16,
+          customer_tag_name = $17,
+          email_group_id = $18,
+          email_group_ids = $19,
+          frequency = $20,
+          day_of_week = $21,
+          day_of_month = $22,
+          time_of_day = $23,
+          enabled = $24,
           updated_at = CURRENT_TIMESTAMP
-        WHERE id = $24
+        WHERE id = $25
       `;
 
       await client.query(updateQuery, [
         scheduleRecord.template_name,
+        scheduleRecord.email_template_type,
         scheduleRecord.template_type,
         scheduleRecord.process,
         scheduleRecord.tags,

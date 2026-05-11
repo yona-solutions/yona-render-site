@@ -56,6 +56,15 @@ function createViewRoutes() {
   });
 
   /**
+   * Email Templates guide page
+   *
+   * GET /email-templates
+   */
+  router.get('/email-templates', (req, res) => {
+    res.sendFile(path.join(publicPath, 'email-templates.html'));
+  });
+
+  /**
    * Customer Explorer page
    *
    * GET /customer-explorer

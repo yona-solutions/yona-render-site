@@ -64,6 +64,47 @@ async function createApp() {
   // Ensure global_settings table exists
   if (process.env.DATABASE_URL && emailConfigService.isAvailable()) {
     try {
+      const emailGroupContactsTable = await emailConfigService.pool.query(`
+        SELECT to_regclass('public.email_group_contacts') AS table_name
+      `);
+      if (emailGroupContactsTable.rows[0]?.table_name) {
+        await emailConfigService.pool.query(`
+          ALTER TABLE email_group_contacts
+          ADD COLUMN IF NOT EXISTS first_name VARCHAR(255),
+          ADD COLUMN IF NOT EXISTS last_name VARCHAR(255)
+        `);
+
+        await emailConfigService.pool.query(`
+          WITH parsed_names AS (
+            SELECT
+              id,
+              tokens[1] AS parsed_first_name,
+              CASE
+                WHEN array_length(tokens, 1) > 1 THEN tokens[array_length(tokens, 1)]
+                ELSE NULL
+              END AS parsed_last_name
+            FROM (
+              SELECT
+                id,
+                regexp_split_to_array(BTRIM(name), '[[:space:]]+') AS tokens
+              FROM email_group_contacts
+              WHERE name IS NOT NULL
+                AND BTRIM(name) <> ''
+            ) AS named_contacts
+          )
+          UPDATE email_group_contacts AS contacts
+          SET
+            first_name = COALESCE(NULLIF(BTRIM(contacts.first_name), ''), parsed_names.parsed_first_name),
+            last_name = COALESCE(NULLIF(BTRIM(contacts.last_name), ''), parsed_names.parsed_last_name)
+          FROM parsed_names
+          WHERE contacts.id = parsed_names.id
+            AND (
+              contacts.first_name IS NULL OR BTRIM(contacts.first_name) = ''
+              OR contacts.last_name IS NULL OR BTRIM(contacts.last_name) = ''
+            )
+        `);
+      }
+
       const reportSchedulesTable = await emailConfigService.pool.query(`
         SELECT to_regclass('public.report_schedules') AS table_name
       `);
@@ -80,7 +121,8 @@ async function createApp() {
 
         await emailConfigService.pool.query(`
           ALTER TABLE report_schedules
-          ADD COLUMN IF NOT EXISTS tags TEXT[] DEFAULT ARRAY[]::TEXT[]
+          ADD COLUMN IF NOT EXISTS tags TEXT[] DEFAULT ARRAY[]::TEXT[],
+          ADD COLUMN IF NOT EXISTS email_template_type VARCHAR(50)
         `);
         await emailConfigService.pool.query(`
           ALTER TABLE report_schedules
@@ -101,11 +143,21 @@ async function createApp() {
           ADD CONSTRAINT chk_template_type CHECK (template_type IN ('district', 'region', 'subsidiary', 'customer_tag'))
         `);
         await emailConfigService.pool.query(`
+          ALTER TABLE report_schedules
+          DROP CONSTRAINT IF EXISTS chk_email_template_type
+        `);
+        await emailConfigService.pool.query(`
+          ALTER TABLE report_schedules
+          ADD CONSTRAINT chk_email_template_type CHECK (
+            email_template_type IN ('district', 'multiple_districts', 'subsidiary_dietary', 'subsidiary')
+            OR email_template_type IS NULL
+          )
+        `);
+        await emailConfigService.pool.query(`
           UPDATE report_schedules
           SET tags = ARRAY[]::TEXT[]
           WHERE tags IS NULL
         `);
-
         const runTimestampColumns = ['last_run_manual', 'last_run_automated', 'last_sent_at']
           .filter(column => reportScheduleColumns.has(column));
 
@@ -177,6 +229,43 @@ async function createApp() {
         await emailConfigService.pool.query(`
           CREATE INDEX IF NOT EXISTS idx_report_schedule_reports_schedule_id
             ON report_schedule_reports(report_schedule_id, sort_order, id)
+        `);
+        await emailConfigService.pool.query(`
+          WITH report_meta AS (
+            SELECT
+              rs.id,
+              COALESCE(report_counts.report_count, CASE WHEN rs.template_type IS NOT NULL AND rs.process IS NOT NULL THEN 1 ELSE 0 END) AS report_count,
+              COALESCE(primary_report.template_type, rs.template_type) AS primary_template_type,
+              LOWER(COALESCE(primary_report.service_filter_name, rs.service_filter_name, '')) AS primary_service_filter_name
+            FROM report_schedules rs
+            LEFT JOIN (
+              SELECT
+                report_schedule_id,
+                COUNT(*) AS report_count
+              FROM report_schedule_reports
+              GROUP BY report_schedule_id
+            ) AS report_counts ON report_counts.report_schedule_id = rs.id
+            LEFT JOIN LATERAL (
+              SELECT
+                template_type,
+                service_filter_name
+              FROM report_schedule_reports
+              WHERE report_schedule_id = rs.id
+              ORDER BY sort_order ASC, id ASC
+              LIMIT 1
+            ) AS primary_report ON TRUE
+          )
+          UPDATE report_schedules rs
+          SET email_template_type = CASE
+            WHEN report_meta.report_count > 1 THEN 'multiple_districts'
+            WHEN report_meta.primary_template_type = 'subsidiary' AND report_meta.primary_service_filter_name = 'dietary' THEN 'subsidiary_dietary'
+            WHEN report_meta.primary_template_type = 'subsidiary' THEN 'subsidiary'
+            WHEN report_meta.primary_template_type = 'district' THEN 'district'
+            ELSE rs.email_template_type
+          END
+          FROM report_meta
+          WHERE rs.id = report_meta.id
+            AND (rs.email_template_type IS NULL OR BTRIM(rs.email_template_type) = '')
         `);
       }
 
