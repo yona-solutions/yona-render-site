@@ -126,6 +126,7 @@ async function createApp() {
         `);
         await emailConfigService.pool.query(`
           ALTER TABLE report_schedules
+          ADD COLUMN IF NOT EXISTS apply_subsidiary_filter_to_detail BOOLEAN NOT NULL DEFAULT FALSE,
           ADD COLUMN IF NOT EXISTS service_filter_id VARCHAR(255),
           ADD COLUMN IF NOT EXISTS service_filter_name VARCHAR(255),
           ADD COLUMN IF NOT EXISTS header_subsidiary_id VARCHAR(255),
@@ -207,6 +208,7 @@ async function createApp() {
             template_name VARCHAR(255) NOT NULL,
             template_type VARCHAR(50) NOT NULL,
             process VARCHAR(50) NOT NULL,
+            apply_subsidiary_filter_to_detail BOOLEAN NOT NULL DEFAULT FALSE,
             service_filter_id VARCHAR(255),
             service_filter_name VARCHAR(255),
             header_subsidiary_id VARCHAR(255),
@@ -224,6 +226,11 @@ async function createApp() {
             CONSTRAINT chk_report_schedule_reports_template_type CHECK (template_type IN ('district', 'region', 'subsidiary', 'customer_tag')),
             CONSTRAINT chk_report_schedule_reports_process CHECK (process IN ('standard', 'operational'))
           )
+        `);
+
+        await emailConfigService.pool.query(`
+          ALTER TABLE report_schedule_reports
+          ADD COLUMN IF NOT EXISTS apply_subsidiary_filter_to_detail BOOLEAN NOT NULL DEFAULT FALSE
         `);
 
         await emailConfigService.pool.query(`

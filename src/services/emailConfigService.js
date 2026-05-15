@@ -379,6 +379,7 @@ class EmailConfigService {
       template_name: data.report_template_name || data.template_name || 'Untitled P&L',
       template_type: templateType,
       process,
+      apply_subsidiary_filter_to_detail: Boolean(data.apply_subsidiary_filter_to_detail),
       service_filter_id: data.service_filter_id || null,
       service_filter_name: data.service_filter_name || null,
       header_subsidiary_id: data.header_subsidiary_id || null,
@@ -404,6 +405,7 @@ class EmailConfigService {
       template_name: row.template_name || '',
       template_type: row.template_type || '',
       process: row.process || '',
+      apply_subsidiary_filter_to_detail: Boolean(row.apply_subsidiary_filter_to_detail),
       service_filter_id: row.service_filter_id || null,
       service_filter_name: row.service_filter_name || null,
       header_subsidiary_id: row.header_subsidiary_id || null,
@@ -447,6 +449,9 @@ class EmailConfigService {
       template_type: primaryReport.template_type || data.template_type || data.hierarchy || 'district',
       process: primaryReport.process || data.process || data.report_type || 'standard',
       tags: Array.isArray(data.tags) ? data.tags : [],
+      apply_subsidiary_filter_to_detail: Boolean(
+        primaryReport.apply_subsidiary_filter_to_detail || data.apply_subsidiary_filter_to_detail
+      ),
       service_filter_id: primaryReport.service_filter_id || data.service_filter_id || null,
       service_filter_name: primaryReport.service_filter_name || data.service_filter_name || null,
       header_subsidiary_id: primaryReport.header_subsidiary_id || data.header_subsidiary_id || null,
@@ -515,6 +520,7 @@ class EmailConfigService {
         template_name,
         template_type,
         process,
+        apply_subsidiary_filter_to_detail,
         service_filter_id,
         service_filter_name,
         header_subsidiary_id,
@@ -529,8 +535,8 @@ class EmailConfigService {
         customer_tag_name
       )
       VALUES (
-        $1, $2, $3, $4, $5, $6, $7, $8, $9,
-        $10, $11, $12, $13, $14, $15, $16, $17
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+        $11, $12, $13, $14, $15, $16, $17, $18
       )
     `;
 
@@ -541,6 +547,7 @@ class EmailConfigService {
         report.template_name || 'Untitled P&L',
         report.template_type || null,
         report.process || null,
+        Boolean(report.apply_subsidiary_filter_to_detail),
         report.service_filter_id || null,
         report.service_filter_name || null,
         report.header_subsidiary_id || null,
@@ -643,6 +650,7 @@ class EmailConfigService {
         INSERT INTO report_schedules (
           template_name, email_template_type, template_type, process,
           tags,
+          apply_subsidiary_filter_to_detail,
           service_filter_id, service_filter_name,
           header_subsidiary_id, header_subsidiary_name,
           district_id, district_name, region_id, region_name,
@@ -651,8 +659,8 @@ class EmailConfigService {
           day_of_week, day_of_month, time_of_day, enabled
         )
         VALUES (
-          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
-          $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24
+          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
+          $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25
         )
         RETURNING id
       `;
@@ -663,6 +671,7 @@ class EmailConfigService {
         scheduleRecord.template_type,
         scheduleRecord.process,
         scheduleRecord.tags,
+        Boolean(scheduleRecord.apply_subsidiary_filter_to_detail),
         scheduleRecord.service_filter_id,
         scheduleRecord.service_filter_name,
         scheduleRecord.header_subsidiary_id,
@@ -750,27 +759,28 @@ class EmailConfigService {
           template_type = $3,
           process = $4,
           tags = $5,
-          service_filter_id = $6,
-          service_filter_name = $7,
-          header_subsidiary_id = $8,
-          header_subsidiary_name = $9,
-          district_id = $10,
-          district_name = $11,
-          region_id = $12,
-          region_name = $13,
-          subsidiary_id = $14,
-          subsidiary_name = $15,
-          customer_tag_id = $16,
-          customer_tag_name = $17,
-          email_group_id = $18,
-          email_group_ids = $19,
-          frequency = $20,
-          day_of_week = $21,
-          day_of_month = $22,
-          time_of_day = $23,
-          enabled = $24,
+          apply_subsidiary_filter_to_detail = $6,
+          service_filter_id = $7,
+          service_filter_name = $8,
+          header_subsidiary_id = $9,
+          header_subsidiary_name = $10,
+          district_id = $11,
+          district_name = $12,
+          region_id = $13,
+          region_name = $14,
+          subsidiary_id = $15,
+          subsidiary_name = $16,
+          customer_tag_id = $17,
+          customer_tag_name = $18,
+          email_group_id = $19,
+          email_group_ids = $20,
+          frequency = $21,
+          day_of_week = $22,
+          day_of_month = $23,
+          time_of_day = $24,
+          enabled = $25,
           updated_at = CURRENT_TIMESTAMP
-        WHERE id = $25
+        WHERE id = $26
       `;
 
       await client.query(updateQuery, [
@@ -779,6 +789,7 @@ class EmailConfigService {
         scheduleRecord.template_type,
         scheduleRecord.process,
         scheduleRecord.tags,
+        Boolean(scheduleRecord.apply_subsidiary_filter_to_detail),
         scheduleRecord.service_filter_id,
         scheduleRecord.service_filter_name,
         scheduleRecord.header_subsidiary_id,

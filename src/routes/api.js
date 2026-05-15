@@ -138,6 +138,12 @@ function getOrgLabelFromQuery(query) {
   return orgLabel || null;
 }
 
+function parseBooleanQuery(value) {
+  const rawValue = Array.isArray(value) ? value[0] : value;
+  if (rawValue == null) return false;
+  return ['1', 'true', 'yes', 'on'].includes(String(rawValue).trim().toLowerCase());
+}
+
 function applyOrgLabel(meta, orgLabel) {
   if (orgLabel) {
     meta.orgLabel = orgLabel;
@@ -158,6 +164,8 @@ async function generateCustomerSummaryAndFacilityReport({
   date,
   reportPlType,
   orgLabel,
+  subsidiaryId = null,
+  subsidiaryFilterName = null,
   summaryParentRegion = '',
   resolveFacilityContext
 }) {
@@ -165,6 +173,7 @@ async function generateCustomerSummaryAndFacilityReport({
   const monthData = await bigQueryService.getPLData({
     hierarchy: 'district',
     customerIds,
+    subsidiaryId,
     date,
     accountConfig,
     ytd: false
@@ -172,6 +181,7 @@ async function generateCustomerSummaryAndFacilityReport({
   const ytdData = await bigQueryService.getPLData({
     hierarchy: 'district',
     customerIds,
+    subsidiaryId,
     date,
     accountConfig,
     ytd: true
@@ -190,6 +200,9 @@ async function generateCustomerSummaryAndFacilityReport({
     headcount: summaryCensus.headcount
   };
   applyOrgLabel(summaryMeta, orgLabel);
+  if (subsidiaryFilterName) {
+    summaryMeta.subsidiaryFilterName = subsidiaryFilterName;
+  }
 
   console.log(`   Generating ${summaryTypeLabel.toLowerCase()} summary P&L (header will be updated with actual counts)...`);
   const summaryResult = await pnlRenderService.generatePNLReport(
@@ -563,6 +576,7 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
     try {
       const { hierarchy, selectedId, date, plType } = req.query;
       const orgLabel = getOrgLabelFromQuery(req.query);
+      const applySubsidiaryFilterToDetail = parseBooleanQuery(req.query.applySubsidiaryFilterToDetail);
 
       // Validate required parameters
       if (!hierarchy || !selectedId || !date) {
@@ -730,6 +744,7 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
       const allCustomersMonthData = await bigQueryService.getPLData({
         hierarchy: 'district',
         customerIds: allCustomerIds,
+        subsidiaryId: applySubsidiaryFilterToDetail ? subsidiaryId : null,
         date,
         accountConfig,
         ytd: false
@@ -737,6 +752,7 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
       const allCustomersYtdData = await bigQueryService.getPLData({
         hierarchy: 'district',
         customerIds: allCustomerIds,
+        subsidiaryId: applySubsidiaryFilterToDetail ? subsidiaryId : null,
         date,
         accountConfig,
         ytd: true
@@ -764,6 +780,7 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
         headcount: subsidiaryCensus.headcount
       };
       applyOrgLabel(subsidiaryMeta, orgLabel);
+      subsidiaryMeta.detailSubsidiaryFilterApplied = applySubsidiaryFilterToDetail;
 
       const subsidiaryResultReport = await pnlRenderService.generatePNLReport(
         subsidiaryMonthData,
@@ -1070,6 +1087,7 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
     try {
       const { hierarchy, selectedId, date, plType } = req.query;
       const orgLabel = getOrgLabelFromQuery(req.query);
+      const applySubsidiaryFilterToDetail = parseBooleanQuery(req.query.applySubsidiaryFilterToDetail);
 
       // Validate required parameters
       if (!hierarchy || !selectedId || !date) {
@@ -1198,6 +1216,9 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
               code: 'NO_CUSTOMERS_FOUND'
             });
           }
+
+          queryParams.subsidiaryId = subsidiaryIds.length === 1 ? subsidiaryIds[0] : subsidiaryIds;
+          queryParams.subsidiaryFilterName = subsidiaryResult.subsidiaryName;
         }
 
         // Update selectedLabel to use the district display name
@@ -1257,6 +1278,7 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
           subsidiaryId = subsidiaryResult.subsidiaryIds.length === 1
             ? subsidiaryResult.subsidiaryIds[0]
             : subsidiaryResult.subsidiaryIds;
+          queryParams.subsidiaryFilterName = subsidiaryResult.subsidiaryName;
           console.log(`   Using subsidiary filter: subsidiary_internal_id=${JSON.stringify(subsidiaryId)}`);
         }
         
@@ -1386,6 +1408,7 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
         queryParams.customersInSubsidiary = customersInSubsidiary;
         queryParams.allowedCustomerIds = allowedCustomerIds;
         queryParams.exclusionsApplied = exclusionsApplied;
+        queryParams.applySubsidiaryFilterToDetail = applySubsidiaryFilterToDetail;
         
         const filterDesc = regionId 
           ? `subsidiary_internal_id IN [${subsidiaryIds.join(', ')}] AND region_internal_id=${regionId}`
@@ -1435,6 +1458,8 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
           date,
           reportPlType,
           orgLabel,
+          subsidiaryId: queryParams.subsidiaryId || null,
+          subsidiaryFilterName: queryParams.subsidiaryFilterName || null,
           summaryParentRegion: queryParams.districtRegion || '',
           resolveFacilityContext: () => ({
             parentDistrict: selectedLabel,
@@ -1538,6 +1563,9 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
           headcount: regionCensus.headcount
         };
         applyOrgLabel(regionMeta, orgLabel);
+        if (queryParams.subsidiaryFilterName) {
+          regionMeta.subsidiaryFilterName = queryParams.subsidiaryFilterName;
+        }
         
         console.log('   Generating region summary P&L (header will be updated with actual counts)...');
         const regionResult = await pnlRenderService.generatePNLReport(
@@ -1561,6 +1589,7 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
         const allCustomersQueryParams = {
           hierarchy: 'district',
           customerIds: allCustomerIds,
+          subsidiaryId: queryParams.subsidiaryId || null,
           date,
           accountConfig
         };
@@ -1798,6 +1827,7 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
         const allCustomersMonthData = await bigQueryService.getPLData({ 
           hierarchy: 'district', 
           customerIds: allCustomerIds, 
+          subsidiaryId: queryParams.applySubsidiaryFilterToDetail ? subsidiaryId : null,
           date, 
           accountConfig, 
           ytd: false 
@@ -1805,6 +1835,7 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
         const allCustomersYtdData = await bigQueryService.getPLData({ 
           hierarchy: 'district', 
           customerIds: allCustomerIds, 
+          subsidiaryId: queryParams.applySubsidiaryFilterToDetail ? subsidiaryId : null,
           date, 
           accountConfig, 
           ytd: true 
@@ -1845,6 +1876,7 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
           headcount: subsidiaryCensus.headcount
         };
         applyOrgLabel(subsidiaryMeta, orgLabel);
+        subsidiaryMeta.detailSubsidiaryFilterApplied = queryParams.applySubsidiaryFilterToDetail;
         
         const subsidiaryResult = await pnlRenderService.generatePNLReport(
           subsidiaryMonthData,

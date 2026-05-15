@@ -30,6 +30,10 @@ function buildSchedulePnlQueryParams(schedule, { entityId, reportDate }) {
     params.set('serviceFilter', schedule.service_filter_id);
   }
 
+  if (schedule.template_type === 'subsidiary' && schedule.apply_subsidiary_filter_to_detail) {
+    params.set('applySubsidiaryFilterToDetail', 'true');
+  }
+
   return params;
 }
 

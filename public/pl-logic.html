@@ -413,15 +413,15 @@
             <div class="grid">
               <div class="grid-item">
                 <h4>Subsidiary tab</h4>
-                <p>1) Run subsidiary summary using <strong>subsidiary_internal_id</strong> (Month + YTD). 2) Pull all customers in that subsidiary from <strong>dim_customers</strong> (optional region or district‑tag filter applies here). 3) Group customers into Regions and Districts. 4) For each Region, run a region summary using <strong>region_internal_id + subsidiary_internal_id</strong>. 5) Build District and Facility detail from the shared customer transaction set.</p>
+                <p>1) Run subsidiary summary using <strong>subsidiary_internal_id</strong> (Month + YTD). 2) Pull all customers in that subsidiary from <strong>dim_customers</strong> (optional region or district‑tag filter applies here). 3) Group customers into Regions and Districts. 4) For each Region, run a region summary using <strong>region_internal_id + subsidiary_internal_id</strong>. 5) Build District and Facility detail from the shared customer transaction set, with an optional checkbox to also apply the subsidiary filter to that detail.</p>
               </div>
               <div class="grid-item">
                 <h4>Region tab</h4>
-                <p>1) Run region summary using <strong>region_internal_id</strong> (optional subsidiary filter). 2) Pull all customers in that region from <strong>dim_customers</strong>. 3) Group customers into Districts. 4) Build District summaries and Facility detail from the same customer‑level transactions.</p>
+                <p>1) Run region summary using <strong>region_internal_id</strong> (optional subsidiary filter). 2) Pull all customers in that region from <strong>dim_customers</strong>. 3) Group customers into Districts. 4) Build District summaries and Facility detail from the same customer‑level transactions, and if a subsidiary filter is selected, only include transaction rows tagged to that subsidiary.</p>
               </div>
               <div class="grid-item">
                 <h4>District tab</h4>
-                <p>1) Pull all customers for the selected district (or district tag) from <strong>dim_customers</strong>. 2) Run district summary using those customers (Month + YTD). 3) Build Facility P&amp;Ls by filtering the shared customer transaction set.</p>
+                <p>1) Pull all customers for the selected district (or district tag) from <strong>dim_customers</strong>. 2) Optionally narrow that report with a subsidiary filter. 3) Run the district summary using the matching customer transaction rows (Month + YTD). 4) Build Facility P&amp;Ls from that same filtered transaction set.</p>
               </div>
               <div class="grid-item">
                 <h4>Facility detail</h4>
@@ -433,22 +433,22 @@
           <section class="section-card">
             <div class="kicker">At a glance</div>
             <div class="flow-row">
-              <div class="flow-card">Subsidiary summary by subsidiary ID → Region summaries by region + subsidiary → District + Facility detail from customer transactions</div>
-              <div class="flow-card">Region summary by region ID → District + Facility detail from customer transactions</div>
-              <div class="flow-card">District summary by customer list → Facility detail from customer transactions</div>
+              <div class="flow-card">Subsidiary summary by subsidiary ID → Region summaries by region + subsidiary → optional subsidiary filter on District + Facility detail</div>
+              <div class="flow-card">Region summary by region ID → optional subsidiary filter carries through District + Facility detail</div>
+              <div class="flow-card">District summary by customer list → optional subsidiary filter narrows transaction rows for summary + Facility detail</div>
             </div>
           </section>
 
           <section id="filters" class="section-card">
             <div class="section-title">How filters are applied</div>
             <div class="list">
-              <div><strong>Subsidiary filter:</strong> Applies <strong>subsidiary_internal_id</strong> to summaries and to the customer list pulled from <strong>dim_customers</strong>.</div>
+              <div><strong>Subsidiary filter:</strong> On the Region and District tabs, applies <strong>subsidiary_internal_id</strong> to summaries and to the detailed transaction rows. On the Subsidiary tab, the optional detail checkbox applies <strong>subsidiary_internal_id</strong> to District and Facility detail only.</div>
               <div><strong>Region filter:</strong> Applies <strong>region_internal_id</strong> to summaries and to the customer list pulled from <strong>dim_customers</strong>.</div>
               <div><strong>District tags:</strong> In the Subsidiary tab, a district tag limits the customer list to districts with that tag.</div>
               <div><strong>Process (Standard vs Operational):</strong> Controls which account rules are included in the P&amp;L.</div>
             </div>
             <div class="callout" style="margin-top: 12px;">
-              Example: Region = R870 + Subsidiary = Yona Ozark means the Region summary uses both IDs, and only customers that match both appear in District/Facility detail.
+              Example: Region = R870 + Subsidiary = Yona Ozark means the Region summary uses both IDs, and the District/Facility detail only includes transaction rows tagged to Yona Ozark.
             </div>
           </section>
 

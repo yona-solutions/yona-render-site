@@ -156,6 +156,17 @@
       flex-wrap: wrap;
     }
 
+    .controls-secondary-row {
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+      flex-wrap: wrap;
+    }
+
+    .controls-secondary-row .control-group {
+      margin-top: 4px;
+    }
+
     .control-group-narrow .searchable-select {
       min-width: 132px;
       width: 132px;
@@ -224,6 +235,48 @@
       flex-direction: column;
       gap: 6px;
       flex: 0 1 auto;
+    }
+
+    .control-group-checkbox {
+      min-width: 0;
+      max-width: none;
+    }
+
+    .checkbox-card {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 18px;
+      padding: 8px 12px;
+      border: 1px solid #d6dee8;
+      border-radius: 6px;
+      background: #ffffff;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+      cursor: pointer;
+    }
+
+    .checkbox-card input {
+      width: 16px;
+      height: 16px;
+      margin: 0;
+      accent-color: #4a7c9e;
+      cursor: pointer;
+      flex: 0 0 auto;
+    }
+
+    .checkbox-card-copy {
+      display: block;
+    }
+
+    .checkbox-card-title {
+      color: #4a5568;
+      font-size: 13px;
+      font-weight: 500;
+      line-height: 1.3;
+    }
+
+    .checkbox-card-description {
+      display: none;
     }
 
     .control-label {
@@ -1000,7 +1053,7 @@
           </div>
         </div>
 
-        <!-- Subsidiary Filter (visible when Region tab is active) -->
+        <!-- Subsidiary Filter (visible when District or Region tab is active) -->
         <div class="control-group control-group-subsidiary" id="subsidiaryFilterGroup" style="display: none;">
           <label class="control-label">Subsidiary</label>
           <div class="searchable-select" id="subsidiaryFilterWrapper">
@@ -1039,6 +1092,18 @@
         <div class="action-buttons">
           <button class="btn btn-primary" onclick="refreshData()">Refresh Data</button>
           <button class="btn btn-secondary" onclick="downloadPDF()">Download PDF</button>
+        </div>
+      </div>
+
+      <div class="controls-secondary-row">
+        <div class="control-group control-group-checkbox" id="subsidiaryDetailFilterGroup" style="display: none;">
+          <label class="control-label">Detail Filter</label>
+          <label class="checkbox-card" for="subsidiaryDetailFilterCheckbox">
+            <input type="checkbox" id="subsidiaryDetailFilterCheckbox" />
+            <span class="checkbox-card-copy">
+              <span class="checkbox-card-title">Apply subsidiary filter to District and Facility summary</span>
+            </span>
+          </label>
         </div>
       </div>
     </div>
@@ -1256,7 +1321,7 @@
         endpoint: '/api/storage/districts',
         label: 'District',
         placeholder: 'district',
-        filterMode: 'none'
+        filterMode: 'subsidiary'
       },
       region: {
         endpoint: '/api/storage/regions',
@@ -1268,7 +1333,8 @@
         endpoint: '/api/storage/departments',
         label: 'Subsidiary',
         placeholder: 'subsidiary',
-        filterMode: 'service'
+        filterMode: 'service',
+        showDetailSubsidiaryToggle: true
       },
       customer_tag: {
         endpoint: '/api/storage/customer-tags',
@@ -1390,7 +1456,7 @@
     }
     
     /**
-     * Load subsidiaries for the filter dropdown (when Region tab is active)
+     * Load subsidiaries for the filter dropdown (when District or Region tab is active)
      * Shows only leaf nodes (subsidiaries), no default selection
      */
     async function loadSubsidiariesForFilter() {
@@ -1499,6 +1565,8 @@
       // Show/hide filters based on hierarchy type
       const subsidiaryFilterGroup = document.getElementById('subsidiaryFilterGroup');
       const serviceFilterGroup = document.getElementById('serviceFilterGroup');
+      const subsidiaryDetailFilterGroup = document.getElementById('subsidiaryDetailFilterGroup');
+      subsidiaryDetailFilterGroup.style.display = hierarchyConfig.showDetailSubsidiaryToggle ? 'flex' : 'none';
 
       if (hierarchyConfig.filterMode === 'subsidiary') {
         subsidiaryFilterGroup.style.display = 'block';
@@ -1534,7 +1602,10 @@
       // Initialize searchable select components
       monthSelect = new SearchableSelect('monthSelectWrapper');
       districtSelect = new SearchableSelect('districtSelectWrapper');
-      subsidiaryFilterSelect = new SearchableSelect('subsidiaryFilterWrapper', [], false);
+      subsidiaryFilterSelect = new SearchableSelect('subsidiaryFilterWrapper', [], {
+        allowClear: true,
+        clearLabel: '— No filter —'
+      });
       serviceFilterSelect = new SearchableSelect('serviceFilterWrapper', [], false);
       subsidiaryHeaderSelect = new SearchableSelect('subsidiaryHeaderWrapper', [], {
         allowClear: true,
@@ -1723,8 +1794,8 @@
           console.log(`   🏷️ Using subsidiary header label: ${selectedHeaderLabel}`);
         }
 
-        // Add subsidiary filter if Region hierarchy and a subsidiary is selected
-        if (hierarchy === 'region' && subsidiaryFilterSelect && subsidiaryFilterSelect.selectedValue) {
+        // Add subsidiary filter if District or Region hierarchy and a subsidiary is selected
+        if ((hierarchy === 'district' || hierarchy === 'region') && subsidiaryFilterSelect && subsidiaryFilterSelect.selectedValue) {
           const subsidiaryFilter = subsidiaryFilterSelect.selectedValue;
           // Only add filter parameter if a subsidiary is actually selected (not empty)
           if (subsidiaryFilter && subsidiaryFilter !== 'all') {
@@ -1739,6 +1810,14 @@
           if (serviceFilter && serviceFilter !== 'all') {
             url += `&serviceFilter=${encodeURIComponent(serviceFilter)}`;
             console.log(`   ⚙️ Applying service filter: ${serviceFilterSelect.selectedLabel || serviceFilter}`);
+          }
+        }
+
+        if (hierarchy === 'subsidiary') {
+          const subsidiaryDetailFilterCheckbox = document.getElementById('subsidiaryDetailFilterCheckbox');
+          if (subsidiaryDetailFilterCheckbox && subsidiaryDetailFilterCheckbox.checked) {
+            url += '&applySubsidiaryFilterToDetail=true';
+            console.log('   📎 Applying subsidiary filter to district and facility detail');
           }
         }
 
@@ -1873,6 +1952,12 @@
       metaInfoHtml += `<strong>Period:</strong> ${escapeHtml(date)}<br>`;
       if (meta.orgLabel) {
         metaInfoHtml += `<strong>Header:</strong> ${escapeHtml(meta.orgLabel)}<br>`;
+      }
+      if (meta.subsidiaryFilterName) {
+        metaInfoHtml += `<strong>Subsidiary Filter:</strong> ${escapeHtml(meta.subsidiaryFilterName)}<br>`;
+      }
+      if (Object.prototype.hasOwnProperty.call(meta, 'detailSubsidiaryFilterApplied')) {
+        metaInfoHtml += `<strong>Detail Subsidiary Filter:</strong> ${meta.detailSubsidiaryFilterApplied ? 'On (District and Facility detail only)' : 'Off'}<br>`;
       }
 
       if (meta.facilityCount) {

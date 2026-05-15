@@ -85,7 +85,7 @@ class BigQueryService {
    * Get P&L data for a specific hierarchy and period
    * 
    * Queries fct_transactions_summary based on hierarchy type:
-   * - District: Filters by customer_internal_id (includes all customers under district/tag)
+   * - District: Filters by customer_internal_id (optionally narrowed by subsidiary_internal_id)
    * - Region: Filters by region_internal_id
    * - Subsidiary: Filters by subsidiary_internal_id
    * 
@@ -96,7 +96,7 @@ class BigQueryService {
    * @param {string} params.hierarchy - Hierarchy level (district, region, subsidiary)
    * @param {Array<number>} params.customerIds - Customer IDs (for district hierarchy)
    * @param {number} params.regionId - Region internal ID (for region hierarchy)
-   * @param {number} params.subsidiaryId - Subsidiary internal ID (for subsidiary hierarchy)
+   * @param {number|Array<number>} params.subsidiaryId - Subsidiary internal ID (for subsidiary hierarchy, or optional district/region transaction filter)
    * @param {string} params.date - Date in YYYY-MM-DD format
    * @param {Object} params.accountConfig - Account configuration for label mapping
    * @param {boolean} params.ytd - If true, query YTD (from start of year to date), otherwise just the month
@@ -117,6 +117,20 @@ class BigQueryService {
     if (hierarchy === 'district' && customerIds && customerIds.length > 0) {
       whereClause = 'customer_internal_id IN UNNEST(@customerIds)';
       queryParams.customerIds = customerIds;
+
+      // District/customer-level queries can optionally be narrowed to one or more
+      // subsidiaries so downstream district/facility detail only includes matching
+      // transaction rows.
+      if (subsidiaryId != null) {
+        const subsidiaryIds = Array.isArray(subsidiaryId) ? subsidiaryId : [subsidiaryId];
+        if (subsidiaryIds.length === 1) {
+          whereClause += ' AND subsidiary_internal_id = @subsidiaryId';
+          queryParams.subsidiaryId = subsidiaryIds[0];
+        } else {
+          whereClause += ' AND subsidiary_internal_id IN UNNEST(@subsidiaryIds)';
+          queryParams.subsidiaryIds = subsidiaryIds;
+        }
+      }
     } else if (hierarchy === 'region' && regionId != null) {
       // Region filtering - can optionally include subsidiary filter
       whereClause = 'region_internal_id = @regionId';

@@ -59,6 +59,101 @@ function normalizeMockContacts(input = []) {
   return normalized;
 }
 
+function normalizeMockScheduleReport(report = {}, index = 0) {
+  return {
+    id: report.id || null,
+    sort_order: Number.isFinite(report.sort_order) ? report.sort_order : index,
+    template_name: report.template_name || '',
+    template_type: report.template_type || '',
+    process: report.process || '',
+    apply_subsidiary_filter_to_detail: Boolean(report.apply_subsidiary_filter_to_detail),
+    service_filter_id: report.service_filter_id || null,
+    service_filter_name: report.service_filter_name || null,
+    header_subsidiary_id: report.header_subsidiary_id || null,
+    header_subsidiary_name: report.header_subsidiary_name || null,
+    district_id: report.district_id || null,
+    district_name: report.district_name || null,
+    region_id: report.region_id || null,
+    region_name: report.region_name || null,
+    subsidiary_id: report.subsidiary_id || null,
+    subsidiary_name: report.subsidiary_name || null,
+    customer_tag_id: report.customer_tag_id || null,
+    customer_tag_name: report.customer_tag_name || null
+  };
+}
+
+function getMockScheduleReports(data = {}) {
+  if (Array.isArray(data.reports) && data.reports.length > 0) {
+    return data.reports.map((report, index) => normalizeMockScheduleReport(report, index));
+  }
+
+  if (!data.template_type || !data.process) {
+    return [];
+  }
+
+  return [
+    normalizeMockScheduleReport({
+      id: data.report_id || data.id || null,
+      template_name: data.report_template_name || data.template_name || data.name || '',
+      template_type: data.template_type,
+      process: data.process,
+      apply_subsidiary_filter_to_detail: data.apply_subsidiary_filter_to_detail,
+      service_filter_id: data.service_filter_id,
+      service_filter_name: data.service_filter_name,
+      header_subsidiary_id: data.header_subsidiary_id,
+      header_subsidiary_name: data.header_subsidiary_name,
+      district_id: data.district_id,
+      district_name: data.district_name,
+      region_id: data.region_id,
+      region_name: data.region_name,
+      subsidiary_id: data.subsidiary_id,
+      subsidiary_name: data.subsidiary_name,
+      customer_tag_id: data.customer_tag_id,
+      customer_tag_name: data.customer_tag_name
+    })
+  ];
+}
+
+function buildMockReportScheduleMirror(data = {}) {
+  const reports = getMockScheduleReports(data);
+  const primaryReport = reports[0] || {};
+  const emailGroupIds = Array.isArray(data.email_group_ids)
+    ? [...new Set(data.email_group_ids.map(id => parseInt(id, 10)).filter(Number.isFinite))]
+    : [data.email_group_id].map(id => parseInt(id, 10)).filter(Number.isFinite);
+
+  return {
+    name: String(data.name || data.template_name || '').trim() || 'Untitled Report Group',
+    template_name: String(data.name || data.template_name || '').trim() || 'Untitled Report Group',
+    email_template_type: data.email_template_type || null,
+    template_type: primaryReport.template_type || data.template_type || 'district',
+    process: primaryReport.process || data.process || 'standard',
+    apply_subsidiary_filter_to_detail: Boolean(
+      primaryReport.apply_subsidiary_filter_to_detail || data.apply_subsidiary_filter_to_detail
+    ),
+    tags: Array.isArray(data.tags) ? data.tags : [],
+    service_filter_id: primaryReport.service_filter_id || data.service_filter_id || null,
+    service_filter_name: primaryReport.service_filter_name || data.service_filter_name || null,
+    header_subsidiary_id: primaryReport.header_subsidiary_id || data.header_subsidiary_id || null,
+    header_subsidiary_name: primaryReport.header_subsidiary_name || data.header_subsidiary_name || null,
+    district_id: primaryReport.district_id || data.district_id || null,
+    district_name: primaryReport.district_name || data.district_name || null,
+    region_id: primaryReport.region_id || data.region_id || null,
+    region_name: primaryReport.region_name || data.region_name || null,
+    subsidiary_id: primaryReport.subsidiary_id || data.subsidiary_id || null,
+    subsidiary_name: primaryReport.subsidiary_name || data.subsidiary_name || null,
+    customer_tag_id: primaryReport.customer_tag_id || data.customer_tag_id || null,
+    customer_tag_name: primaryReport.customer_tag_name || data.customer_tag_name || null,
+    email_group_id: emailGroupIds[0] || null,
+    email_group_ids: emailGroupIds,
+    reports,
+    frequency: data.frequency || 'monthly',
+    day_of_week: data.day_of_week || null,
+    day_of_month: data.day_of_month ?? null,
+    time_of_day: data.time_of_day || '08:00:00',
+    enabled: data.enabled !== undefined ? Boolean(data.enabled) : true
+  };
+}
+
 // Mock Email Groups
 const mockEmailGroups = [
   {
@@ -496,32 +591,11 @@ function updateMockEmailGroup(id, updates) {
  */
 function createMockReportSchedule(data) {
   const newId = Math.max(...mockReportSchedules.map(s => s.id)) + 1;
-  
+
+  const mirroredSchedule = buildMockReportScheduleMirror(data);
   const newSchedule = {
     id: newId,
-    template_name: data.template_name || data.name,
-    email_template_type: data.email_template_type || null,
-    template_type: data.template_type,
-    process: data.process,
-    tags: data.tags || [],
-    service_filter_id: data.service_filter_id || null,
-    service_filter_name: data.service_filter_name || null,
-    header_subsidiary_id: data.header_subsidiary_id || null,
-    header_subsidiary_name: data.header_subsidiary_name || null,
-    district_id: data.district_id || null,
-    district_name: data.district_name || null,
-    region_id: data.region_id || null,
-    region_name: data.region_name || null,
-    subsidiary_id: data.subsidiary_id || null,
-    subsidiary_name: data.subsidiary_name || null,
-    customer_tag_id: data.customer_tag_id || null,
-    customer_tag_name: data.customer_tag_name || null,
-    email_group_ids: data.email_group_ids || [],  // Array of group IDs
-    frequency: data.frequency,
-    day_of_week: data.day_of_week || null,
-    day_of_month: data.day_of_month || null,
-    time_of_day: data.time_of_day || '08:00',
-    enabled: data.enabled !== undefined ? data.enabled : true,
+    ...mirroredSchedule,
     created_at: new Date(),
     updated_at: new Date(),
     last_sent_at: null,
@@ -537,16 +611,28 @@ function createMockReportSchedule(data) {
  * Update mock report schedule (simulated)
  */
 function updateMockReportSchedule(id, updates) {
-  const schedule = mockReportSchedules.find(s => s.id === parseInt(id));
-  if (!schedule) {
+  const scheduleIndex = mockReportSchedules.findIndex(s => s.id === parseInt(id));
+  if (scheduleIndex === -1) {
     return null;
   }
 
-  // Apply updates
-  Object.assign(schedule, updates);
-  schedule.updated_at = new Date();
+  const existing = mockReportSchedules[scheduleIndex];
+  const merged = {
+    ...existing,
+    ...updates,
+    reports: Array.isArray(updates.reports) ? updates.reports : (existing.reports || [])
+  };
+  const mirroredSchedule = buildMockReportScheduleMirror(merged);
+  const updatedSchedule = {
+    ...existing,
+    ...mirroredSchedule,
+    id: existing.id,
+    created_at: existing.created_at,
+    updated_at: new Date()
+  };
+  mockReportSchedules[scheduleIndex] = updatedSchedule;
 
-  return JSON.parse(JSON.stringify(schedule));
+  return JSON.parse(JSON.stringify(updatedSchedule));
 }
 
 /**
