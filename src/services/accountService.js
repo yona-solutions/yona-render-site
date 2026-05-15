@@ -20,7 +20,7 @@ const SECTION_CONFIG = {
   },
   'EXPENSES': {
     header: 'EXPENSES',
-    accounts: ['Expense', 'EBITDA', 'Net Income', 'Other Income and Expenses', 'Other Expense', 'Other Income', 'Net Other Income']
+    accounts: ['Expense', 'EBITDA', 'Net Income', 'Other Income and Expenses', 'OIH (Hidden)', 'Net Other Income']
   }
 };
 
