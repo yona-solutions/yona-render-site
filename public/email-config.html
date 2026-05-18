@@ -5034,7 +5034,9 @@
         // Step 3: Process report
         updateLoadingStep(3);
         console.log('🔨 Preparing report HTML using the P&L PDF pipeline...');
-        const preparedReport = window.pnlPdf.prepareReportHtml(htmlContent);
+        const preparedReport = window.pnlPdf.prepareReportHtml(htmlContent, {
+          pdfRowHeight: window.pdfRowHeight
+        });
         console.log(`📊 Filtered to ${preparedReport.keptCount} reports with non-zero net income`);
         const fullHTML = window.pnlPdf.buildPdfHtml(preparedReport.html, {
           pdfRowHeight: window.pdfRowHeight
@@ -5044,13 +5046,34 @@
         updateLoadingStep(4);
         console.log('🔄 Generating PDF...');
         const blob = await window.pnlPdf.requestPdfBlob(fullHTML);
+        const filename = `PNL_${schedule.template_type}_${entityName.replace(/[^a-zA-Z0-9]/g, '_')}_${latestDate}.pdf`;
+        const captureEnabled = window.pnlPdf.isPdfDebugCaptureEnabled();
+
+        if (captureEnabled) {
+          const pdfshiftOptions = window.pnlPdf.buildPdfshiftOptions(fullHTML);
+          const capture = window.pnlPdf.capturePdfDebugArtifacts({
+            baseName: filename.replace(/\.pdf$/i, ''),
+            rawHtml: htmlContent,
+            preparedReport,
+            fullHTML,
+            pdfshiftOptions,
+            metadata: {
+              source: 'email-config',
+              scheduleId,
+              scheduleName: schedule.template_name,
+              hierarchy: schedule.template_type,
+              entityId,
+              entityName,
+              date: latestDate,
+              pdfRowHeight: window.pdfRowHeight
+            }
+          });
+          console.log('🧪 PDF debug capture saved:', capture.debugBaseName);
+        }
         
         // Step 5: Download the PDF
         updateLoadingStep(5);
-        window.pnlPdf.downloadBlob(
-          blob,
-          `PNL_${schedule.template_type}_${entityName.replace(/[^a-zA-Z0-9]/g, '_')}_${latestDate}.pdf`
-        );
+        window.pnlPdf.downloadBlob(blob, filename);
         
         // Complete all steps and briefly show success
         completeAllSteps();

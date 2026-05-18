@@ -1939,6 +1939,7 @@
       
       // Log full result to console
       console.log('📊 P&L Report Result:', result);
+      window.__lastPnlReportResult = result;
       
       // Update metadata
       document.getElementById('resultsMetadata').textContent = 
@@ -2090,7 +2091,9 @@
 
         const htmlContent = resultsContainer.innerHTML;
 
-        const preparedReport = window.pnlPdf.prepareReportHtml(htmlContent);
+        const preparedReport = window.pnlPdf.prepareReportHtml(htmlContent, {
+          pdfRowHeight: window.pdfRowHeight
+        });
         console.log(`📊 Filtered to ${preparedReport.keptCount} reports with non-zero net income`);
 
         const fullHTML = window.pnlPdf.buildPdfHtml(preparedReport.html, {
@@ -2107,6 +2110,27 @@
         const selectedOption = document.getElementById('entitySelect')?.selectedOptions[0]?.textContent || 'Report';
         const date = document.getElementById('dateSelect')?.value || new Date().toISOString().split('T')[0];
         const filename = `PNL_${hierarchy}_${selectedOption.replace(/[^a-zA-Z0-9]/g, '_')}_${date}.pdf`;
+        const captureEnabled = window.pnlPdf.isPdfDebugCaptureEnabled();
+
+        if (captureEnabled) {
+          const capture = window.pnlPdf.capturePdfDebugArtifacts({
+            baseName: filename.replace(/\.pdf$/i, ''),
+            rawHtml: htmlContent,
+            preparedReport,
+            fullHTML,
+            pdfshiftOptions,
+            metadata: {
+              source: 'pl-view',
+              hierarchy: currentHierarchy,
+              selectedId: districtSelect.getValue(),
+              selectedLabel: window.__lastPnlReportResult?.selectedLabel || selectedOption,
+              date,
+              pdfRowHeight: window.pdfRowHeight,
+              meta: window.__lastPnlReportResult?.meta || null
+            }
+          });
+          console.log('🧪 PDF debug capture saved:', capture.debugBaseName);
+        }
 
         window.pnlPdf.downloadBlob(blob, filename);
 
