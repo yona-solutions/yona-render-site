@@ -101,7 +101,7 @@
 
   function getPageCapacityUnits(rowHeight, includeReportHeader, options = {}) {
     const scale = 12.5 / rowHeight;
-    const baseUnits = includeReportHeader ? 62 : 67;
+    const baseUnits = includeReportHeader ? 72 : 72;
     const minimumUnits = includeReportHeader ? 40 : 45;
     return Math.max(minimumUnits, baseUnits * scale);
   }
@@ -188,6 +188,19 @@
     return container.outerHTML;
   }
 
+  function restoreLeadingSubtotalBorderTop(tbody) {
+    if (!tbody) return;
+    const firstRow = tbody.querySelector('tr:first-child');
+    if (!firstRow || !firstRow.classList.contains('pnl-subtotal-row')) return;
+
+    firstRow.querySelectorAll('td[data-pdf-border-top]').forEach(cell => {
+      const saved = cell.getAttribute('data-pdf-border-top');
+      if (!saved) return;
+      const existing = cell.getAttribute('style') || '';
+      cell.setAttribute('style', (saved + '; ' + existing).replace(/;\s*$/, '').trim());
+    });
+  }
+
   function buildPaginatedContainerHtml(doc, sourceContainer, sourceTable, pageRows, includeReportHeader) {
     const pageContainer = doc.createElement('div');
     pageContainer.setAttribute('class', sourceContainer.getAttribute('class') || 'pnl-report-container page-break');
@@ -211,6 +224,7 @@
     }
 
     pageRows.forEach(row => pageTbody.appendChild(row));
+    restoreLeadingSubtotalBorderTop(pageTbody);
 
     pageTable.appendChild(pageTbody);
     pageContainer.appendChild(pageTable);
@@ -300,7 +314,7 @@
     const pdfshiftHorizontalMarginPx = 40;
     const footerHeightPx = 10;
     const bodyHorizontalPaddingPx = 40;
-    const bottomPageMarginPx = 0.7 * 96;
+    const bottomPageMarginPx = 0;
 
     return {
       viewportWidthPx: (8.5 * 96) - pdfshiftHorizontalMarginPx,
@@ -462,7 +476,12 @@
 
           if (currentHasDoubleLine && previousWasDoubleLine) {
             row.querySelectorAll('td[style*="border-top"]').forEach(cell => {
-              const cleanedStyle = removeInlineStyleDeclaration(cell.getAttribute('style'), 'border-top');
+              const styleAttr = cell.getAttribute('style') || '';
+              const match = styleAttr.match(/border-top\s*:[^;]*/i);
+              if (match) {
+                cell.setAttribute('data-pdf-border-top', match[0]);
+              }
+              const cleanedStyle = removeInlineStyleDeclaration(styleAttr, 'border-top');
               if (cleanedStyle) {
                 cell.setAttribute('style', cleanedStyle);
               } else {
@@ -532,7 +551,7 @@
 
     @page {
       size: letter portrait;
-      margin: 0 0 0.7in 0;
+      margin: 0;
     }
 
     body {
