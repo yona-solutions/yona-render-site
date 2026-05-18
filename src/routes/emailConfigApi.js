@@ -11,6 +11,7 @@ const emailService = require('../services/emailService');
 const emailSchedulerService = require('../services/emailSchedulerService');
 const reportBatchTaskService = require('../services/reportBatchTaskService');
 const scheduleReportService = require('../services/scheduleReportService');
+const pnlPdfServer = require('../utils/pnlPdfServer');
 const {
   buildAttachmentFilename,
   buildReportEmailMessage,
@@ -1268,6 +1269,163 @@ router.post('/report-schedules/:id/send-to-groups', async (req, res) => {
 // ============================================
 // Process Schedule API (for Cloud Function)
 // ============================================
+
+/**
+ * GET /api/report-schedules/:id/pdf-debug
+ * Generate the PDF exactly as the email flow would, return it as a download,
+ * and include X-Debug headers showing prepared container count vs PDF page count
+ * so we can see where PDFShift is adding extra breaks beyond our pagination.
+ */
+router.get('/report-schedules/:id/pdf-debug', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reportDate } = req.query;
+
+    let schedule;
+    if (!emailConfigService.isAvailable()) {
+      schedule = mockEmailData.getMockReportSchedule(parseInt(id));
+    } else {
+      schedule = await emailConfigService.getReportSchedule(parseInt(id));
+    }
+    if (!schedule) return res.status(404).json({ error: 'Report schedule not found' });
+
+    const pdfRowHeight = await getPdfRowHeightSetting();
+    const resolvedDate = await scheduleReportService.resolveReportDate(
+      reportDate || null,
+      bigQueryServiceInstance
+    );
+
+    const htmlContent = await scheduleReportService.fetchScheduleReportHtml(schedule, {
+      entityId: scheduleReportService.getScheduleEntity(schedule).entityId,
+      reportDate: scheduleReportService.normalizeReportDateValue(resolvedDate)
+    });
+
+    const { pdfBuffer, prepared, fullHTML } = await pnlPdfServer.generatePdfBufferFromReportHtml(
+      htmlContent, { pdfRowHeight }
+    );
+
+    // Count prepared containers
+    const preparedContainerCount = (prepared.html.match(/pnl-report-container/g) || []).length;
+
+    // Count PDF pages by scanning for /Type /Page in the PDF binary
+    let pdfPageCount = 0;
+    const pdfStr = pdfBuffer.toString('binary');
+    const pageMatches = pdfStr.match(/\/Type\s*\/Page[^s]/g);
+    pdfPageCount = pageMatches ? pageMatches.length : 0;
+
+    // Find containers where PDFShift likely added extra breaks
+    // (total PDF pages - prepared containers = extra PDFShift splits)
+    const extraBreaks = pdfPageCount - preparedContainerCount;
+
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="debug_${schedule.template_name.replace(/[^a-z0-9]/gi,'_')}_${resolvedDate}.pdf"`,
+      'X-Prepared-Containers': String(preparedContainerCount),
+      'X-Kept-Reports': String(prepared.keptCount),
+      'X-Pdf-Pages': String(pdfPageCount),
+      'X-Extra-Pdfshift-Breaks': String(extraBreaks),
+      'X-Raw-Html-Length': String(htmlContent.length),
+      'X-Full-Html-Length': String(fullHTML.length),
+      'X-Pdf-Row-Height': String(pdfRowHeight),
+      'Access-Control-Expose-Headers': 'X-Prepared-Containers,X-Kept-Reports,X-Pdf-Pages,X-Extra-Pdfshift-Breaks,X-Pdf-Row-Height'
+    });
+
+    console.log(`📊 pdf-debug for schedule ${id}: ${preparedContainerCount} containers → ${pdfPageCount} PDF pages (${extraBreaks > 0 ? '+'+extraBreaks+' PDFShift extra breaks' : 'clean'})`);
+    res.send(pdfBuffer);
+
+  } catch (error) {
+    console.error('❌ pdf-debug error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * GET /api/report-schedules/:id/html-debug
+ * Fetch the raw HTML the email path would generate, run it through prepareReportHtml,
+ * and return stats + HTML artifacts for comparison with the browser download path.
+ * Query params:
+ *   reportDate  - optional YYYY-MM-DD date (defaults to latest)
+ *   includeHtml - set to "true" to include raw/prepared HTML strings in the response
+ */
+router.get('/report-schedules/:id/html-debug', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reportDate, includeHtml } = req.query;
+
+    let schedule;
+    if (!emailConfigService.isAvailable()) {
+      schedule = mockEmailData.getMockReportSchedule(parseInt(id));
+    } else {
+      schedule = await emailConfigService.getReportSchedule(parseInt(id));
+    }
+
+    if (!schedule) {
+      return res.status(404).json({ error: 'Report schedule not found' });
+    }
+
+    const pdfRowHeight = await getPdfRowHeightSetting();
+    const resolvedDate = await scheduleReportService.resolveReportDate(
+      reportDate || null,
+      bigQueryServiceInstance
+    );
+
+    const htmlContent = await scheduleReportService.fetchScheduleReportHtml(schedule, {
+      entityId: scheduleReportService.getScheduleEntity(schedule).entityId,
+      reportDate: scheduleReportService.normalizeReportDateValue(resolvedDate)
+    });
+
+    const prepared = pnlPdfServer.prepareReportHtml(htmlContent, { pdfRowHeight });
+
+    function countContainers(html) {
+      return (String(html).match(/pnl-report-container/g) || []).length;
+    }
+
+    function getContainerStats(html) {
+      const doc = (() => {
+        try {
+          const { JSDOM } = require('jsdom');
+          return new JSDOM(`<div id="root">${html}</div>`).window.document;
+        } catch (e) {
+          return null;
+        }
+      })();
+      if (!doc) return [];
+      return Array.from(doc.querySelectorAll('.pnl-report-container')).map(c => {
+        const title = (c.querySelector('.pnl-title')?.textContent || '').trim();
+        const rows = c.querySelectorAll('tbody tr').length;
+        return { title, bodyRows: rows };
+      });
+    }
+
+    const rawContainerCount = countContainers(htmlContent);
+    const preparedContainerCount = countContainers(prepared.html);
+    const preparedStats = getContainerStats(prepared.html);
+
+    const response = {
+      scheduleId: id,
+      templateName: schedule.template_name,
+      templateType: schedule.template_type,
+      reportDate: resolvedDate,
+      pdfRowHeight,
+      rawHtmlLength: htmlContent.length,
+      preparedHtmlLength: prepared.html.length,
+      rawContainerCount,
+      preparedContainerCount,
+      keptReportCount: prepared.keptCount,
+      preparedContainers: preparedStats
+    };
+
+    if (includeHtml === 'true') {
+      response.rawHtml = htmlContent;
+      response.preparedHtml = prepared.html;
+    }
+
+    res.json(response);
+  } catch (error) {
+    console.error('❌ html-debug error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
 
 /**
  * POST /api/report-schedules/:id/process

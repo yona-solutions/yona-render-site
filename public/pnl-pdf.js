@@ -314,7 +314,7 @@
     const pdfshiftHorizontalMarginPx = 40;
     const footerHeightPx = 10;
     const bodyHorizontalPaddingPx = 40;
-    const bottomPageMarginPx = 0;
+    const bottomPageMarginPx = 5;
 
     return {
       viewportWidthPx: (8.5 * 96) - pdfshiftHorizontalMarginPx,
@@ -551,7 +551,7 @@
 
     @page {
       size: letter portrait;
-      margin: 0;
+      margin: 0 0 5px 0;
     }
 
     body {
