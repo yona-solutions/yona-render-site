@@ -113,6 +113,8 @@ function normalizeEmailTemplateType(value) {
   switch (normalized) {
     case 'district':
       return 'district';
+    case 'region':
+      return 'region';
     case 'multiple_districts':
     case 'multi_district':
     case 'multi_districts':
@@ -132,6 +134,19 @@ function getReportGroupKind(schedule = {}) {
   return normalizeEmailTemplateType(schedule?.email_template_type);
 }
 
+function getScheduleFieldValue(schedule = {}, fieldName) {
+  const primaryReport = getPrimaryReport(schedule);
+  return String(
+    primaryReport?.[fieldName]
+      || schedule?.[fieldName]
+      || ''
+  ).trim();
+}
+
+function getRegionName(schedule = {}) {
+  return getScheduleFieldValue(schedule, 'region_name') || '';
+}
+
 function getEntityName(schedule = {}) {
   const scheduleName = stripScheduleIndex(schedule?.name || schedule?.template_name || '');
   const subsidiaryMatch = scheduleName.match(/^(.*?)\s*-\s*Subsidiary\s*\((Dietary Only|All)\)$/i);
@@ -149,7 +164,9 @@ function getEntityName(schedule = {}) {
   }
 
   const primaryReport = getPrimaryReport(schedule);
-  const fallbackName = primaryReport?.header_subsidiary_name
+  const fallbackName = primaryReport?.region_name
+    || schedule?.region_name
+    || primaryReport?.header_subsidiary_name
     || primaryReport?.subsidiary_name
     || schedule?.header_subsidiary_name
     || schedule?.subsidiary_name
@@ -200,6 +217,7 @@ function buildReportEmailMessage(schedule, recipient, reportDate) {
       || schedule?.template_name
       || ''
   );
+  const regionName = getRegionName(schedule) || getEntityName(schedule) || 'Region';
   const entityName = getEntityName(schedule) || 'Yona';
 
   let subject;
@@ -211,6 +229,11 @@ function buildReportEmailMessage(schedule, recipient, reportDate) {
       subject = `${monthYear} Financial Reports - ${districtManager}`;
       secondParagraph = `Attached are the ${escapeHtml(monthOnly)} Financial Reports for your District.`;
       secondParagraphText = `Attached are the ${monthOnly} Financial Reports for your District.`;
+      break;
+    case 'region':
+      subject = `${monthYear} Financial Reports - ${regionName}`;
+      secondParagraph = `Attached are the ${escapeHtml(monthOnly)} Financial Reports for ${escapeHtml(regionName)}.`;
+      secondParagraphText = `Attached are the ${monthOnly} Financial Reports for ${regionName}.`;
       break;
     case 'multiple_districts':
       subject = `${monthYear} Financial Reports - ${entityName}`;
@@ -285,6 +308,11 @@ function buildAttachmentFilename(schedule, reportDate, reportOverride = null) {
         || ''
     );
     return `${districtNumber} - ${districtManager} (${monthYear}).pdf`;
+  }
+
+  if (reportGroupKind === 'region' || (reportOverride && reportOverride.template_type === 'region')) {
+    const regionName = getRegionName(reportOverride || schedule) || getEntityName(schedule) || 'Region';
+    return `${regionName} (${monthYear}).pdf`;
   }
 
   const entityName = getEntityName(schedule) || stripScheduleIndex(schedule?.name || schedule?.template_name || 'Report');

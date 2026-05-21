@@ -2214,6 +2214,7 @@
               <select id="reportGroupEmailTemplateType" required>
                 <option value="">Select template type...</option>
                 <option value="district">District</option>
+                <option value="region">Region</option>
                 <option value="multiple_districts">Multiple Districts</option>
                 <option value="subsidiary_dietary">Subsidiary (Dietary Only)</option>
                 <option value="subsidiary">Subsidiary (All)</option>
@@ -5994,6 +5995,8 @@
       switch (normalized) {
         case 'district':
           return 'district';
+        case 'region':
+          return 'region';
         case 'multiple_districts':
         case 'multi_district':
         case 'multi_districts':
@@ -6013,6 +6016,8 @@
       switch (normalizeEmailTemplateType(value)) {
         case 'district':
           return 'District';
+        case 'region':
+          return 'Region';
         case 'multiple_districts':
           return 'Multiple Districts';
         case 'subsidiary_dietary':

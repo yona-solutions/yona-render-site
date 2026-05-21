@@ -114,6 +114,20 @@
       font-size: 14px;
     }
 
+    .header p + p {
+      margin-top: 8px;
+    }
+
+    .header a {
+      color: #2d4a68;
+      font-weight: 600;
+      text-decoration: none;
+    }
+
+    .header a:hover {
+      text-decoration: underline;
+    }
+
     .content {
       padding: 25px 35px;
     }
@@ -266,6 +280,7 @@
     <div class="header">
       <h1>Email Templates</h1>
       <p>Simple reference for what each template type sends.</p>
+      <p>Create or edit report groups from <a href="/email-config">Email Config</a>; this page is reference-only.</p>
     </div>
 
     <div class="content">
@@ -312,6 +327,58 @@ Yona Finance Team</div>
                 <div class="template-value">Hi John,
 
 Attached are the April Financial Reports for your District.
+
+Please let us know of any questions.
+
+Thank you,
+Yona Finance Team</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="template-card" data-template-card>
+          <div class="template-card-header">
+            <h2>Region</h2>
+            <button class="template-toggle" type="button" onclick="toggleTemplateExample(this)" aria-expanded="false">
+              <span>Example</span>
+              <span class="template-toggle-icon">▶</span>
+            </button>
+          </div>
+          <div class="template-field">
+            <span class="template-label">Subject</span>
+            <div class="template-value">{MONTH} {YEAR} Financial Reports - {REGION NAME}</div>
+          </div>
+          <div class="template-field">
+            <span class="template-label">Attachment Text</span>
+            <div class="template-value">{REGION NAME} ({MONTH} {YEAR})</div>
+          </div>
+          <div class="template-field">
+            <span class="template-label">Body Text</span>
+            <div class="template-value">Hi {FIRST NAME},
+
+Attached are the {MONTH} Financial Reports for {REGION NAME}.
+
+Please let us know of any questions.
+
+Thank you,
+Yona Finance Team</div>
+          </div>
+          <div class="template-example">
+            <div class="template-example-inner">
+              <div class="template-field">
+                <span class="template-label">Example Subject</span>
+                <div class="template-value">April 2026 Financial Reports - R100</div>
+              </div>
+              <div class="template-field">
+                <span class="template-label">Example Attachment Text</span>
+                <div class="template-value">R100 (April 2026)</div>
+              </div>
+              <div class="template-field">
+                <span class="template-label">Example Body Text</span>
+                <div class="template-value">Hi Jamie,
+
+Attached are the April Financial Reports for R100.
 
 Please let us know of any questions.
 

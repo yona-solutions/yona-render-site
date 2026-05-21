@@ -307,6 +307,15 @@ function validateReportGroupPayload(groupData) {
     }
   }
 
+  if (groupData.email_template_type === 'region') {
+    if (groupData.reports.length !== 1) {
+      return 'Region email template type requires exactly one attached P&L';
+    }
+    if (groupData.reports[0]?.template_type !== 'region') {
+      return 'Region email template type requires a region P&L';
+    }
+  }
+
   if (groupData.email_template_type === 'multiple_districts') {
     if (groupData.reports.length < 2) {
       return 'Multiple Districts email template type requires at least two attached P&Ls';
