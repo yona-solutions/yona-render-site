@@ -129,6 +129,8 @@ async function createApp() {
           ADD COLUMN IF NOT EXISTS apply_subsidiary_filter_to_detail BOOLEAN NOT NULL DEFAULT FALSE,
           ADD COLUMN IF NOT EXISTS service_filter_id VARCHAR(255),
           ADD COLUMN IF NOT EXISTS service_filter_name VARCHAR(255),
+          ADD COLUMN IF NOT EXISTS customer_tag_filter_id VARCHAR(255),
+          ADD COLUMN IF NOT EXISTS customer_tag_filter_name VARCHAR(255),
           ADD COLUMN IF NOT EXISTS header_subsidiary_id VARCHAR(255),
           ADD COLUMN IF NOT EXISTS header_subsidiary_name VARCHAR(255),
           ADD COLUMN IF NOT EXISTS customer_tag_id VARCHAR(255),
@@ -211,6 +213,8 @@ async function createApp() {
             apply_subsidiary_filter_to_detail BOOLEAN NOT NULL DEFAULT FALSE,
             service_filter_id VARCHAR(255),
             service_filter_name VARCHAR(255),
+            customer_tag_filter_id VARCHAR(255),
+            customer_tag_filter_name VARCHAR(255),
             header_subsidiary_id VARCHAR(255),
             header_subsidiary_name VARCHAR(255),
             district_id VARCHAR(255),
@@ -230,7 +234,21 @@ async function createApp() {
 
         await emailConfigService.pool.query(`
           ALTER TABLE report_schedule_reports
-          ADD COLUMN IF NOT EXISTS apply_subsidiary_filter_to_detail BOOLEAN NOT NULL DEFAULT FALSE
+          ADD COLUMN IF NOT EXISTS apply_subsidiary_filter_to_detail BOOLEAN NOT NULL DEFAULT FALSE,
+          ADD COLUMN IF NOT EXISTS service_filter_id VARCHAR(255),
+          ADD COLUMN IF NOT EXISTS service_filter_name VARCHAR(255),
+          ADD COLUMN IF NOT EXISTS customer_tag_filter_id VARCHAR(255),
+          ADD COLUMN IF NOT EXISTS customer_tag_filter_name VARCHAR(255),
+          ADD COLUMN IF NOT EXISTS header_subsidiary_id VARCHAR(255),
+          ADD COLUMN IF NOT EXISTS header_subsidiary_name VARCHAR(255),
+          ADD COLUMN IF NOT EXISTS district_id VARCHAR(255),
+          ADD COLUMN IF NOT EXISTS district_name VARCHAR(255),
+          ADD COLUMN IF NOT EXISTS region_id VARCHAR(255),
+          ADD COLUMN IF NOT EXISTS region_name VARCHAR(255),
+          ADD COLUMN IF NOT EXISTS subsidiary_id VARCHAR(255),
+          ADD COLUMN IF NOT EXISTS subsidiary_name VARCHAR(255),
+          ADD COLUMN IF NOT EXISTS customer_tag_id VARCHAR(255),
+          ADD COLUMN IF NOT EXISTS customer_tag_name VARCHAR(255)
         `);
 
         await emailConfigService.pool.query(`

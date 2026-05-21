@@ -382,6 +382,8 @@ class EmailConfigService {
       apply_subsidiary_filter_to_detail: Boolean(data.apply_subsidiary_filter_to_detail),
       service_filter_id: data.service_filter_id || null,
       service_filter_name: data.service_filter_name || null,
+      customer_tag_filter_id: data.customer_tag_filter_id || null,
+      customer_tag_filter_name: data.customer_tag_filter_name || null,
       header_subsidiary_id: data.header_subsidiary_id || null,
       header_subsidiary_name: data.header_subsidiary_name || null,
       district_id: data.district_id || null,
@@ -408,6 +410,8 @@ class EmailConfigService {
       apply_subsidiary_filter_to_detail: Boolean(row.apply_subsidiary_filter_to_detail),
       service_filter_id: row.service_filter_id || null,
       service_filter_name: row.service_filter_name || null,
+      customer_tag_filter_id: row.customer_tag_filter_id || null,
+      customer_tag_filter_name: row.customer_tag_filter_name || null,
       header_subsidiary_id: row.header_subsidiary_id || null,
       header_subsidiary_name: row.header_subsidiary_name || null,
       district_id: row.district_id || null,
@@ -454,6 +458,8 @@ class EmailConfigService {
       ),
       service_filter_id: primaryReport.service_filter_id || data.service_filter_id || null,
       service_filter_name: primaryReport.service_filter_name || data.service_filter_name || null,
+      customer_tag_filter_id: primaryReport.customer_tag_filter_id || data.customer_tag_filter_id || null,
+      customer_tag_filter_name: primaryReport.customer_tag_filter_name || data.customer_tag_filter_name || null,
       header_subsidiary_id: primaryReport.header_subsidiary_id || data.header_subsidiary_id || null,
       header_subsidiary_name: primaryReport.header_subsidiary_name || data.header_subsidiary_name || null,
       district_id: primaryReport.district_id || data.district_id || null,
@@ -523,6 +529,8 @@ class EmailConfigService {
         apply_subsidiary_filter_to_detail,
         service_filter_id,
         service_filter_name,
+        customer_tag_filter_id,
+        customer_tag_filter_name,
         header_subsidiary_id,
         header_subsidiary_name,
         district_id,
@@ -536,7 +544,8 @@ class EmailConfigService {
       )
       VALUES (
         $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-        $11, $12, $13, $14, $15, $16, $17, $18
+        $11, $12, $13, $14, $15, $16, $17, $18,
+        $19, $20
       )
     `;
 
@@ -550,6 +559,8 @@ class EmailConfigService {
         Boolean(report.apply_subsidiary_filter_to_detail),
         report.service_filter_id || null,
         report.service_filter_name || null,
+        report.customer_tag_filter_id || null,
+        report.customer_tag_filter_name || null,
         report.header_subsidiary_id || null,
         report.header_subsidiary_name || null,
         report.district_id || null,
@@ -652,6 +663,7 @@ class EmailConfigService {
           tags,
           apply_subsidiary_filter_to_detail,
           service_filter_id, service_filter_name,
+          customer_tag_filter_id, customer_tag_filter_name,
           header_subsidiary_id, header_subsidiary_name,
           district_id, district_name, region_id, region_name,
           subsidiary_id, subsidiary_name, customer_tag_id, customer_tag_name,
@@ -660,7 +672,7 @@ class EmailConfigService {
         )
         VALUES (
           $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
-          $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25
+          $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27
         )
         RETURNING id
       `;
@@ -674,6 +686,8 @@ class EmailConfigService {
         Boolean(scheduleRecord.apply_subsidiary_filter_to_detail),
         scheduleRecord.service_filter_id,
         scheduleRecord.service_filter_name,
+        scheduleRecord.customer_tag_filter_id,
+        scheduleRecord.customer_tag_filter_name,
         scheduleRecord.header_subsidiary_id,
         scheduleRecord.header_subsidiary_name,
         scheduleRecord.district_id,
@@ -762,25 +776,27 @@ class EmailConfigService {
           apply_subsidiary_filter_to_detail = $6,
           service_filter_id = $7,
           service_filter_name = $8,
-          header_subsidiary_id = $9,
-          header_subsidiary_name = $10,
-          district_id = $11,
-          district_name = $12,
-          region_id = $13,
-          region_name = $14,
-          subsidiary_id = $15,
-          subsidiary_name = $16,
-          customer_tag_id = $17,
-          customer_tag_name = $18,
-          email_group_id = $19,
-          email_group_ids = $20,
-          frequency = $21,
-          day_of_week = $22,
-          day_of_month = $23,
-          time_of_day = $24,
-          enabled = $25,
+          customer_tag_filter_id = $9,
+          customer_tag_filter_name = $10,
+          header_subsidiary_id = $11,
+          header_subsidiary_name = $12,
+          district_id = $13,
+          district_name = $14,
+          region_id = $15,
+          region_name = $16,
+          subsidiary_id = $17,
+          subsidiary_name = $18,
+          customer_tag_id = $19,
+          customer_tag_name = $20,
+          email_group_id = $21,
+          email_group_ids = $22,
+          frequency = $23,
+          day_of_week = $24,
+          day_of_month = $25,
+          time_of_day = $26,
+          enabled = $27,
           updated_at = CURRENT_TIMESTAMP
-        WHERE id = $26
+        WHERE id = $28
       `;
 
       await client.query(updateQuery, [
@@ -792,6 +808,8 @@ class EmailConfigService {
         Boolean(scheduleRecord.apply_subsidiary_filter_to_detail),
         scheduleRecord.service_filter_id,
         scheduleRecord.service_filter_name,
+        scheduleRecord.customer_tag_filter_id,
+        scheduleRecord.customer_tag_filter_name,
         scheduleRecord.header_subsidiary_id,
         scheduleRecord.header_subsidiary_name,
         scheduleRecord.district_id,

@@ -1283,13 +1283,32 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
         }
         
         // Get customers in this region from dim_customers (optionally filtered by subsidiary)
-        const customersInRegion = await bigQueryService.getCustomersInRegion(regionId, subsidiaryId);
+        let customersInRegion = await bigQueryService.getCustomersInRegion(regionId, subsidiaryId);
         
         if (customersInRegion.length === 0) {
           return res.status(404).json({ 
             error: 'No customers found for selected region/subsidiary combination',
             code: 'NO_CUSTOMERS_FOUND'
           });
+        }
+
+        // Optional customer tag filter (region hierarchy only)
+        const customerTagFilter = req.query.customerTagFilter;
+        if (customerTagFilter && customerTagFilter !== 'all') {
+          const customerTagResult = await storageService.getCustomersForCustomerTag(customerTagFilter);
+          const tagCustomerIds = new Set(customerTagResult.customers.map(c => c.customer_internal_id));
+          customersInRegion = customersInRegion.filter(c => tagCustomerIds.has(c.customer_internal_id));
+
+          if (customersInRegion.length === 0) {
+            return res.status(404).json({
+              error: 'No customers found for selected customer tag within region',
+              code: 'NO_CUSTOMERS_FOUND'
+            });
+          }
+
+          queryParams.customerTagFilter = customerTagFilter;
+          queryParams.customerTagFilterName = customerTagResult.customerTagName;
+          console.log(`   🏷️ Applying customer tag filter: ${customerTagResult.customerTagName} (${customersInRegion.length} customers)`);
         }
         
         // Group customers by their parent district
@@ -1520,30 +1539,73 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
         //
         // QUERY HIERARCHY (same principle as subsidiary tab — see header comment above):
         //   Region   →  WHERE region_internal_id = @regionId [AND subsidiary_internal_id = @subsidiaryId]
+        //             or customer_internal_id IN UNNEST(@customerIds) when customer-tag filtered
         //   District →  WHERE customer_internal_id IN UNNEST(@customerIds)
         //   Facility →  WHERE customer_internal_id IN UNNEST(@customerIds)
         //
-        // Always query region summary directly by region_internal_id. Do NOT
-        // substitute customer-level data — formula accounts will be incorrect.
+        // Without a customer-tag filter, query region summary directly by
+        // region_internal_id. With a customer-tag filter, intentionally switch
+        // to customer-level queries so the summary reflects only the tagged subset.
 
-        // 1. Generate region summary P&L (always filtered by region_internal_id)
+        const hasCustomerTagFilter = Boolean(queryParams.customerTagFilterName);
+        const regionCustomerIds = queryParams.allowedCustomerIds;
+
+        // 1. Generate region summary P&L
         console.log('   Querying BigQuery for region summary (Month + YTD)...');
-        const regionData = await bigQueryService.getPLData({
-          hierarchy: 'region',
-          regionId: queryParams.regionId,
-          subsidiaryId: queryParams.subsidiaryId,
-          date,
-          accountConfig,
-          ytd: false
-        });
-        const regionYtdData = await bigQueryService.getPLData({
-          hierarchy: 'region',
-          regionId: queryParams.regionId,
-          subsidiaryId: queryParams.subsidiaryId,
-          date,
-          accountConfig,
-          ytd: true
-        });
+        const regionDataRaw = await bigQueryService.getPLData(
+          hasCustomerTagFilter
+            ? {
+                hierarchy: 'district',
+                customerIds: regionCustomerIds,
+                subsidiaryId: queryParams.subsidiaryId || null,
+                date,
+                accountConfig,
+                ytd: false
+              }
+            : {
+                hierarchy: 'region',
+                regionId: queryParams.regionId,
+                subsidiaryId: queryParams.subsidiaryId,
+                date,
+                accountConfig,
+                ytd: false
+              }
+        );
+        const regionYtdDataRaw = await bigQueryService.getPLData(
+          hasCustomerTagFilter
+            ? {
+                hierarchy: 'district',
+                customerIds: regionCustomerIds,
+                subsidiaryId: queryParams.subsidiaryId || null,
+                date,
+                accountConfig,
+                ytd: true
+              }
+            : {
+                hierarchy: 'region',
+                regionId: queryParams.regionId,
+                subsidiaryId: queryParams.subsidiaryId,
+                date,
+                accountConfig,
+                ytd: true
+              }
+        );
+        const regionData = hasCustomerTagFilter
+          ? accountService.filterDataByCustomers(
+              regionDataRaw,
+              regionCustomerIds,
+              queryParams.regionId,
+              queryParams.subsidiaryId
+            )
+          : regionDataRaw;
+        const regionYtdData = hasCustomerTagFilter
+          ? accountService.filterDataByCustomers(
+              regionYtdDataRaw,
+              regionCustomerIds,
+              queryParams.regionId,
+              queryParams.subsidiaryId
+            )
+          : regionYtdDataRaw;
         
         const regionCustomersForCensus = uniqueCustomersById(
           queryParams.districtGroups.flatMap(group => group.customers)
@@ -1565,6 +1627,9 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
         applyOrgLabel(regionMeta, orgLabel);
         if (queryParams.subsidiaryFilterName) {
           regionMeta.subsidiaryFilterName = queryParams.subsidiaryFilterName;
+        }
+        if (queryParams.customerTagFilterName) {
+          regionMeta.customerTagFilterName = queryParams.customerTagFilterName;
         }
         
         console.log('   Generating region summary P&L (header will be updated with actual counts)...');

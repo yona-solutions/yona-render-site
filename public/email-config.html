@@ -2338,6 +2338,14 @@
               </select>
             </div>
 
+            <div class="form-group" id="editCustomerTagFilterGroup" style="display: none;">
+              <label for="editCustomerTagFilterId">Customer Tag Filter</label>
+              <select id="editCustomerTagFilterId">
+                <option value="">No customer tag filter</option>
+              </select>
+              <div class="form-help">Optional: filter region reports by customer tag, matching the P&amp;L page.</div>
+            </div>
+
             <div class="form-group" id="editCustomerTagGroup">
               <label for="editCustomerTagId">Customer Tag <span style="color: #e53e3e;">*</span></label>
               <select id="editCustomerTagId" onchange="onEditEntityChange('customerTag')">
@@ -3114,7 +3122,8 @@
             (report.district_name || '').toLowerCase().includes(entityFilter) ||
             (report.region_name || '').toLowerCase().includes(entityFilter) ||
             (report.subsidiary_name || '').toLowerCase().includes(entityFilter) ||
-            (report.customer_tag_name || '').toLowerCase().includes(entityFilter)
+            (report.customer_tag_name || '').toLowerCase().includes(entityFilter) ||
+            (report.customer_tag_filter_name || '').toLowerCase().includes(entityFilter)
           );
           if (!entityMatch) return false;
         }
@@ -3811,6 +3820,7 @@
       document.getElementById('editDistrictId').value = schedule.district_id || '';
       document.getElementById('editRegionId').value = schedule.region_id || '';
       document.getElementById('editCustomerTagId').value = schedule.customer_tag_id || '';
+      document.getElementById('editCustomerTagFilterId').value = schedule.customer_tag_filter_id || '';
       document.getElementById('editSubsidiaryId').value = schedule.subsidiary_id || '';
       document.getElementById('editServiceFilterId').value = schedule.service_filter_id || '';
       document.getElementById('editApplySubsidiaryFilterToDetail').checked = Boolean(schedule.apply_subsidiary_filter_to_detail);
@@ -3848,6 +3858,7 @@
       document.getElementById('editDistrictId').value = '';
       document.getElementById('editRegionId').value = '';
       document.getElementById('editCustomerTagId').value = '';
+      document.getElementById('editCustomerTagFilterId').value = '';
       document.getElementById('editSubsidiaryId').value = '';
       document.getElementById('editServiceFilterId').value = '';
       document.getElementById('editApplySubsidiaryFilterToDetail').checked = false;
@@ -3875,6 +3886,7 @@
       const serviceFilterInput = document.getElementById('editServiceFilterId');
       const headerInput = document.getElementById('editHeaderSubsidiaryId');
       const customerTagInput = document.getElementById('editCustomerTagId');
+      const customerTagFilterInput = document.getElementById('editCustomerTagFilterId');
       if (serviceFilterInput) {
         serviceFilterInput.value = '';
       }
@@ -3883,6 +3895,9 @@
       }
       if (customerTagInput) {
         customerTagInput.value = '';
+      }
+      if (customerTagFilterInput) {
+        customerTagFilterInput.value = '';
       }
       isScheduleTagInputFocused = false;
       isScheduleTagPickerOpen = false;
@@ -3914,6 +3929,10 @@
       return templateType === 'region' || templateType === 'district';
     }
 
+    function supportsCustomerTagFilter(templateType) {
+      return templateType === 'region';
+    }
+
     function buildScheduleDataUrl(schedule, entityId, reportDate) {
       const params = new URLSearchParams({
         hierarchy: schedule.template_type,
@@ -3928,6 +3947,10 @@
 
       if (supportsSubsidiaryFilter(schedule.template_type) && schedule.subsidiary_id) {
         params.set('subsidiaryFilter', schedule.subsidiary_id);
+      }
+
+      if (supportsCustomerTagFilter(schedule.template_type) && schedule.customer_tag_filter_id) {
+        params.set('customerTagFilter', schedule.customer_tag_filter_id);
       }
 
       if (schedule.template_type === 'subsidiary' && schedule.service_filter_id) {
@@ -3958,6 +3981,11 @@
         document.getElementById('editCustomerTagId'),
         customerTagOptions,
         'Select customer tag...'
+      );
+      populateSelectOptions(
+        document.getElementById('editCustomerTagFilterId'),
+        customerTagOptions,
+        'No customer tag filter'
       );
       populateSelectOptions(
         document.getElementById('editSubsidiaryId'),
@@ -4073,6 +4101,7 @@
       const districtSelect = document.getElementById('editDistrictId');
       const regionSelect = document.getElementById('editRegionId');
       const customerTagSelect = document.getElementById('editCustomerTagId');
+      const customerTagFilterSelect = document.getElementById('editCustomerTagFilterId');
       const subsidiarySelect = document.getElementById('editSubsidiaryId');
       const serviceFilterSelect = document.getElementById('editServiceFilterId');
       const subsidiarySummaryFilterCheckbox = document.getElementById('editApplySubsidiaryFilterToDetail');
@@ -4081,6 +4110,7 @@
       const districtGroup = document.getElementById('editDistrictGroup');
       const regionGroup = document.getElementById('editRegionGroup');
       const customerTagGroup = document.getElementById('editCustomerTagGroup');
+      const customerTagFilterGroup = document.getElementById('editCustomerTagFilterGroup');
       const serviceFilterGroup = document.getElementById('editServiceFilterGroup');
       const subsidiarySummaryFilterGroup = document.getElementById('editSubsidiarySummaryFilterGroup');
       const headerSubsidiaryGroup = document.getElementById('editHeaderSubsidiaryGroup');
@@ -4095,10 +4125,12 @@
       const isSubsidiary = type === 'subsidiary';
       const isCustomerTag = type === 'customer_tag';
       const hasOptionalSubsidiaryFilter = supportsSubsidiaryFilter(type);
+      const hasOptionalCustomerTagFilter = supportsCustomerTagFilter(type);
 
       districtGroup.style.display = isDistrict ? 'block' : 'none';
       regionGroup.style.display = isRegion ? 'block' : 'none';
       customerTagGroup.style.display = isCustomerTag ? 'block' : 'none';
+      customerTagFilterGroup.style.display = hasOptionalCustomerTagFilter ? 'block' : 'none';
       serviceFilterGroup.style.display = isSubsidiary ? 'block' : 'none';
       subsidiarySummaryFilterGroup.style.display = isSubsidiary ? 'block' : 'none';
       headerSubsidiaryGroup.style.display = type ? 'block' : 'none';
@@ -4106,6 +4138,7 @@
       districtSelect.disabled = !isDistrict;
       regionSelect.disabled = !isRegion;
       customerTagSelect.disabled = !isCustomerTag;
+      customerTagFilterSelect.disabled = !hasOptionalCustomerTagFilter;
       subsidiarySelect.disabled = !(hasOptionalSubsidiaryFilter || isSubsidiary);
       serviceFilterSelect.disabled = !isSubsidiary;
       subsidiarySummaryFilterCheckbox.disabled = !isSubsidiary;
@@ -4132,6 +4165,7 @@
         if (!isDistrict) districtSelect.value = '';
         if (!isRegion) regionSelect.value = '';
         if (!isCustomerTag) customerTagSelect.value = '';
+        if (!hasOptionalCustomerTagFilter) customerTagFilterSelect.value = '';
         if (!isSubsidiary) serviceFilterSelect.value = '';
         if (!isSubsidiary) subsidiarySummaryFilterCheckbox.checked = false;
         if ((previousType === 'subsidiary') !== isSubsidiary) {
@@ -4931,6 +4965,9 @@
       ];
       if (supportsSubsidiaryFilter(schedule.template_type) && schedule.subsidiary_name) {
         detailParts.push(`subsidiary filter: ${schedule.subsidiary_name}`);
+      }
+      if (supportsCustomerTagFilter(schedule.template_type) && schedule.customer_tag_filter_name) {
+        detailParts.push(`customer tag filter: ${schedule.customer_tag_filter_name}`);
       }
       if (schedule.template_type === 'subsidiary' && schedule.service_filter_name) {
         detailParts.push(`service: ${schedule.service_filter_name}`);
@@ -6075,6 +6112,8 @@
                 customer_tag_name: group.customer_tag_name,
                 service_filter_id: group.service_filter_id,
                 service_filter_name: group.service_filter_name,
+                customer_tag_filter_id: group.customer_tag_filter_id,
+                customer_tag_filter_name: group.customer_tag_filter_name,
                 header_subsidiary_id: group.header_subsidiary_id,
                 header_subsidiary_name: group.header_subsidiary_name
               })].filter(Boolean)
@@ -6117,6 +6156,8 @@
         customer_tag_name: report.customer_tag_name || null,
         service_filter_id: report.service_filter_id || null,
         service_filter_name: report.service_filter_name || null,
+        customer_tag_filter_id: report.customer_tag_filter_id || null,
+        customer_tag_filter_name: report.customer_tag_filter_name || null,
         header_subsidiary_id: report.header_subsidiary_id || null,
         header_subsidiary_name: report.header_subsidiary_name || null
       };
@@ -6152,6 +6193,8 @@
         customer_tag_name: null,
         service_filter_id: null,
         service_filter_name: null,
+        customer_tag_filter_id: null,
+        customer_tag_filter_name: null,
         header_subsidiary_id: null,
         header_subsidiary_name: null
       };
@@ -6184,6 +6227,9 @@
       const parts = [getTemplateTypeLabel(report.template_type), entityDisplay, processLabel];
       if (supportsSubsidiaryFilter(report.template_type) && report.subsidiary_name) {
         parts.push(`Subsidiary Filter: ${report.subsidiary_name}`);
+      }
+      if (supportsCustomerTagFilter(report.template_type) && report.customer_tag_filter_name) {
+        parts.push(`Customer Tag Filter: ${report.customer_tag_filter_name}`);
       }
       if (report.template_type === 'subsidiary' && report.service_filter_name) {
         parts.push(`Service: ${report.service_filter_name}`);
@@ -6546,6 +6592,7 @@
       document.getElementById('editDistrictId').value = currentEditingSchedule.district_id || '';
       document.getElementById('editRegionId').value = currentEditingSchedule.region_id || '';
       document.getElementById('editCustomerTagId').value = currentEditingSchedule.customer_tag_id || '';
+      document.getElementById('editCustomerTagFilterId').value = currentEditingSchedule.customer_tag_filter_id || '';
       document.getElementById('editSubsidiaryId').value = currentEditingSchedule.subsidiary_id || '';
       document.getElementById('editServiceFilterId').value = currentEditingSchedule.service_filter_id || '';
       document.getElementById('editApplySubsidiaryFilterToDetail').checked = Boolean(currentEditingSchedule.apply_subsidiary_filter_to_detail);
@@ -6573,6 +6620,7 @@
       const districtSelect = document.getElementById('editDistrictId');
       const regionSelect = document.getElementById('editRegionId');
       const customerTagSelect = document.getElementById('editCustomerTagId');
+      const customerTagFilterSelect = document.getElementById('editCustomerTagFilterId');
       const subsidiarySelect = document.getElementById('editSubsidiaryId');
       const serviceFilterSelect = document.getElementById('editServiceFilterId');
       const subsidiarySummaryFilterCheckbox = document.getElementById('editApplySubsidiaryFilterToDetail');
@@ -6595,6 +6643,7 @@
       let regionId = null, regionName = null;
       let subsidiaryId = null, subsidiaryName = null;
       let customerTagId = null, customerTagName = null;
+      let customerTagFilterId = null, customerTagFilterName = null;
       let serviceFilterId = null, serviceFilterName = null;
       let applySubsidiaryFilterToDetail = false;
       let headerSubsidiaryId = null, headerSubsidiaryName = null;
@@ -6615,6 +6664,12 @@
         if (regionId) {
           const option = getOptionById(regionOptions, regionId);
           regionName = option ? option.label : null;
+        }
+
+        customerTagFilterId = customerTagFilterSelect.value || null;
+        if (customerTagFilterId) {
+          const option = getOptionById(customerTagOptions, customerTagFilterId);
+          customerTagFilterName = option ? option.label : null;
         }
 
         subsidiaryId = subsidiarySelect.value || null;
@@ -6678,6 +6733,8 @@
         apply_subsidiary_filter_to_detail: applySubsidiaryFilterToDetail,
         service_filter_id: serviceFilterId,
         service_filter_name: serviceFilterName,
+        customer_tag_filter_id: customerTagFilterId,
+        customer_tag_filter_name: customerTagFilterName,
         header_subsidiary_id: headerSubsidiaryId,
         header_subsidiary_name: headerSubsidiaryName,
         district_id: districtId,
@@ -6745,6 +6802,8 @@
           apply_subsidiary_filter_to_detail: Boolean(report.apply_subsidiary_filter_to_detail),
           service_filter_id: report.service_filter_id || null,
           service_filter_name: report.service_filter_name || null,
+          customer_tag_filter_id: report.customer_tag_filter_id || null,
+          customer_tag_filter_name: report.customer_tag_filter_name || null,
           header_subsidiary_id: report.header_subsidiary_id || null,
           header_subsidiary_name: report.header_subsidiary_name || null,
           district_id: report.district_id || null,

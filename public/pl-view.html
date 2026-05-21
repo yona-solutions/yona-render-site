@@ -1067,6 +1067,20 @@
           </div>
         </div>
 
+        <!-- Customer Tag Filter (only visible when Region tab is active) -->
+        <div class="control-group control-group-subsidiary" id="customerTagFilterGroup" style="display: none;">
+          <label class="control-label">Customer Tag</label>
+          <div class="searchable-select" id="customerTagFilterWrapper">
+            <input
+              type="text"
+              id="customerTagFilterInput"
+              placeholder="Optional: Filter by customer tag..."
+              readonly
+            />
+            <div class="searchable-select-dropdown" id="customerTagFilterDropdown"></div>
+          </div>
+        </div>
+
         <!-- Service Filter (only visible when Subsidiary tab is active) -->
         <div class="control-group control-group-subsidiary" id="serviceFilterGroup" style="display: none;">
           <label class="control-label">Service</label>
@@ -1314,7 +1328,7 @@
     // Initialize Page
     // ============================================
     
-    let monthSelect, districtSelect, subsidiaryFilterSelect, serviceFilterSelect, subsidiaryHeaderSelect;
+    let monthSelect, districtSelect, subsidiaryFilterSelect, customerTagFilterSelect, serviceFilterSelect, subsidiaryHeaderSelect;
 
     const HIERARCHY_CONFIG = {
       district: {
@@ -1327,7 +1341,8 @@
         endpoint: '/api/storage/regions',
         label: 'Region',
         placeholder: 'region',
-        filterMode: 'subsidiary'
+        filterMode: 'subsidiary',
+        showCustomerTagFilter: true
       },
       subsidiary: {
         endpoint: '/api/storage/departments',
@@ -1542,6 +1557,33 @@
         serviceFilterSelect.setOptions([], false);
       }
     }
+
+    /**
+     * Load customer tags for the region customer tag filter dropdown
+     */
+    async function loadCustomerTagsForFilter() {
+      try {
+        console.log('📡 Fetching customer tags for filter dropdown...');
+        const response = await authFetch('/api/storage/customer-tags');
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch customer tags');
+        }
+
+        const items = await response.json();
+        const options = items.map(item => ({
+          value: item.id,
+          label: item.label,
+          type: item.type
+        }));
+
+        customerTagFilterSelect.setOptions(options, false);
+        console.log(`✅ Loaded ${options.length} customer tags`);
+      } catch (error) {
+        console.error('Error loading customer tags for filter:', error);
+        customerTagFilterSelect.setOptions([], false);
+      }
+    }
     
     async function applyHierarchySelection(hierarchyType, hierarchyLabelText = null) {
       const hierarchyConfig = HIERARCHY_CONFIG[hierarchyType];
@@ -1564,9 +1606,11 @@
 
       // Show/hide filters based on hierarchy type
       const subsidiaryFilterGroup = document.getElementById('subsidiaryFilterGroup');
+      const customerTagFilterGroup = document.getElementById('customerTagFilterGroup');
       const serviceFilterGroup = document.getElementById('serviceFilterGroup');
       const subsidiaryDetailFilterGroup = document.getElementById('subsidiaryDetailFilterGroup');
       subsidiaryDetailFilterGroup.style.display = hierarchyConfig.showDetailSubsidiaryToggle ? 'flex' : 'none';
+      customerTagFilterGroup.style.display = hierarchyConfig.showCustomerTagFilter ? 'block' : 'none';
 
       if (hierarchyConfig.filterMode === 'subsidiary') {
         subsidiaryFilterGroup.style.display = 'block';
@@ -1583,6 +1627,12 @@
         serviceFilterGroup.style.display = 'none';
         subsidiaryFilterSelect.selectOption(null, '');
         serviceFilterSelect.selectOption(null, '');
+      }
+
+      if (hierarchyConfig.showCustomerTagFilter) {
+        await loadCustomerTagsForFilter();
+      } else {
+        customerTagFilterSelect.selectOption(null, '');
       }
 
       // Load the appropriate hierarchy data from API
@@ -1603,6 +1653,10 @@
       monthSelect = new SearchableSelect('monthSelectWrapper');
       districtSelect = new SearchableSelect('districtSelectWrapper');
       subsidiaryFilterSelect = new SearchableSelect('subsidiaryFilterWrapper', [], {
+        allowClear: true,
+        clearLabel: '— No filter —'
+      });
+      customerTagFilterSelect = new SearchableSelect('customerTagFilterWrapper', [], {
         allowClear: true,
         clearLabel: '— No filter —'
       });
@@ -1804,6 +1858,14 @@
           }
         }
 
+        if (hierarchy === 'region' && customerTagFilterSelect && customerTagFilterSelect.selectedValue) {
+          const customerTagFilter = customerTagFilterSelect.selectedValue;
+          if (customerTagFilter && customerTagFilter !== 'all') {
+            url += `&customerTagFilter=${encodeURIComponent(customerTagFilter)}`;
+            console.log(`   🏷️ Applying customer tag filter: ${customerTagFilterSelect.selectedLabel || customerTagFilter}`);
+          }
+        }
+
         // Add service filter if Subsidiary hierarchy and a service is selected
         if (hierarchy === 'subsidiary' && serviceFilterSelect && serviceFilterSelect.selectedValue) {
           const serviceFilter = serviceFilterSelect.selectedValue;
@@ -1956,6 +2018,9 @@
       }
       if (meta.subsidiaryFilterName) {
         metaInfoHtml += `<strong>Subsidiary Filter:</strong> ${escapeHtml(meta.subsidiaryFilterName)}<br>`;
+      }
+      if (meta.customerTagFilterName) {
+        metaInfoHtml += `<strong>Customer Tag Filter:</strong> ${escapeHtml(meta.customerTagFilterName)}<br>`;
       }
       if (Object.prototype.hasOwnProperty.call(meta, 'detailSubsidiaryFilterApplied')) {
         metaInfoHtml += `<strong>Detail Subsidiary Filter:</strong> ${meta.detailSubsidiaryFilterApplied ? 'On (District and Facility detail only)' : 'Off'}<br>`;
