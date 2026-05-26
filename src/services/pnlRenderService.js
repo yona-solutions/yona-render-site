@@ -116,6 +116,18 @@ function formatInteger(n) {
   return Math.round(Number(n)).toLocaleString();
 }
 
+function formatRegionHeaderTitle(entityName, customerTagFilterName) {
+  const baseName = String(entityName || '').trim();
+  const tagName = String(customerTagFilterName || '').trim();
+
+  if (!baseName || !tagName) {
+    return baseName;
+  }
+
+  const expectedSuffix = ` - ${tagName}`;
+  return baseName.endsWith(expectedSuffix) ? baseName : `${baseName}${expectedSuffix}`;
+}
+
 /**
  * Generates the HTML header for a P&L report
  * Header varies based on entity type (Subsidiary, Region, District, Facility)
@@ -140,7 +152,8 @@ function generateHeader(meta) {
     accountCount,
     orgLabel,
     reportTypeLabel,
-    regionStructure
+    regionStructure,
+    customerTagFilterName
   } = meta;
   
   const formattedMonth = formatMonthLabel(monthLabel);
@@ -248,9 +261,10 @@ function generateHeader(meta) {
       </div>
     `;
   } else if (typeLabel === 'Region') {
+    const regionTitle = formatRegionHeaderTitle(entityName, customerTagFilterName);
     return `
       <div class="pnl-report-header" style="text-align:center; margin-bottom:10px">
-        <div class="pnl-title" style="font-weight:700">${escapeHtml(entityName)}</div>
+        <div class="pnl-title" style="font-weight:700">${escapeHtml(regionTitle)}</div>
         <div class="pnl-subtitle" style="font-weight:700">${escapeHtml(organization)}</div>
         ${buildRow([
           formattedMonth,
