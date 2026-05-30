@@ -34,7 +34,7 @@ class BigQueryService {
    * Get available dates for the date filter
    * 
    * Fetches distinct month dates from the transactions summary table
-   * that are before the current month, ordered by date descending.
+   * that are on or before the current month, ordered by date descending.
    * 
    * @returns {Promise<Array<{time: string, formatted: string}>>} Array of available dates
    * @throws {Error} If BigQuery is not initialized or query fails
@@ -47,7 +47,7 @@ class BigQueryService {
     const query = `
       SELECT DISTINCT TIME_DATE AS TIME
       FROM \`${this.dataset}.fct_transactions_summary\`
-      WHERE TIME_DATE < DATE_TRUNC(CURRENT_DATE(), MONTH)
+      WHERE TIME_DATE <= DATE_TRUNC(CURRENT_DATE(), MONTH)
       ORDER BY TIME_DATE DESC
     `;
 

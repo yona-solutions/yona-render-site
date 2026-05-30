@@ -87,13 +87,30 @@ async function resolveReportDate(providedReportDate, bigQueryService) {
     return normalizeReportDateValue(providedReportDate);
   }
 
+  const getPreferredReportDate = (dates) => {
+    if (!Array.isArray(dates) || dates.length === 0) {
+      return null;
+    }
+
+    const now = new Date();
+    const previousMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const year = previousMonth.getFullYear();
+    const month = String(previousMonth.getMonth() + 1).padStart(2, '0');
+    const preferredValue = `${year}-${month}-01`;
+    const matchingDate = dates.find(date => (date.time || date.formatted) === preferredValue);
+
+    return matchingDate
+      ? (matchingDate.time || matchingDate.formatted)
+      : (dates[0].time || dates[0].formatted);
+  };
+
   if (bigQueryService) {
     const dates = await bigQueryService.getAvailableDates();
     if (!dates || !Array.isArray(dates) || dates.length === 0) {
       throw new Error('No P&L data available');
     }
 
-    return dates[0].time || dates[0].formatted;
+    return getPreferredReportDate(dates);
   }
 
   const datesResponse = await fetch(`${getApplicationBaseUrl()}/api/pl/dates`, {
@@ -110,7 +127,7 @@ async function resolveReportDate(providedReportDate, bigQueryService) {
     throw new Error('No P&L data available');
   }
 
-  return dates[0].time || dates[0].formatted;
+  return getPreferredReportDate(dates);
 }
 
 async function fetchScheduleReportHtmlFromStream(schedule, {

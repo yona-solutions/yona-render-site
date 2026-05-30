@@ -1372,6 +1372,14 @@
     function getSelectedSubsidiaryHeaderLabel() {
       return subsidiaryHeaderSelect?.selectedLabel?.trim() || '';
     }
+
+    function getPreferredMonthValue() {
+      const now = new Date();
+      const previousMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const year = previousMonth.getFullYear();
+      const month = String(previousMonth.getMonth() + 1).padStart(2, '0');
+      return `${year}-${month}-01`;
+    }
     
     /**
      * Load available dates from BigQuery and populate the month dropdown
@@ -1392,7 +1400,15 @@
           label: dateObj.formatted
         }));
         
-        monthSelect.setOptions(options);
+        monthSelect.setOptions(options, false);
+
+        const preferredValue = getPreferredMonthValue();
+        const preferredOption = options.find(option => option.value === preferredValue);
+        const defaultOption = preferredOption || options[0];
+
+        if (defaultOption) {
+          monthSelect.selectOption(defaultOption.value, defaultOption.label);
+        }
         
         console.log(`✅ Loaded ${dates.length} available dates`);
       } catch (error) {
@@ -1405,7 +1421,15 @@
           { value: '2025-10-01', label: '2025-10-01' },
           { value: '2025-09-01', label: '2025-09-01' }
         ];
-        monthSelect.setOptions(fallbackDates);
+        monthSelect.setOptions(fallbackDates, false);
+
+        const preferredValue = getPreferredMonthValue();
+        const preferredOption = fallbackDates.find(option => option.value === preferredValue);
+        const defaultOption = preferredOption || fallbackDates[0];
+
+        if (defaultOption) {
+          monthSelect.selectOption(defaultOption.value, defaultOption.label);
+        }
         console.warn('Using sample dates as fallback');
       }
     }

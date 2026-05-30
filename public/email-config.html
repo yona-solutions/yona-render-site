@@ -4949,10 +4949,11 @@
         const response = await authFetch('/api/pl/dates');
         if (response.ok) {
           const dates = await response.json();
-          monthSelect.innerHTML = dates.map((d, idx) => {
+          const selectedValue = getPreferredReportMonthOption(dates);
+          monthSelect.innerHTML = dates.map(d => {
             const date = new Date(d.time + 'T00:00:00');
             const label = date.toLocaleString('en-US', { month: 'long', year: 'numeric' });
-            return `<option value="${d.time}" ${idx === 0 ? 'selected' : ''}>${label}</option>`;
+            return `<option value="${d.time}" ${d.time === selectedValue ? 'selected' : ''}>${label}</option>`;
           }).join('');
         }
       } catch (error) {
@@ -5195,10 +5196,11 @@
         const response = await authFetch('/api/pl/dates');
         if (response.ok) {
           const dates = await response.json();
-          monthSelect.innerHTML = dates.map((d, idx) => {
+          const selectedValue = getPreferredReportMonthOption(dates);
+          monthSelect.innerHTML = dates.map(d => {
             const date = new Date(d.time + 'T00:00:00');
             const label = date.toLocaleString('en-US', { month: 'long', year: 'numeric' });
-            return `<option value="${d.time}" ${idx === 0 ? 'selected' : ''}>${label}</option>`;
+            return `<option value="${d.time}" ${d.time === selectedValue ? 'selected' : ''}>${label}</option>`;
           }).join('');
         }
       } catch (error) {
@@ -5561,6 +5563,16 @@
       return date.toLocaleString('en-US', { month: 'long', year: 'numeric' });
     }
 
+    function getPreferredReportMonthOption(dates) {
+      const preferredValue = getPreferredBatchMonthValue();
+      const matchingDate = Array.isArray(dates)
+        ? dates.find(date => (date.time || date.formatted) === preferredValue)
+        : null;
+      return matchingDate
+        ? (matchingDate.time || matchingDate.formatted)
+        : (dates?.[0]?.time || dates?.[0]?.formatted || preferredValue);
+    }
+
     function getPreferredBatchMonthValue() {
       const now = new Date();
       const previousMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
@@ -5617,7 +5629,7 @@
 
         const dates = await response.json();
         const preferredValue = getPreferredBatchMonthValue();
-        const fallbackValue = dates[0]?.time || dates[0]?.formatted || preferredValue;
+        const fallbackValue = getPreferredReportMonthOption(dates);
         const selectedValue = dates.some(date => (date.time || date.formatted) === preferredValue)
           ? preferredValue
           : fallbackValue;
