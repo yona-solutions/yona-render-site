@@ -294,6 +294,43 @@ async function generateCustomerSummaryAndFacilityReport({
  * @returns {Router} Configured Express router
  */
 function createApiRoutes(storageService, bigQueryService, pgPool) {
+  function setConfigGenerationHeader(res, generation) {
+    res.set('Cache-Control', 'no-store');
+    res.set('X-Config-Generation', String(generation ?? '0'));
+  }
+
+  async function getConfigGeneration(fileName) {
+    const { exists, metadata } = await storageService.getFile(fileName);
+    return exists ? String(metadata.generation) : '0';
+  }
+
+  async function sendConfigFile(res, fileName, options = {}) {
+    const { allowMissing = false, emptyValue = {} } = options;
+
+    try {
+      const { data, metadata } = await storageService.getFileAsJsonWithMetadata(fileName);
+      setConfigGenerationHeader(res, metadata.generation);
+      res.json(data);
+    } catch (error) {
+      if (allowMissing && error.message === 'File not found') {
+        setConfigGenerationHeader(res, '0');
+        res.json(emptyValue);
+        return;
+      }
+      throw error;
+    }
+  }
+
+  async function sendConfigConflict(res, fileName, message) {
+    const currentGeneration = await getConfigGeneration(fileName);
+    setConfigGenerationHeader(res, currentGeneration);
+    return res.status(409).json({
+      error: message,
+      code: 'CONFIG_CONFLICT',
+      currentGeneration
+    });
+  }
+
   // Health check endpoint
   router.get('/health', (req, res) => {
     res.json({ 
@@ -2254,8 +2291,7 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
    */
   router.get('/config/account', async (req, res) => {
     try {
-      const config = await storageService.getFileAsJson('account_config.json');
-      res.json(config);
+      await sendConfigFile(res, 'account_config.json');
     } catch (error) {
       console.error('Error fetching account config:', error);
       res.status(500).json({ 
@@ -2272,8 +2308,7 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
    */
   router.get('/config/customer', async (req, res) => {
     try {
-      const config = await storageService.getFileAsJson('customer_config.json');
-      res.json(config);
+      await sendConfigFile(res, 'customer_config.json');
     } catch (error) {
       console.error('Error fetching customer config:', error);
       res.status(500).json({ 
@@ -2290,8 +2325,7 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
    */
   router.get('/config/department', async (req, res) => {
     try {
-      const config = await storageService.getFileAsJson('subsidiary_config.json');
-      res.json(config);
+      await sendConfigFile(res, 'subsidiary_config.json');
     } catch (error) {
       console.error('Error fetching department config:', error);
       res.status(500).json({ 
@@ -2308,8 +2342,7 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
    */
   router.get('/config/region', async (req, res) => {
     try {
-      const config = await storageService.getFileAsJson('region_config.json');
-      res.json(config);
+      await sendConfigFile(res, 'region_config.json');
     } catch (error) {
       console.error('Error fetching region config:', error);
       res.status(500).json({ 
@@ -2326,8 +2359,7 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
    */
   router.get('/config/vendor', async (req, res) => {
     try {
-      const config = await storageService.getFileAsJson('vendor_config.json');
-      res.json(config);
+      await sendConfigFile(res, 'vendor_config.json');
     } catch (error) {
       console.error('Error fetching vendor config:', error);
       res.status(500).json({ 
@@ -2344,12 +2376,8 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
    */
   router.get('/config/scenario', async (req, res) => {
     try {
-      const config = await storageService.getFileAsJson('scenario_config.json');
-      res.json(config);
+      await sendConfigFile(res, 'scenario_config.json', { allowMissing: true, emptyValue: {} });
     } catch (error) {
-      if (error.message === 'File not found') {
-        return res.json({});
-      }
       console.error('Error fetching scenario config:', error);
       res.status(500).json({
         error: error.message,
@@ -2449,7 +2477,18 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
       const filenameMap = { department: 'subsidiary' };
       const fileKey = filenameMap[dimension] || dimension;
       const filename = `${fileKey}_config.json`;
-      await storageService.saveFileAsJson(filename, config);
+      const expectedGeneration = req.get('X-Config-Generation');
+      if (expectedGeneration == null || expectedGeneration === '') {
+        return await sendConfigConflict(
+          res,
+          filename,
+          'This configuration changed after the page loaded. Refresh and try again.'
+        );
+      }
+
+      let savedMetadata = await storageService.saveFileAsJson(filename, config, {
+        ifGenerationMatch: expectedGeneration
+      });
 
       console.log(`✅ Saved ${filename} to GCS`);
 
@@ -2486,16 +2525,31 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
           needsPersist = true;
         }
         if (needsPersist) {
-          await storageService.saveFileAsJson(filename, config);
+          savedMetadata = await storageService.saveFileAsJson(filename, config, {
+            ifGenerationMatch: savedMetadata.generation
+          });
           console.log('✅ Persisted scenario metadata to GCS');
         }
         const count = await bigQueryService.syncScenarios(config);
         console.log(`✅ BQ scenario sync complete: ${count} rows`);
-        return res.json({ success: true });
+        setConfigGenerationHeader(res, savedMetadata.generation);
+        return res.json({ success: true, generation: String(savedMetadata.generation) });
       }
 
-      res.json({ success: true });
+      setConfigGenerationHeader(res, savedMetadata.generation);
+      res.json({ success: true, generation: String(savedMetadata.generation) });
     } catch (error) {
+      if (error && Number(error.code) === 412) {
+        const { dimension } = req.params;
+        const filenameMap = { department: 'subsidiary' };
+        const fileKey = filenameMap[dimension] || dimension;
+        const filename = `${fileKey}_config.json`;
+        return await sendConfigConflict(
+          res,
+          filename,
+          'Another change was saved first. Refresh to load the latest configuration before retrying.'
+        );
+      }
       console.error('Error saving config:', error);
       res.status(500).json({ 
         error: 'Failed to save configuration',

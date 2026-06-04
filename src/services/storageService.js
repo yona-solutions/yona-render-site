@@ -276,13 +276,44 @@ class StorageService {
   }
 
   /**
+   * Get file contents as JSON along with GCS object metadata.
+   *
+   * @param {string} fileName - Full path to the file in the bucket
+   * @returns {Promise<{data: object, metadata: object}>} Parsed JSON and object metadata
+   * @throws {Error} If file doesn't exist or isn't valid JSON
+   */
+  async getFileAsJsonWithMetadata(fileName) {
+    if (!this.isAvailable()) {
+      throw new Error('GCP Storage not initialized');
+    }
+
+    const bucket = this.storage.bucket(this.bucketName);
+    const file = bucket.file(fileName);
+
+    const [exists] = await file.exists();
+    if (!exists) {
+      throw new Error('File not found');
+    }
+
+    const [[metadata], [contents]] = await Promise.all([
+      file.getMetadata(),
+      file.download()
+    ]);
+
+    return {
+      data: JSON.parse(contents.toString('utf8')),
+      metadata
+    };
+  }
+
+  /**
    * Save JSON data to a file in GCS
    * 
    * @param {string} fileName - Name of file in GCS bucket
    * @param {Object} data - JavaScript object to save as JSON
    * @returns {Promise<void>}
    */
-  async saveFileAsJson(fileName, data) {
+  async saveFileAsJson(fileName, data, options = {}) {
     if (!this.isAvailable()) {
       throw new Error('GCP Storage not initialized');
     }
@@ -294,14 +325,26 @@ class StorageService {
     const jsonString = JSON.stringify(data, null, 2);
     
     // Upload to GCS
-    await file.save(jsonString, {
+    const saveOptions = {
       contentType: 'application/json',
       metadata: {
         cacheControl: 'no-cache',
       }
-    });
+    };
+
+    if (options.ifGenerationMatch !== undefined && options.ifGenerationMatch !== null) {
+      saveOptions.preconditionOpts = {
+        ifGenerationMatch: String(options.ifGenerationMatch)
+      };
+    }
+
+    await file.save(jsonString, saveOptions);
+
+    const [metadata] = await file.getMetadata();
     
     console.log(`✅ Saved ${fileName} to GCS bucket ${this.bucketName}`);
+
+    return metadata;
   }
 
   /**

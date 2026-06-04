@@ -1612,6 +1612,7 @@
     const AppState = {
       currentDimension: 'account',
       dimensions: {},
+      configGenerations: {},
       expandedNodes: new Set(),
       searchQuery: '',
       trees: {},
@@ -1635,11 +1636,59 @@
     }
 
     // API Functions
+    function getConfigGenerationFromResponse(response) {
+      return response.headers.get('X-Config-Generation');
+    }
+
+    function updateConfigGeneration(dimensionType, response, fallbackGeneration = null) {
+      const generation = getConfigGenerationFromResponse(response) || fallbackGeneration;
+      if (generation != null && generation !== '') {
+        AppState.configGenerations[dimensionType] = String(generation);
+      } else {
+        delete AppState.configGenerations[dimensionType];
+      }
+    }
+
+    function buildConfigSaveHeaders(dimensionType) {
+      const headers = { 'Content-Type': 'application/json' };
+      const generation = AppState.configGenerations[dimensionType];
+      if (generation != null && generation !== '') {
+        headers['X-Config-Generation'] = generation;
+      }
+      return headers;
+    }
+
+    function isConfigConflict(response, payload) {
+      return response.status === 409 && payload?.code === 'CONFIG_CONFLICT';
+    }
+
+    async function reloadDimension(dimensionType) {
+      AppState.dimensions[dimensionType] = null;
+      AppState.trees[dimensionType] = null;
+      delete AppState.configGenerations[dimensionType];
+      await loadDimension(dimensionType);
+
+      if (dimensionType === AppState.currentDimension) {
+        renderCurrentDimension();
+      }
+    }
+
+    async function handleConfigConflict(dimensionType, message) {
+      await reloadDimension(dimensionType);
+
+      if (AppState.currentDimension === dimensionType && AppState.editingNode) {
+        closeEditSidebar();
+      }
+
+      alert(message);
+    }
+
     async function loadDimension(dimensionType) {
       const response = await authFetch(`/api/config/${dimensionType}`);
       if (!response.ok) throw new Error(`Failed to load ${dimensionType}`);
       const data = await response.json();
       AppState.dimensions[dimensionType] = data;
+      updateConfigGeneration(dimensionType, response);
       return data;
     }
 
@@ -2171,22 +2220,29 @@
     }
     
     async function saveConfigurationSilently() {
-      const currentData = AppState.dimensions[AppState.currentDimension];
+      const dimension = AppState.currentDimension;
+      const currentData = AppState.dimensions[dimension];
       if (!currentData) return;
       
       try {
-        const response = await authFetch(`/api/config/${AppState.currentDimension}`, {
+        const response = await authFetch(`/api/config/${dimension}`, {
           method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: buildConfigSaveHeaders(dimension),
           body: JSON.stringify(currentData),
         });
         
         if (response.ok) {
+          updateConfigGeneration(dimension, response);
           console.log('✅ Configuration auto-saved after reorder');
         } else {
-          const errorData = await response.json();
+          const errorData = await response.json().catch(() => null);
+          if (isConfigConflict(response, errorData)) {
+            await handleConfigConflict(
+              dimension,
+              'This configuration changed while you had it open, so the reorder was not saved. The latest version has been reloaded.'
+            );
+            return;
+          }
           console.error('Failed to auto-save:', errorData);
         }
       } catch (error) {
@@ -2636,6 +2692,7 @@
       try {
         AppState.dimensions[AppState.currentDimension] = null;
         AppState.trees[AppState.currentDimension] = null;
+        delete AppState.configGenerations[AppState.currentDimension];
         
         await loadDimension(AppState.currentDimension);
         renderCurrentDimension();
@@ -2733,19 +2790,26 @@
 
         const response = await authFetch('/api/config/scenario', {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers: buildConfigSaveHeaders('scenario'),
           body: JSON.stringify(AppState.dimensions['scenario'])
         });
 
-        if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        const result = await response.json();
+        const result = await response.json().catch(() => null);
+        if (!response.ok) {
+          if (isConfigConflict(response, result)) {
+            await handleConfigConflict(
+              'scenario',
+              'Another scenario change was saved first, so your new scenario was not added. The latest version has been reloaded.'
+            );
+            return;
+          }
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        updateConfigGeneration('scenario', response, result?.generation);
         if (!result.success) throw new Error('Save failed');
 
         // Reload config from server so auto-assigned IDs are reflected (M icon)
-        const fresh = await authFetch('/api/config/scenario');
-        if (fresh.ok) {
-          AppState.dimensions['scenario'] = await fresh.json();
-        }
+        await loadDimension('scenario');
 
         AppState.trees['scenario'] = buildTree(AppState.dimensions['scenario']);
         renderTree(AppState.trees['scenario'], AppState.searchQuery);
@@ -2892,13 +2956,22 @@
       try {
         const response = await authFetch(`/api/config/${dimension}`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers: buildConfigSaveHeaders(dimension),
           body: JSON.stringify(configData)
         });
         
         if (!response.ok) {
+          const errorData = await response.json().catch(() => null);
+          if (isConfigConflict(response, errorData)) {
+            await handleConfigConflict(
+              dimension,
+              'This configuration changed while you had it open, so the delete was not saved. The latest version has been reloaded.'
+            );
+            return;
+          }
           throw new Error('Failed to save after deletion');
         }
+        updateConfigGeneration(dimension, response);
         
         console.log(`Successfully deleted ${node.label || node.id}`);
       } catch (error) {
@@ -3344,17 +3417,22 @@
       try {
         const response = await authFetch(`/api/config/${dimension}`, {
           method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: buildConfigSaveHeaders(dimension),
           body: JSON.stringify(configData)
         });
 
+        const result = await response.json().catch(() => null);
         if (!response.ok) {
+          if (isConfigConflict(response, result)) {
+            await handleConfigConflict(
+              dimension,
+              'Someone else saved changes after this page loaded, so your edit was not applied. The latest version has been reloaded.'
+            );
+            return;
+          }
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
-
-        const result = await response.json();
+        updateConfigGeneration(dimension, response, result?.generation);
         if (result.success) {
           console.log('✅ Configuration saved successfully');
 
