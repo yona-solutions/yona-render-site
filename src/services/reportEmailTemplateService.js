@@ -115,6 +115,9 @@ function normalizeEmailTemplateType(value) {
       return 'district';
     case 'region':
       return 'region';
+    case 'customer_tag':
+    case 'customer_tag_summary':
+      return 'customer_tag';
     case 'multiple_districts':
     case 'multi_district':
     case 'multi_districts':
@@ -235,6 +238,11 @@ function buildReportEmailMessage(schedule, recipient, reportDate) {
       secondParagraph = `Attached are the ${escapeHtml(monthOnly)} Financial Reports for ${escapeHtml(regionName)}.`;
       secondParagraphText = `Attached are the ${monthOnly} Financial Reports for ${regionName}.`;
       break;
+    case 'customer_tag':
+      subject = `${monthYear} Financial Reports - ${entityName}`;
+      secondParagraph = `Attached are the ${escapeHtml(monthOnly)} Customer Tag Summary Financial Reports for ${escapeHtml(entityName)}.`;
+      secondParagraphText = `Attached are the ${monthOnly} Customer Tag Summary Financial Reports for ${entityName}.`;
+      break;
     case 'multiple_districts':
       subject = `${monthYear} Financial Reports - ${entityName}`;
       secondParagraph = `Attached are the ${escapeHtml(monthOnly)} Financial Reports for ${escapeHtml(entityName)}.`;
@@ -316,6 +324,10 @@ function buildAttachmentFilename(schedule, reportDate, reportOverride = null) {
   }
 
   const entityName = getEntityName(schedule) || stripScheduleIndex(schedule?.name || schedule?.template_name || 'Report');
+
+  if (reportGroupKind === 'customer_tag') {
+    return `${entityName} Customer Tag Summary (${monthYear}).pdf`;
+  }
 
   if (reportGroupKind === 'subsidiary_dietary') {
     return `${entityName} Dietary Accounts (${monthYear}).pdf`;

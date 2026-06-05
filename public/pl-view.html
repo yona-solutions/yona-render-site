@@ -1081,7 +1081,7 @@
           </div>
         </div>
 
-        <!-- Service Filter (only visible when Subsidiary tab is active) -->
+        <!-- Service Filter (visible when Region or Subsidiary tab is active) -->
         <div class="control-group control-group-subsidiary" id="serviceFilterGroup" style="display: none;">
           <label class="control-label">Service</label>
           <div class="searchable-select" id="serviceFilterWrapper">
@@ -1342,7 +1342,8 @@
         label: 'Region',
         placeholder: 'region',
         filterMode: 'subsidiary',
-        showCustomerTagFilter: true
+        showCustomerTagFilter: true,
+        showServiceFilter: true
       },
       subsidiary: {
         endpoint: '/api/storage/departments',
@@ -1352,10 +1353,12 @@
         showDetailSubsidiaryToggle: true
       },
       customer_tag: {
-        endpoint: '/api/storage/customer-tags',
+        endpoint: '/api/storage/departments',
         label: 'Customer Tag',
-        placeholder: 'customer tag',
-        filterMode: 'none'
+        selectionLabel: 'Subsidiary',
+        placeholder: 'subsidiary',
+        filterMode: 'none',
+        showServiceFilter: true
       }
     };
 
@@ -1438,7 +1441,7 @@
      * Current hierarchy type
      */
     let currentHierarchy = 'district';
-    let currentHierarchyLabel = HIERARCHY_CONFIG[currentHierarchy].label;
+    let currentHierarchyLabel = HIERARCHY_CONFIG[currentHierarchy].selectionLabel || HIERARCHY_CONFIG[currentHierarchy].label;
     
     /**
      * Load hierarchy options based on the selected type
@@ -1484,7 +1487,7 @@
         console.error(`Error loading ${hierarchyType}:`, error);
         
         // Fallback to sample data
-        const fallbackLabel = HIERARCHY_CONFIG[hierarchyType]?.label || hierarchyType;
+        const fallbackLabel = HIERARCHY_CONFIG[hierarchyType]?.selectionLabel || HIERARCHY_CONFIG[hierarchyType]?.label || hierarchyType;
         const fallbackData = [
           { value: '101', label: `Sample ${fallbackLabel} 101` },
           { value: '102', label: `Sample ${fallbackLabel} 102` }
@@ -1557,7 +1560,7 @@
     }
 
     /**
-     * Load services for the subsidiary service filter dropdown
+     * Load services for the region/subsidiary service filter dropdown
      */
     async function loadServicesForFilter() {
       try {
@@ -1616,14 +1619,15 @@
       }
 
       const labelText = hierarchyLabelText || hierarchyConfig.label;
+      const selectionLabel = hierarchyConfig.selectionLabel || labelText;
 
       console.log('Hierarchy changed to:', hierarchyType);
       currentHierarchy = hierarchyType;
-      currentHierarchyLabel = labelText;
+      currentHierarchyLabel = selectionLabel;
 
       // Update the dropdown label to match selected hierarchy
       const hierarchyLabel = document.querySelector('.control-group:nth-child(3) .control-label');
-      hierarchyLabel.textContent = labelText;
+      hierarchyLabel.textContent = selectionLabel;
 
       // Update the dropdown placeholder
       districtSelect.input.setAttribute('placeholder', `Select ${hierarchyConfig.placeholder}...`);
@@ -1636,20 +1640,25 @@
       subsidiaryDetailFilterGroup.style.display = hierarchyConfig.showDetailSubsidiaryToggle ? 'flex' : 'none';
       customerTagFilterGroup.style.display = hierarchyConfig.showCustomerTagFilter ? 'block' : 'none';
 
-      if (hierarchyConfig.filterMode === 'subsidiary') {
+      const showSubsidiaryFilter = hierarchyConfig.filterMode === 'subsidiary';
+      const showServiceFilter = hierarchyConfig.filterMode === 'service' || Boolean(hierarchyConfig.showServiceFilter);
+
+      if (showSubsidiaryFilter) {
         subsidiaryFilterGroup.style.display = 'block';
-        serviceFilterGroup.style.display = 'none';
         await loadSubsidiariesForFilter();
-        serviceFilterSelect.selectOption(null, '');
       } else if (hierarchyConfig.filterMode === 'service') {
         subsidiaryFilterGroup.style.display = 'none';
-        serviceFilterGroup.style.display = 'block';
-        await loadServicesForFilter();
         subsidiaryFilterSelect.selectOption(null, '');
       } else {
         subsidiaryFilterGroup.style.display = 'none';
-        serviceFilterGroup.style.display = 'none';
         subsidiaryFilterSelect.selectOption(null, '');
+      }
+
+      if (showServiceFilter) {
+        serviceFilterGroup.style.display = 'block';
+        await loadServicesForFilter();
+      } else {
+        serviceFilterGroup.style.display = 'none';
         serviceFilterSelect.selectOption(null, '');
       }
 
@@ -1834,6 +1843,12 @@
               { id: 'processing-districts', label: 'Processing districts', hasDetail: true },
               { id: 'finalizing', label: 'Finalizing reports' }
             ];
+          } else if (hierarchyType === 'customer_tag') {
+            return [
+              { id: 'subsidiary-customers', label: 'Fetching subsidiary customers' },
+              { id: 'processing-client-groups', label: 'Processing client groups', hasDetail: true },
+              { id: 'finalizing', label: 'Finalizing reports' }
+            ];
           } else {
             return [
               { id: 'district-summary', label: `Fetching ${currentHierarchyLabel.toLowerCase()} summary` },
@@ -1890,8 +1905,8 @@
           }
         }
 
-        // Add service filter if Subsidiary hierarchy and a service is selected
-        if (hierarchy === 'subsidiary' && serviceFilterSelect && serviceFilterSelect.selectedValue) {
+        // Add service filter if Region, Subsidiary, or Customer Tag hierarchy and a service is selected
+        if ((hierarchy === 'region' || hierarchy === 'subsidiary' || hierarchy === 'customer_tag') && serviceFilterSelect && serviceFilterSelect.selectedValue) {
           const serviceFilter = serviceFilterSelect.selectedValue;
           if (serviceFilter && serviceFilter !== 'all') {
             url += `&serviceFilter=${encodeURIComponent(serviceFilter)}`;
@@ -2046,11 +2061,22 @@
       if (meta.customerTagFilterName) {
         metaInfoHtml += `<strong>Customer Tag Filter:</strong> ${escapeHtml(meta.customerTagFilterName)}<br>`;
       }
+      if (meta.serviceFilterName) {
+        metaInfoHtml += `<strong>Service Filter:</strong> ${escapeHtml(meta.serviceFilterName)}<br>`;
+      }
+      if (meta.customerTagCount) {
+        metaInfoHtml += `<strong>Client Groups:</strong> ${meta.customerTagCount}<br>`;
+      }
+
+      if (meta.typeLabel === 'Customer Tag' && meta.accountCount != null) {
+        metaInfoHtml += `<strong>Accounts:</strong> ${meta.accountCount}<br>`;
+      }
+
       if (Object.prototype.hasOwnProperty.call(meta, 'detailSubsidiaryFilterApplied')) {
         metaInfoHtml += `<strong>Detail Subsidiary Filter:</strong> ${meta.detailSubsidiaryFilterApplied ? 'On (District and Facility detail only)' : 'Off'}<br>`;
       }
 
-      if (meta.facilityCount) {
+      if (meta.typeLabel !== 'Customer Tag' && meta.facilityCount) {
         metaInfoHtml += `<strong>Facilities:</strong> ${meta.facilityCount}<br>`;
       }
 

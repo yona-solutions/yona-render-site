@@ -768,6 +768,92 @@ class StorageService {
   }
 
   /**
+   * Group customers by customer tag.
+   *
+   * A single customer may appear in multiple customer-tag groups when multiple
+   * tags are configured on that customer entry.
+   *
+   * @param {Array<Object>} customers - Array of customer objects with customer_internal_id
+   * @returns {Promise<Array<{customerTagId: string, customerTagName: string, customers: Array}>>}
+   */
+  async groupCustomersByCustomerTag(customers) {
+    const configData = await this.getFileAsJson('customer_config.json');
+    const configOrder = buildConfigOrderIndex(configData);
+
+    const customerIdToConfig = {};
+    for (const [configId, config] of Object.entries(configData)) {
+      if (config.customer_internal_id != null) {
+        customerIdToConfig[config.customer_internal_id] = {
+          configId,
+          configOrderIndex: configOrder[configId],
+          ...config
+        };
+      }
+    }
+
+    const groupsByTag = new Map();
+    const seenCustomerIdsByTag = new Map();
+
+    for (const customer of customers || []) {
+      const customerId = customer?.customer_internal_id;
+      const customerConfig = customerIdToConfig[customerId];
+
+      if (!customerConfig || customerConfig.displayExcluded) {
+        continue;
+      }
+
+      const tags = getCustomerTags(customerConfig);
+      if (!tags.length) {
+        continue;
+      }
+
+      for (const tag of tags) {
+        if (!groupsByTag.has(tag)) {
+          groupsByTag.set(tag, {
+            customerTagId: `tag_${tag}`,
+            customerTagName: tag,
+            customers: []
+          });
+          seenCustomerIdsByTag.set(tag, new Set());
+        }
+
+        const seenForTag = seenCustomerIdsByTag.get(tag);
+        if (seenForTag.has(customerId)) {
+          continue;
+        }
+        seenForTag.add(customerId);
+
+        groupsByTag.get(tag).customers.push({
+          ...customer,
+          label: customerConfig.label || customer.label,
+          configId: customerConfig.configId,
+          parentDistrictId: customerConfig.parent,
+          parentDistrictLabel: configData[customerConfig.parent]?.label || customerConfig.parent || '',
+          parentRegion: configData[customerConfig.parent]?.districtRegion || configData[customerConfig.parent]?.region_label || null,
+          configOrderIndex: customerConfig.configOrderIndex,
+          customerPnlHidden: Boolean(customerConfig.customerPnlHidden),
+          customerPnlCountExcluded: Boolean(customerConfig.customerPnlCountExcluded)
+        });
+      }
+    }
+
+    const pathCache = {};
+    const groups = Array.from(groupsByTag.values());
+    for (const group of groups) {
+      group.customers.sort((a, b) => compareCustomersByDisplayOrder(configData, configOrder, a, b, {
+        groupIsTag: true,
+        pathCache
+      }));
+    }
+
+    return groups
+      .filter(group => group.customers.length > 0)
+      .sort((a, b) => String(a.customerTagName || '').localeCompare(String(b.customerTagName || ''), undefined, {
+        sensitivity: 'base'
+      }));
+  }
+
+  /**
    * Get all service nodes from customer configuration
    *
    * @returns {Promise<Array>} Array of {id, label} objects sorted by label

@@ -153,7 +153,9 @@ function generateHeader(meta) {
     orgLabel,
     reportTypeLabel,
     regionStructure,
-    customerTagFilterName
+    customerTagFilterName,
+    subsidiaryFilterName,
+    serviceFilterName
   } = meta;
   
   const formattedMonth = formatMonthLabel(monthLabel);
@@ -323,10 +325,17 @@ function generateHeader(meta) {
       </div>
     `;
   } else if (typeLabel === 'Customer Tag') {
+    const customerTagOrganization = organization || subsidiaryFilterName || '';
     return `
       <div class="pnl-report-header" style="text-align:center; margin-bottom:10px">
         <div class="pnl-title" style="font-weight:700">${escapeHtml(entityName)}</div>
-        ${buildRow([organization], { bold: true, className: 'pnl-header-row-secondary' })}
+        ${buildRow(
+          [
+            customerTagOrganization,
+            serviceFilterName ? `Service: ${serviceFilterName}` : ''
+          ],
+          { bold: true, className: 'pnl-header-row-secondary' }
+        )}
         ${buildRow([
           formattedMonth,
           resolvedAccountCount != null ? `Accounts: ${resolvedAccountCount}` : '',

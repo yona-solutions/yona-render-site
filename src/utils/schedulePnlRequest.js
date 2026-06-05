@@ -30,7 +30,7 @@ function buildSchedulePnlQueryParams(schedule, { entityId, reportDate }) {
     params.set('customerTagFilter', schedule.customer_tag_filter_id);
   }
 
-  if (schedule.template_type === 'subsidiary' && schedule.service_filter_id) {
+  if ((schedule.template_type === 'region' || schedule.template_type === 'subsidiary' || schedule.template_type === 'customer_tag') && schedule.service_filter_id) {
     params.set('serviceFilter', schedule.service_filter_id);
   }
 

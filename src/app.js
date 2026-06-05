@@ -152,7 +152,7 @@ async function createApp() {
         await emailConfigService.pool.query(`
           ALTER TABLE report_schedules
           ADD CONSTRAINT chk_email_template_type CHECK (
-            email_template_type IN ('district', 'region', 'multiple_districts', 'subsidiary_dietary', 'subsidiary')
+            email_template_type IN ('district', 'region', 'customer_tag', 'multiple_districts', 'subsidiary_dietary', 'subsidiary')
             OR email_template_type IS NULL
           )
         `);

@@ -293,8 +293,8 @@ function validateReportGroupPayload(groupData) {
     if (report.template_type === 'subsidiary' && !report.subsidiary_id) {
       return `${label} must have a subsidiary selected`;
     }
-    if (report.template_type === 'customer_tag' && !report.customer_tag_id) {
-      return `${label} must have a customer tag selected`;
+    if (report.template_type === 'customer_tag' && !report.subsidiary_id && !report.customer_tag_id) {
+      return `${label} must have a subsidiary selected`;
     }
   }
 
@@ -313,6 +313,15 @@ function validateReportGroupPayload(groupData) {
     }
     if (groupData.reports[0]?.template_type !== 'region') {
       return 'Region email template type requires a region P&L';
+    }
+  }
+
+  if (groupData.email_template_type === 'customer_tag') {
+    if (groupData.reports.length !== 1) {
+      return 'Customer Tag email template type requires exactly one attached P&L';
+    }
+    if (groupData.reports[0]?.template_type !== 'customer_tag') {
+      return 'Customer Tag email template type requires a customer tag P&L';
     }
   }
 

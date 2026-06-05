@@ -2215,6 +2215,7 @@
                 <option value="">Select template type...</option>
                 <option value="district">District</option>
                 <option value="region">Region</option>
+                <option value="customer_tag">Customer Tag</option>
                 <option value="multiple_districts">Multiple Districts</option>
                 <option value="subsidiary_dietary">Subsidiary (Dietary Only)</option>
                 <option value="subsidiary">Subsidiary (All)</option>
@@ -2373,11 +2374,11 @@
             </div>
 
             <div class="form-group" id="editServiceFilterGroup" style="display: none;">
-              <label for="editServiceFilterId">Service</label>
+              <label for="editServiceFilterId">Service Filter</label>
               <select id="editServiceFilterId">
                 <option value="">No service filter</option>
               </select>
-              <div class="form-help">Optional: filter subsidiary reports by service, matching the P&L page.</div>
+              <div class="form-help">Optional: filter reports by service, matching the P&L page.</div>
             </div>
 
             <div class="form-group" id="editSubsidiarySummaryFilterGroup" style="display: none;">
@@ -2767,12 +2768,22 @@
         };
       }
 
-      if (schedule.template_type === 'customer_tag' && schedule.customer_tag_id) {
-        return {
-          entityId: schedule.customer_tag_id,
-          entityName: schedule.customer_tag_name || 'Customer Tag',
-          entityLabel: 'Customer Tag'
-        };
+      if (schedule.template_type === 'customer_tag') {
+        if (schedule.subsidiary_id) {
+          return {
+            entityId: schedule.subsidiary_id,
+            entityName: schedule.subsidiary_name || 'Subsidiary',
+            entityLabel: 'Subsidiary'
+          };
+        }
+
+        if (schedule.customer_tag_id) {
+          return {
+            entityId: schedule.customer_tag_id,
+            entityName: schedule.customer_tag_name || 'Customer Tag',
+            entityLabel: 'Customer Tag'
+          };
+        }
       }
 
       return null;
@@ -2810,11 +2821,20 @@
         };
       }
 
-      if (schedule.template_type === 'customer_tag' && schedule.customer_tag_name) {
-        return {
-          entityDisplay: schedule.customer_tag_name,
-          entityTooltip: `Customer Tag: ${schedule.customer_tag_name}`
-        };
+      if (schedule.template_type === 'customer_tag') {
+        if (schedule.subsidiary_name) {
+          return {
+            entityDisplay: schedule.subsidiary_name,
+            entityTooltip: `Subsidiary: ${schedule.subsidiary_name}`
+          };
+        }
+
+        if (schedule.customer_tag_name) {
+          return {
+            entityDisplay: schedule.customer_tag_name,
+            entityTooltip: `Customer Tag: ${schedule.customer_tag_name}`
+          };
+        }
       }
 
       return {
@@ -3124,7 +3144,8 @@
             (report.region_name || '').toLowerCase().includes(entityFilter) ||
             (report.subsidiary_name || '').toLowerCase().includes(entityFilter) ||
             (report.customer_tag_name || '').toLowerCase().includes(entityFilter) ||
-            (report.customer_tag_filter_name || '').toLowerCase().includes(entityFilter)
+            (report.customer_tag_filter_name || '').toLowerCase().includes(entityFilter) ||
+            (report.service_filter_name || '').toLowerCase().includes(entityFilter)
           );
           if (!entityMatch) return false;
         }
@@ -3930,8 +3951,16 @@
       return templateType === 'region' || templateType === 'district';
     }
 
+    function usesRequiredSubsidiarySelection(templateType) {
+      return templateType === 'subsidiary' || templateType === 'customer_tag';
+    }
+
     function supportsCustomerTagFilter(templateType) {
       return templateType === 'region';
+    }
+
+    function supportsServiceFilter(templateType) {
+      return templateType === 'region' || templateType === 'subsidiary' || templateType === 'customer_tag';
     }
 
     function buildScheduleDataUrl(schedule, entityId, reportDate) {
@@ -3954,7 +3983,7 @@
         params.set('customerTagFilter', schedule.customer_tag_filter_id);
       }
 
-      if (schedule.template_type === 'subsidiary' && schedule.service_filter_id) {
+      if (supportsServiceFilter(schedule.template_type) && schedule.service_filter_id) {
         params.set('serviceFilter', schedule.service_filter_id);
       }
 
@@ -3991,7 +4020,7 @@
       populateSelectOptions(
         document.getElementById('editSubsidiaryId'),
         subsidiaryOptions,
-        templateType === 'subsidiary' ? 'Select subsidiary...' : 'No subsidiary filter'
+        usesRequiredSubsidiarySelection(templateType) ? 'Select subsidiary...' : 'No subsidiary filter'
       );
       populateSelectOptions(
         document.getElementById('editServiceFilterId'),
@@ -4034,7 +4063,7 @@
     function setEditSubsidiaryFilterExpanded(expanded, { clearValue = false } = {}) {
       const type = document.getElementById('editTemplateType')?.value || '';
       const hasOptionalSubsidiaryFilter = supportsSubsidiaryFilter(type);
-      const isSubsidiary = type === 'subsidiary';
+      const requiresSubsidiarySelection = usesRequiredSubsidiarySelection(type);
       const toggle = document.getElementById('editSubsidiaryFilterToggle');
       const toggleGroup = document.getElementById('editSubsidiaryFilterToggleGroup');
       const subsidiaryGroup = document.getElementById('editSubsidiaryGroup');
@@ -4047,7 +4076,7 @@
         select.value = '';
       }
 
-      if (isSubsidiary) {
+      if (requiresSubsidiarySelection) {
         toggleGroup.style.display = 'none';
         subsidiaryGroup.style.display = 'block';
         actions.style.display = 'none';
@@ -4125,35 +4154,40 @@
       const isRegion = type === 'region';
       const isSubsidiary = type === 'subsidiary';
       const isCustomerTag = type === 'customer_tag';
+      const requiresSubsidiarySelection = usesRequiredSubsidiarySelection(type);
       const hasOptionalSubsidiaryFilter = supportsSubsidiaryFilter(type);
       const hasOptionalCustomerTagFilter = supportsCustomerTagFilter(type);
+      const hasOptionalServiceFilter = supportsServiceFilter(type);
 
       districtGroup.style.display = isDistrict ? 'block' : 'none';
       regionGroup.style.display = isRegion ? 'block' : 'none';
-      customerTagGroup.style.display = isCustomerTag ? 'block' : 'none';
+      customerTagGroup.style.display = 'none';
       customerTagFilterGroup.style.display = hasOptionalCustomerTagFilter ? 'block' : 'none';
-      serviceFilterGroup.style.display = isSubsidiary ? 'block' : 'none';
+      serviceFilterGroup.style.display = hasOptionalServiceFilter ? 'block' : 'none';
       subsidiarySummaryFilterGroup.style.display = isSubsidiary ? 'block' : 'none';
       headerSubsidiaryGroup.style.display = type ? 'block' : 'none';
 
       districtSelect.disabled = !isDistrict;
       regionSelect.disabled = !isRegion;
-      customerTagSelect.disabled = !isCustomerTag;
+      customerTagSelect.disabled = true;
       customerTagFilterSelect.disabled = !hasOptionalCustomerTagFilter;
-      subsidiarySelect.disabled = !(hasOptionalSubsidiaryFilter || isSubsidiary);
-      serviceFilterSelect.disabled = !isSubsidiary;
+      subsidiarySelect.disabled = !(hasOptionalSubsidiaryFilter || requiresSubsidiarySelection);
+      serviceFilterSelect.disabled = !hasOptionalServiceFilter;
       subsidiarySummaryFilterCheckbox.disabled = !isSubsidiary;
       headerSubsidiarySelect.disabled = !type;
 
       districtSelect.required = isDistrict;
       regionSelect.required = isRegion;
-      customerTagSelect.required = isCustomerTag;
-      subsidiarySelect.required = isSubsidiary;
+      customerTagSelect.required = false;
+      subsidiarySelect.required = requiresSubsidiarySelection;
       headerSubsidiarySelect.required = Boolean(type);
 
       if (isSubsidiary) {
         subsidiaryLabel.innerHTML = 'Subsidiary <span style="color: #e53e3e;">*</span>';
         subsidiaryHelp.textContent = 'Required: select the same subsidiary you would choose on the P&L page.';
+      } else if (isCustomerTag) {
+        subsidiaryLabel.innerHTML = 'Subsidiary <span style="color: #e53e3e;">*</span>';
+        subsidiaryHelp.textContent = 'Required: select the subsidiary whose client groups should render as summary pages.';
       } else if (hasOptionalSubsidiaryFilter) {
         subsidiaryLabel.textContent = 'Subsidiary Filter';
         subsidiaryHelp.textContent = 'Optional: filter by subsidiary, matching the P&L page.';
@@ -4165,14 +4199,14 @@
       if (!preserveSelections) {
         if (!isDistrict) districtSelect.value = '';
         if (!isRegion) regionSelect.value = '';
-        if (!isCustomerTag) customerTagSelect.value = '';
+        customerTagSelect.value = '';
         if (!hasOptionalCustomerTagFilter) customerTagFilterSelect.value = '';
-        if (!isSubsidiary) serviceFilterSelect.value = '';
+        if (!hasOptionalServiceFilter) serviceFilterSelect.value = '';
         if (!isSubsidiary) subsidiarySummaryFilterCheckbox.checked = false;
-        if ((previousType === 'subsidiary') !== isSubsidiary) {
+        if (usesRequiredSubsidiarySelection(previousType) !== requiresSubsidiarySelection) {
           subsidiarySelect.value = '';
         }
-        if (!(hasOptionalSubsidiaryFilter || isSubsidiary)) {
+        if (!(hasOptionalSubsidiaryFilter || requiresSubsidiarySelection)) {
           subsidiarySelect.value = '';
         }
         if (!type) {
@@ -4185,7 +4219,7 @@
         subsidiarySelect.value = '';
       }
 
-      const shouldExpandSubsidiaryFilter = isSubsidiary || (hasOptionalSubsidiaryFilter && Boolean(subsidiarySelect.value));
+      const shouldExpandSubsidiaryFilter = requiresSubsidiarySelection || (hasOptionalSubsidiaryFilter && Boolean(subsidiarySelect.value));
       setEditSubsidiaryFilterExpanded(shouldExpandSubsidiaryFilter);
       setEditSubsidiarySummaryFilterVisible(isSubsidiary);
 
@@ -4306,24 +4340,28 @@
           const opt = getOptionById(subsidiaryOptions, subsidiaryId);
           subsidiaryName = opt ? opt.label : null;
         }
-      } else if (templateType === 'subsidiary') {
+      }
+
+      if (supportsServiceFilter(templateType)) {
+        serviceFilterId = serviceFilterSelect.value || null;
+        if (serviceFilterId) {
+          const opt = getOptionById(serviceOptions, serviceFilterId);
+          serviceFilterName = opt ? opt.label : null;
+        }
+      }
+
+      if (templateType === 'subsidiary') {
         subsidiaryId = subsidiarySelect.value || null;
         if (subsidiaryId) {
           const opt = getOptionById(subsidiaryOptions, subsidiaryId);
           subsidiaryName = opt ? opt.label : null;
         }
         applySubsidiaryFilterToDetail = Boolean(subsidiarySummaryFilterCheckbox?.checked);
-
-        serviceFilterId = serviceFilterSelect.value || null;
-        if (serviceFilterId) {
-          const opt = getOptionById(serviceOptions, serviceFilterId);
-          serviceFilterName = opt ? opt.label : null;
-        }
       } else if (templateType === 'customer_tag') {
-        customerTagId = customerTagSelect.value || null;
-        if (customerTagId) {
-          const opt = getOptionById(customerTagOptions, customerTagId);
-          customerTagName = opt ? opt.label : null;
+        subsidiaryId = subsidiarySelect.value || null;
+        if (subsidiaryId) {
+          const opt = getOptionById(subsidiaryOptions, subsidiaryId);
+          subsidiaryName = opt ? opt.label : null;
         }
       }
 
@@ -4345,8 +4383,8 @@
         alert('Please select a subsidiary');
         return;
       }
-      if (templateType === 'customer_tag' && !customerTagId) {
-        alert('Please select a customer tag');
+      if (templateType === 'customer_tag' && !subsidiaryId) {
+        alert('Please select a subsidiary');
         return;
       }
       if (!headerSubsidiaryId) {
@@ -4370,8 +4408,8 @@
         region_name: regionName,
         subsidiary_id: subsidiaryId,
         subsidiary_name: subsidiaryName,
-        customer_tag_id: customerTagId,
-        customer_tag_name: customerTagName,
+        customer_tag_id: null,
+        customer_tag_name: null,
         email_group_ids: modalEmailGroupIds,
         enabled: currentEditingSchedule ? currentEditingSchedule.enabled !== false : true
       };
@@ -4971,7 +5009,7 @@
       if (supportsCustomerTagFilter(schedule.template_type) && schedule.customer_tag_filter_name) {
         detailParts.push(`customer tag filter: ${schedule.customer_tag_filter_name}`);
       }
-      if (schedule.template_type === 'subsidiary' && schedule.service_filter_name) {
+      if (supportsServiceFilter(schedule.template_type) && schedule.service_filter_name) {
         detailParts.push(`service: ${schedule.service_filter_name}`);
       }
       if (schedule.template_type === 'subsidiary' && schedule.apply_subsidiary_filter_to_detail) {
@@ -6009,6 +6047,9 @@
           return 'district';
         case 'region':
           return 'region';
+        case 'customer_tag':
+        case 'customer_tag_summary':
+          return 'customer_tag';
         case 'multiple_districts':
         case 'multi_district':
         case 'multi_districts':
@@ -6030,6 +6071,8 @@
           return 'District';
         case 'region':
           return 'Region';
+        case 'customer_tag':
+          return 'Customer Tag';
         case 'multiple_districts':
           return 'Multiple Districts';
         case 'subsidiary_dietary':
@@ -6248,7 +6291,7 @@
       if (supportsCustomerTagFilter(report.template_type) && report.customer_tag_filter_name) {
         parts.push(`Customer Tag Filter: ${report.customer_tag_filter_name}`);
       }
-      if (report.template_type === 'subsidiary' && report.service_filter_name) {
+      if (supportsServiceFilter(report.template_type) && report.service_filter_name) {
         parts.push(`Service: ${report.service_filter_name}`);
       }
       if (report.template_type === 'subsidiary' && report.apply_subsidiary_filter_to_detail) {
@@ -6694,24 +6737,28 @@
           const option = getOptionById(subsidiaryOptions, subsidiaryId);
           subsidiaryName = option ? option.label : null;
         }
-      } else if (templateType === 'subsidiary') {
+      }
+
+      if (supportsServiceFilter(templateType)) {
+        serviceFilterId = serviceFilterSelect.value || null;
+        if (serviceFilterId) {
+          const option = getOptionById(serviceOptions, serviceFilterId);
+          serviceFilterName = option ? option.label : null;
+        }
+      }
+
+      if (templateType === 'subsidiary') {
         subsidiaryId = subsidiarySelect.value || null;
         if (subsidiaryId) {
           const option = getOptionById(subsidiaryOptions, subsidiaryId);
           subsidiaryName = option ? option.label : null;
         }
         applySubsidiaryFilterToDetail = Boolean(subsidiarySummaryFilterCheckbox?.checked);
-
-        serviceFilterId = serviceFilterSelect.value || null;
-        if (serviceFilterId) {
-          const option = getOptionById(serviceOptions, serviceFilterId);
-          serviceFilterName = option ? option.label : null;
-        }
       } else if (templateType === 'customer_tag') {
-        customerTagId = customerTagSelect.value || null;
-        if (customerTagId) {
-          const option = getOptionById(customerTagOptions, customerTagId);
-          customerTagName = option ? option.label : null;
+        subsidiaryId = subsidiarySelect.value || null;
+        if (subsidiaryId) {
+          const option = getOptionById(subsidiaryOptions, subsidiaryId);
+          subsidiaryName = option ? option.label : null;
         }
       }
 
@@ -6733,8 +6780,8 @@
         alert('Please select a subsidiary');
         return;
       }
-      if (templateType === 'customer_tag' && !customerTagId) {
-        alert('Please select a customer tag');
+      if (templateType === 'customer_tag' && !subsidiaryId) {
+        alert('Please select a subsidiary');
         return;
       }
       if (!headerSubsidiaryId) {
@@ -6760,8 +6807,8 @@
         region_name: regionName,
         subsidiary_id: subsidiaryId,
         subsidiary_name: subsidiaryName,
-        customer_tag_id: customerTagId,
-        customer_tag_name: customerTagName
+        customer_tag_id: null,
+        customer_tag_name: null
       };
 
       if (currentEditingReportIndex !== null && currentEditingGroup.reports[currentEditingReportIndex]) {

@@ -286,6 +286,149 @@ async function generateCustomerSummaryAndFacilityReport({
   };
 }
 
+async function generateCustomerTagSummaryPacketReport({
+  bigQueryService,
+  accountConfig,
+  childrenMap,
+  sectionConfig,
+  censusRecords,
+  customerTagGroups,
+  date,
+  reportPlType,
+  orgLabel,
+  subsidiaryId = null,
+  subsidiaryName = null,
+  serviceFilterName = null
+}) {
+  const groups = Array.isArray(customerTagGroups)
+    ? customerTagGroups.filter(group => Array.isArray(group?.customers) && group.customers.length > 0)
+    : [];
+
+  const allCustomers = uniqueCustomersById(groups.flatMap(group => group.customers));
+  const allCustomerIds = allCustomers.map(customer => customer.customer_internal_id);
+
+  const packetMeta = {
+    typeLabel: 'Customer Tag',
+    entityName: subsidiaryName || orgLabel || 'Customer Tag',
+    monthLabel: date,
+    plType: reportPlType,
+    customerTagCount: 0,
+    accountCount: 0
+  };
+  applyOrgLabel(packetMeta, orgLabel);
+  if (subsidiaryName) {
+    packetMeta.subsidiaryFilterName = subsidiaryName;
+  }
+  if (serviceFilterName) {
+    packetMeta.serviceFilterName = serviceFilterName;
+  }
+
+  if (!groups.length || !allCustomerIds.length) {
+    return {
+      html: '',
+      noRevenue: true,
+      customerTagCount: 0,
+      accountCount: 0,
+      meta: packetMeta
+    };
+  }
+
+  console.log(`   Querying BigQuery for customer tag summaries (${groups.length} groups, ${allCustomerIds.length} customers)...`);
+  const monthData = await bigQueryService.getPLData({
+    hierarchy: 'district',
+    customerIds: allCustomerIds,
+    subsidiaryId,
+    date,
+    accountConfig,
+    ytd: false
+  });
+  const ytdData = await bigQueryService.getPLData({
+    hierarchy: 'district',
+    customerIds: allCustomerIds,
+    subsidiaryId,
+    date,
+    accountConfig,
+    ytd: true
+  });
+
+  const summaryPages = [];
+  let renderedGroupCount = 0;
+  let renderedAccountCount = 0;
+
+  for (const group of groups) {
+    const groupCustomers = uniqueCustomersById(group.customers);
+    const groupCustomerIds = groupCustomers.map(customer => customer.customer_internal_id);
+
+    if (!groupCustomerIds.length) {
+      continue;
+    }
+
+    const groupMonthData = accountService.filterDataByCustomers(
+      monthData,
+      groupCustomerIds,
+      null,
+      subsidiaryId
+    );
+    const groupYtdData = accountService.filterDataByCustomers(
+      ytdData,
+      groupCustomerIds,
+      null,
+      subsidiaryId
+    );
+
+    const groupCensus = sumCensusForCustomers(censusRecords, groupCustomers, date, serviceFilterName
+      ? { service: serviceFilterName }
+      : {}
+    );
+    const groupAccountCount = groupCustomers.filter(shouldCountFacility).length;
+    const groupMeta = {
+      typeLabel: 'Customer Tag',
+      entityName: group.customerTagName,
+      monthLabel: date,
+      accountCount: groupAccountCount,
+      plType: reportPlType,
+      actualCensus: groupCensus.actual,
+      budgetCensus: groupCensus.budget,
+      headcount: groupCensus.headcount
+    };
+    applyOrgLabel(groupMeta, orgLabel);
+    if (subsidiaryName) {
+      groupMeta.subsidiaryFilterName = subsidiaryName;
+    }
+    if (serviceFilterName) {
+      groupMeta.serviceFilterName = serviceFilterName;
+    }
+
+    const groupResult = await pnlRenderService.generatePNLReport(
+      groupMonthData,
+      groupYtdData,
+      groupMeta,
+      accountConfig,
+      childrenMap,
+      sectionConfig
+    );
+
+    if (groupResult.noRevenue) {
+      continue;
+    }
+
+    summaryPages.push(groupResult.html);
+    renderedGroupCount++;
+    renderedAccountCount += groupAccountCount;
+  }
+
+  packetMeta.customerTagCount = renderedGroupCount;
+  packetMeta.accountCount = renderedAccountCount;
+
+  return {
+    html: summaryPages.join('\n\n'),
+    noRevenue: summaryPages.length === 0,
+    customerTagCount: renderedGroupCount,
+    accountCount: renderedAccountCount,
+    meta: packetMeta
+  };
+}
+
 /**
  * Configure API routes
  * 
@@ -1268,22 +1411,94 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
         queryParams.districtRegion = districtRegion || '';
         console.log(`   Found ${customerIds.length} customer IDs for ${isTag ? 'tag' : 'district'}: ${districtName}`);
       } else if (hierarchy === 'customer_tag') {
-        const customerTagResult = await storageService.getCustomersForCustomerTag(actualId);
-        const { customers, customerTagName } = customerTagResult;
+        const subsidiaryResult = await storageService.getSubsidiaryInternalId(actualId);
 
-        if (customers.length === 0) {
-          return res.status(404).json({
-            error: 'No customers found for selected customer tag',
-            code: 'NO_CUSTOMERS_FOUND'
-          });
+      if (subsidiaryResult) {
+          const { subsidiaryIds, subsidiaryName } = subsidiaryResult;
+          const normalizedSubsidiaryId = subsidiaryIds.length === 1 ? subsidiaryIds[0] : subsidiaryIds;
+          let customersInSubsidiary = await bigQueryService.getCustomersInSubsidiary(subsidiaryIds);
+
+          if (customersInSubsidiary.length === 0) {
+            return res.status(404).json({
+              error: 'No customers found for selected subsidiary',
+              code: 'NO_CUSTOMERS_FOUND'
+            });
+          }
+
+          const serviceFilter = req.query.serviceFilter;
+          if (serviceFilter && serviceFilter !== 'all') {
+            const serviceResult = await storageService.getCustomersForService(serviceFilter);
+            const serviceCustomerIdSet = new Set(serviceResult.customers.map(c => c.customer_internal_id));
+            customersInSubsidiary = customersInSubsidiary.filter(c => serviceCustomerIdSet.has(c.customer_internal_id));
+
+            if (customersInSubsidiary.length === 0) {
+              return res.status(404).json({
+                error: 'No customers found for selected service within customer tag packet',
+                code: 'NO_CUSTOMERS_FOUND'
+              });
+            }
+
+            queryParams.serviceFilter = serviceFilter;
+            queryParams.serviceFilterName = serviceResult.serviceName;
+            console.log(`   ⚙️ Applying service filter: ${serviceResult.serviceName} (${customersInSubsidiary.length} customers)`);
+          }
+
+          const customerTagGroups = await storageService.groupCustomersByCustomerTag(customersInSubsidiary);
+          if (customerTagGroups.length === 0) {
+            return res.status(404).json({
+              error: queryParams.serviceFilterName
+                ? 'No customer-tag groups found for selected subsidiary/service combination'
+                : 'No customer-tag groups found for selected subsidiary',
+              code: 'NO_CUSTOMERS_FOUND'
+            });
+          }
+
+          selectedLabel = subsidiaryName;
+          queryParams.subsidiaryId = normalizedSubsidiaryId;
+          queryParams.subsidiaryFilterName = subsidiaryName;
+          queryParams.customerTagGroups = customerTagGroups;
+          queryParams.customers = uniqueCustomersById(customerTagGroups.flatMap(group => group.customers));
+          console.log(`   Found ${customerTagGroups.length} customer-tag groups in subsidiary: ${subsidiaryName}`);
+        } else {
+          // Compatibility path for legacy customer-tag schedules that still target
+          // a single tag directly instead of using a subsidiary as the primary scope.
+          const customerTagResult = await storageService.getCustomersForCustomerTag(actualId);
+          let { customers, customerTagName } = customerTagResult;
+
+          if (customers.length === 0) {
+            return res.status(404).json({
+              error: 'No customers found for selected customer tag',
+              code: 'NO_CUSTOMERS_FOUND'
+            });
+          }
+
+          const serviceFilter = req.query.serviceFilter;
+          if (serviceFilter && serviceFilter !== 'all') {
+            const serviceResult = await storageService.getCustomersForService(serviceFilter);
+            const serviceCustomerIdSet = new Set(serviceResult.customers.map(c => c.customer_internal_id));
+            customers = customers.filter(c => serviceCustomerIdSet.has(c.customer_internal_id));
+
+            if (customers.length === 0) {
+              return res.status(404).json({
+                error: 'No customers found for selected customer tag/service combination',
+                code: 'NO_CUSTOMERS_FOUND'
+              });
+            }
+
+            queryParams.serviceFilter = serviceFilter;
+            queryParams.serviceFilterName = serviceResult.serviceName;
+            console.log(`   ⚙️ Applying legacy customer tag service filter: ${serviceResult.serviceName} (${customers.length} customers)`);
+          }
+
+          selectedLabel = customerTagName;
+          queryParams.customerTagGroups = [{
+            customerTagId: actualId,
+            customerTagName,
+            customers
+          }];
+          queryParams.customers = customers;
+          console.log(`   Found ${customers.length} customer IDs for legacy customer tag: ${customerTagName}`);
         }
-
-        selectedLabel = customerTagName;
-
-        const customerIds = customers.map(c => c.customer_internal_id);
-        queryParams.customerIds = customerIds;
-        queryParams.customers = customers;
-        console.log(`   Found ${customerIds.length} customer IDs for customer tag: ${customerTagName}`);
       } else if (hierarchy === 'region') {
         // Get region internal ID and name
         const regionResult = await storageService.getRegionInternalId(actualId);
@@ -1346,6 +1561,25 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
           queryParams.customerTagFilter = customerTagFilter;
           queryParams.customerTagFilterName = customerTagResult.customerTagName;
           console.log(`   🏷️ Applying customer tag filter: ${customerTagResult.customerTagName} (${customersInRegion.length} customers)`);
+        }
+
+        // Optional service filter (region hierarchy only)
+        const serviceFilter = req.query.serviceFilter;
+        if (serviceFilter && serviceFilter !== 'all') {
+          const serviceResult = await storageService.getCustomersForService(serviceFilter);
+          const serviceCustomerIdSet = new Set(serviceResult.customers.map(c => c.customer_internal_id));
+          customersInRegion = customersInRegion.filter(c => serviceCustomerIdSet.has(c.customer_internal_id));
+
+          if (customersInRegion.length === 0) {
+            return res.status(404).json({
+              error: 'No customers found for selected service within region',
+              code: 'NO_CUSTOMERS_FOUND'
+            });
+          }
+
+          queryParams.serviceFilter = serviceFilter;
+          queryParams.serviceFilterName = serviceResult.serviceName;
+          console.log(`   ⚙️ Applying service filter: ${serviceResult.serviceName} (${customersInRegion.length} customers)`);
         }
         
         // Group customers by their parent district
@@ -1493,6 +1727,10 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
       // - Region summaries: Aggregate for each region in the subsidiary
       // - District summaries: Aggregate for each district in each region
       // - Facility reports: Individual P&L for each customer with revenue
+      //
+      // For CUSTOMER TAGS: Generate summary-only pages for each customer-tag group
+      // - Selected subsidiary/tag scope determines the customer population
+      // - Each rendered page is a customer-tag summary only (no facility detail pages)
       // 
       // Each report includes both Month and YTD columns
       // ============================================
@@ -1538,28 +1776,24 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
           meta: districtReport.meta
         });
       } else if (hierarchy === 'customer_tag') {
-        const customerTagReport = await generateCustomerSummaryAndFacilityReport({
+        const customerTagReport = await generateCustomerTagSummaryPacketReport({
           bigQueryService,
           accountConfig,
           childrenMap,
           sectionConfig,
           censusRecords,
-          summaryTypeLabel: 'Customer Tag',
-          entityName: selectedLabel,
-          customers: queryParams.customers,
-          customerIds: queryParams.customerIds,
+          customerTagGroups: queryParams.customerTagGroups,
           date,
           reportPlType,
           orgLabel,
-          resolveFacilityContext: customer => ({
-            parentDistrict: customer.parentDistrictLabel || selectedLabel,
-            parentRegion: customer.parentRegion || ''
-          })
+          subsidiaryId: queryParams.subsidiaryId || null,
+          subsidiaryName: queryParams.subsidiaryFilterName || null,
+          serviceFilterName: queryParams.serviceFilterName || null
         });
 
         totalNoRevenue = customerTagReport.noRevenue;
 
-        console.log(`✅ Generated customer tag summary + ${customerTagReport.facilityCount} facility P&Ls`);
+        console.log(`✅ Generated ${customerTagReport.customerTagCount} customer tag summary page(s)`);
 
         res.json({
           html: customerTagReport.html,
@@ -1568,7 +1802,8 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
           selectedId,
           selectedLabel,
           date,
-          facilityCount: customerTagReport.facilityCount,
+          customerTagCount: customerTagReport.customerTagCount,
+          accountCount: customerTagReport.accountCount,
           meta: customerTagReport.meta
         });
       } else if (hierarchy === 'region') {
@@ -1581,16 +1816,22 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
         //   Facility →  WHERE customer_internal_id IN UNNEST(@customerIds)
         //
         // Without a customer-tag filter, query region summary directly by
-        // region_internal_id. With a customer-tag filter, intentionally switch
-        // to customer-level queries so the summary reflects only the tagged subset.
+        // region_internal_id. With a customer-tag or service filter, intentionally
+        // switch to customer-level queries so the summary reflects only the
+        // filtered subset.
 
         const hasCustomerTagFilter = Boolean(queryParams.customerTagFilterName);
+        const hasServiceFilter = Boolean(queryParams.serviceFilterName);
+        const hasCustomerSubsetFilter = hasCustomerTagFilter || hasServiceFilter;
         const regionCustomerIds = queryParams.allowedCustomerIds;
+        const regionCensusOptions = hasServiceFilter
+          ? { service: queryParams.serviceFilterName }
+          : {};
 
         // 1. Generate region summary P&L
         console.log('   Querying BigQuery for region summary (Month + YTD)...');
         const regionDataRaw = await bigQueryService.getPLData(
-          hasCustomerTagFilter
+          hasCustomerSubsetFilter
             ? {
                 hierarchy: 'district',
                 customerIds: regionCustomerIds,
@@ -1609,7 +1850,7 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
               }
         );
         const regionYtdDataRaw = await bigQueryService.getPLData(
-          hasCustomerTagFilter
+          hasCustomerSubsetFilter
             ? {
                 hierarchy: 'district',
                 customerIds: regionCustomerIds,
@@ -1627,7 +1868,7 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
                 ytd: true
               }
         );
-        const regionData = hasCustomerTagFilter
+        const regionData = hasCustomerSubsetFilter
           ? accountService.filterDataByCustomers(
               regionDataRaw,
               regionCustomerIds,
@@ -1635,7 +1876,7 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
               queryParams.subsidiaryId
             )
           : regionDataRaw;
-        const regionYtdData = hasCustomerTagFilter
+        const regionYtdData = hasCustomerSubsetFilter
           ? accountService.filterDataByCustomers(
               regionYtdDataRaw,
               regionCustomerIds,
@@ -1647,12 +1888,12 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
         const regionCustomersForCensus = uniqueCustomersById(
           queryParams.districtGroups.flatMap(group => group.customers)
         );
-        const regionCensus = sumCensusForCustomers(censusRecords, regionCustomersForCensus, date);
+        const regionCensus = sumCensusForCustomers(censusRecords, regionCustomersForCensus, date, regionCensusOptions);
 
         // Region summaries include census rollup
         const regionMeta = {
           typeLabel: 'Region',
-          entityName: selectedLabel,
+          entityName: hasServiceFilter ? `${selectedLabel} — Service: ${queryParams.serviceFilterName}` : selectedLabel,
           monthLabel: date,
           districtCount: 0, // Will be updated after processing
           facilityCount: 0, // Will be updated after processing
@@ -1667,6 +1908,9 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
         }
         if (queryParams.customerTagFilterName) {
           regionMeta.customerTagFilterName = queryParams.customerTagFilterName;
+        }
+        if (queryParams.serviceFilterName) {
+          regionMeta.serviceFilterName = queryParams.serviceFilterName;
         }
         
         console.log('   Generating region summary P&L (header will be updated with actual counts)...');
@@ -1713,10 +1957,12 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
           // 3a. Filter data for this district/tag (in memory, no BigQuery call)
           const groupType = districtGroup.isTag ? 'District Tag' : 'District';
           console.log(`   - ${groupType}: ${districtGroup.districtLabel} (${districtCustomerIds.length} customers)`);
-          const districtData = accountService.filterDataByCustomers(allCustomersData, districtCustomerIds);
-          const districtYtdData = accountService.filterDataByCustomers(allCustomersYtdData, districtCustomerIds);
+          const noCustomerRegionId = districtCustomerIds.includes(0) ? queryParams.regionId : null;
+          const noCustomerSubsidiaryId = districtCustomerIds.includes(0) ? queryParams.subsidiaryId : null;
+          const districtData = accountService.filterDataByCustomers(allCustomersData, districtCustomerIds, noCustomerRegionId, noCustomerSubsidiaryId);
+          const districtYtdData = accountService.filterDataByCustomers(allCustomersYtdData, districtCustomerIds, noCustomerRegionId, noCustomerSubsidiaryId);
           
-          const districtCensus = sumCensusForCustomers(censusRecords, districtGroup.customers, date);
+          const districtCensus = sumCensusForCustomers(censusRecords, districtGroup.customers, date, regionCensusOptions);
 
           // Create district meta with placeholder facility count (will be corrected after processing)
           const districtMeta = {
@@ -1755,11 +2001,13 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
             // 3b. Generate facility P&Ls for customers in this district (filter in memory)
             let districtFacilityCount = 0;
             for (const customer of districtGroup.customers) {
-              const facilityData = accountService.filterDataByCustomers(allCustomersData, [customer.customer_internal_id]);
-              const facilityYtdData = accountService.filterDataByCustomers(allCustomersYtdData, [customer.customer_internal_id]);
+              const facilityRegionId = customer.customer_internal_id === 0 ? queryParams.regionId : null;
+              const facilitySubsidiaryId = customer.customer_internal_id === 0 ? queryParams.subsidiaryId : null;
+              const facilityData = accountService.filterDataByCustomers(allCustomersData, [customer.customer_internal_id], facilityRegionId, facilitySubsidiaryId);
+              const facilityYtdData = accountService.filterDataByCustomers(allCustomersYtdData, [customer.customer_internal_id], facilityRegionId, facilitySubsidiaryId);
               
               const customerCode = customer.customer_code || getCustomerCodeFromLabel(customer.label);
-              const census = sumCensusForCodes(censusRecords, customerCode ? [customerCode] : [], date);
+              const census = sumCensusForCodes(censusRecords, customerCode ? [customerCode] : [], date, regionCensusOptions);
               
               const facilityMeta = {
                 typeLabel: 'Facility',

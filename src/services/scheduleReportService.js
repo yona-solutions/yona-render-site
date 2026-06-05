@@ -26,11 +26,24 @@ function getScheduleEntity(schedule) {
     };
   }
 
-  if (schedule.template_type === 'customer_tag' && schedule.customer_tag_id) {
-    return {
-      entityId: schedule.customer_tag_id,
-      entityName: schedule.customer_tag_name || 'Customer Tag'
-    };
+  if (schedule.template_type === 'customer_tag') {
+    if (schedule.subsidiary_id) {
+      return {
+        entityId: schedule.subsidiary_id,
+        entityName: schedule.subsidiary_name || 'Subsidiary'
+      };
+    }
+
+    if (schedule.customer_tag_id) {
+      return {
+        entityId: schedule.customer_tag_id,
+        entityName: schedule.customer_tag_name || 'Customer Tag'
+      };
+    }
+  }
+
+  if (schedule.template_type === 'customer_tag') {
+    throw new Error('Please select a subsidiary before generating the report');
   }
 
   throw new Error(`Please select a ${schedule.template_type} before generating the report`);
