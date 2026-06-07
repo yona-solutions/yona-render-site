@@ -23,6 +23,14 @@ function getCustomerTags(config) {
     .filter(Boolean);
 }
 
+function buildCustomerTagMeta(config) {
+  const customerTags = getCustomerTags(config);
+  return {
+    customerTags,
+    customerTagLabel: customerTags.length ? customerTags.join(', ') : null
+  };
+}
+
 function getDimensionDisplayOrder(id, config) {
   if (config?.order !== undefined && config.order !== null) {
     return config.order;
@@ -680,6 +688,7 @@ class StorageService {
             customer_code: customerCode,
             label: config.label,
             configId: id,
+            ...buildCustomerTagMeta(config),
             parentDistrictId: config.parent,
             start_date_est: config.start_date_est,
             customerPnlHidden: Boolean(config.customerPnlHidden),
@@ -746,6 +755,7 @@ class StorageService {
         customer_code: customerCode,
         label: config.label,
         configId: id,
+        ...buildCustomerTagMeta(config),
         parentDistrictId: config.parent,
         parentDistrictLabel: parentDistrictConfig?.label || config.parent || '',
         parentRegion: parentDistrictConfig?.districtRegion || parentDistrictConfig?.region_label || null,
@@ -827,6 +837,7 @@ class StorageService {
           ...customer,
           label: customerConfig.label || customer.label,
           configId: customerConfig.configId,
+          ...buildCustomerTagMeta(customerConfig),
           parentDistrictId: customerConfig.parent,
           parentDistrictLabel: configData[customerConfig.parent]?.label || customerConfig.parent || '',
           parentRegion: configData[customerConfig.parent]?.districtRegion || configData[customerConfig.parent]?.region_label || null,
@@ -898,6 +909,7 @@ class StorageService {
           customer_internal_id: config.customer_internal_id,
           label: config.label,
           configId: id,
+          ...buildCustomerTagMeta(config),
           customerPnlHidden: Boolean(config.customerPnlHidden),
           customerPnlCountExcluded: Boolean(config.customerPnlCountExcluded)
         });
@@ -1106,6 +1118,7 @@ class StorageService {
             ...customer,
             label: customerConfig.label || customer.label,
             configId: customerConfig.configId,
+            ...buildCustomerTagMeta(customerConfig),
             parentDistrictId,
             configOrderIndex: customerConfig.configOrderIndex,
             customerPnlHidden: Boolean(customerConfig.customerPnlHidden),
@@ -1301,6 +1314,7 @@ class StorageService {
               ...customer,
               label: customerConfigEntry.label || customer.label,
               configId: customerConfigEntry.configId,
+              ...buildCustomerTagMeta(customerConfigEntry),
               parentDistrictId,
               configOrderIndex: customerConfigEntry.configOrderIndex,
               customerPnlHidden: Boolean(customerConfigEntry.customerPnlHidden),
@@ -1365,6 +1379,7 @@ class StorageService {
         targetDistrict.customers.push({
           ...noCustomer,
           configId: noCustomerConfigEntry?.configId,
+          ...buildCustomerTagMeta(noCustomerConfigEntry),
           parentDistrictId: noCustomerParentDistrictId,
           configOrderIndex: noCustomerConfigEntry?.configOrderIndex,
           customerPnlHidden: Boolean(noCustomerConfigEntry?.customerPnlHidden),

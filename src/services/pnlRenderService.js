@@ -148,6 +148,7 @@ function generateHeader(meta) {
     actualCensus,
     budgetCensus,
     startDateEst,
+    customerTagLabel,
     headcount,
     accountCount,
     orgLabel,
@@ -213,6 +214,7 @@ function generateHeader(meta) {
         ${buildRow([
           formattedMonth,
           startDateEst ? `Start Date: ${formatStartDate(startDateEst)}` : '',
+          customerTagLabel,
           `Report Type: ${resolvedReportType}`
         ])}
         ${censusRow}

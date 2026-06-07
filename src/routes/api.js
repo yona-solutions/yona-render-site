@@ -151,6 +151,20 @@ function applyOrgLabel(meta, orgLabel) {
   return meta;
 }
 
+function applyFacilityCustomerTag(meta, customer) {
+  const customerTagLabel = typeof customer?.customerTagLabel === 'string'
+    ? customer.customerTagLabel.trim()
+    : (Array.isArray(customer?.customerTags)
+        ? customer.customerTags.map(tag => String(tag || '').trim()).filter(Boolean).join(', ')
+        : '');
+
+  if (customerTagLabel) {
+    meta.customerTagLabel = customerTagLabel;
+  }
+
+  return meta;
+}
+
 async function generateCustomerSummaryAndFacilityReport({
   bigQueryService,
   accountConfig,
@@ -250,6 +264,7 @@ async function generateCustomerSummaryAndFacilityReport({
       startDateEst: customer.start_date_est
     };
     applyOrgLabel(facilityMeta, orgLabel);
+    applyFacilityCustomerTag(facilityMeta, customer);
 
     const facilityResult = await pnlRenderService.generatePNLReport(
       facilityMonthData,
@@ -1125,6 +1140,7 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
               parentRegion: district.districtRegion || region.regionLabel
             };
             applyOrgLabel(facilityMeta, orgLabel);
+            applyFacilityCustomerTag(facilityMeta, customer);
 
             const facilityResult = await pnlRenderService.generatePNLReport(
               facilityMonthData,
@@ -2022,6 +2038,7 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
                 startDateEst: customer.start_date_est
               };
               applyOrgLabel(facilityMeta, orgLabel);
+              applyFacilityCustomerTag(facilityMeta, customer);
               
               const facilityResult = await pnlRenderService.generatePNLReport(
                 facilityData,
@@ -2402,6 +2419,7 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
                 parentRegion: district.districtRegion || region.regionLabel
               };
               applyOrgLabel(facilityMeta, orgLabel);
+              applyFacilityCustomerTag(facilityMeta, customer);
               
               const facilityResult = await pnlRenderService.generatePNLReport(
                 facilityMonthData,
