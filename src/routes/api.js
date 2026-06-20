@@ -3139,9 +3139,12 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
   // In-memory state for tracking the import job
   let gcsImportState = {
     running: false,
-    stage: 'idle',       // idle | loading | cleanup | transform | done | failed
+    stage: 'idle',       // idle | netsuite_export | loading | cleanup | transform | dimension_export | done | failed
     startedAt: null,
     completedAt: null,
+    initiatedByEmail: null,
+    triggerType: null,
+    source: null,
     result: null,
     error: null,
   };
@@ -3157,6 +3160,53 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
     if (!exists) return null;
     const [contents] = await file.download();
     return JSON.parse(contents.toString('utf8'));
+  }
+
+  async function backfillLatestGcsImportLogMetadata({ startedAt, completedAt, initiatedByEmail, triggerType, source }) {
+    if (!pgPool || !startedAt) {
+      return null;
+    }
+
+    const startedAtMs = Date.parse(startedAt);
+    const completedAtMs = completedAt ? Date.parse(completedAt) : Date.now();
+    const lowerBound = new Date((Number.isFinite(startedAtMs) ? startedAtMs : Date.now()) - (5 * 60 * 1000)).toISOString();
+    const upperBound = new Date((Number.isFinite(completedAtMs) ? completedAtMs : Date.now()) + (2 * 60 * 1000)).toISOString();
+
+    for (let attempt = 0; attempt < 5; attempt++) {
+      try {
+        const result = await pgPool.query(
+          `
+            WITH candidate AS (
+              SELECT id
+              FROM gcs_import_logs
+              WHERE started_at >= $1
+                AND started_at <= $2
+              ORDER BY started_at DESC
+              LIMIT 1
+            )
+            UPDATE gcs_import_logs AS logs
+            SET initiated_by_email = COALESCE($3, logs.initiated_by_email),
+                trigger_type = COALESCE($4, logs.trigger_type),
+                source = COALESCE($5, logs.source)
+            FROM candidate
+            WHERE logs.id = candidate.id
+            RETURNING logs.id, logs.initiated_by_email, logs.trigger_type, logs.source
+          `,
+          [lowerBound, upperBound, initiatedByEmail, triggerType, source]
+        );
+
+        if (result.rows.length > 0) {
+          return result.rows[0];
+        }
+      } catch (error) {
+        console.warn('Failed to backfill gcs_import_logs metadata:', error.message);
+        return null;
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 1500));
+    }
+
+    return null;
   }
 
   /**
@@ -3217,18 +3267,23 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
       });
     }
 
+    const initiatedByEmail = String(req.user?.email || '').trim().toLowerCase() || null;
+
     // Reset and mark as running
     gcsImportState = {
       running: true,
-      stage: 'loading',
+      stage: 'netsuite_export',
       startedAt: new Date().toISOString(),
       completedAt: null,
+      initiatedByEmail,
+      triggerType: 'manual',
+      source: 'sphere_ui',
       result: null,
       error: null,
     };
 
     // Return immediately — run the function in the background
-    res.json({ success: true, message: 'Import started' });
+    res.json({ success: true, message: 'Import started', initiatedByEmail });
 
     // Background execution
     try {
@@ -3239,19 +3294,61 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
       const client = await auth.getIdTokenClient(GCS_FUNCTION_URL);
       const response = await client.request({
         url: GCS_FUNCTION_URL,
-        method: 'GET',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        data: {
+          initiatedByEmail,
+          triggerType: 'manual',
+          source: 'sphere_ui',
+        },
         timeout: 3600000, // 60 minutes — match cloud function timeout
       });
 
       const data = response.data;
 
       if (data.success) {
+        const completedAt = new Date().toISOString();
+
+        const backfilledLog = await backfillLatestGcsImportLogMetadata({
+          startedAt: gcsImportState.startedAt,
+          completedAt,
+          initiatedByEmail,
+          triggerType: 'manual',
+          source: 'sphere_ui',
+        });
+
+        if (backfilledLog) {
+          console.log(`Backfilled sync initiator metadata on gcs_import_logs row ${backfilledLog.id}`);
+        }
+
         gcsImportState.stage = 'done';
-        gcsImportState.result = data;
+        gcsImportState.result = {
+          ...data,
+          backfilledLogId: backfilledLog?.id || null,
+        };
       } else {
+        const completedAt = new Date().toISOString();
+
+        const backfilledLog = await backfillLatestGcsImportLogMetadata({
+          startedAt: gcsImportState.startedAt,
+          completedAt,
+          initiatedByEmail,
+          triggerType: 'manual',
+          source: 'sphere_ui',
+        });
+
+        if (backfilledLog) {
+          console.log(`Backfilled sync initiator metadata on gcs_import_logs row ${backfilledLog.id}`);
+        }
+
         gcsImportState.stage = 'failed';
         gcsImportState.error = data.error || 'Unknown error';
-        gcsImportState.result = data;
+        gcsImportState.result = {
+          ...data,
+          backfilledLogId: backfilledLog?.id || null,
+        };
       }
     } catch (error) {
       console.error('GCS import error:', error);

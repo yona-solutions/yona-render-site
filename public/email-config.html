@@ -649,6 +649,47 @@
       transform: rotate(180deg);
     }
 
+    .sortable-header {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .sort-button-group {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .sort-icon-btn {
+      border: 1px solid #d5deea;
+      background: white;
+      color: #718096;
+      border-radius: 4px;
+      width: 20px;
+      height: 20px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 10px;
+      line-height: 1;
+      transition: all 0.15s ease;
+      padding: 0;
+    }
+
+    .sort-icon-btn:hover {
+      border-color: #a0aec0;
+      color: #4a5568;
+      background: #f8fafc;
+    }
+
+    .sort-icon-btn.active {
+      background: #e6f0f8;
+      border-color: #4a7c9e;
+      color: #2d4a68;
+    }
+
     @media (max-width: 900px) {
       .section-header-actions {
         width: 100%;
@@ -1974,11 +2015,27 @@
           <table id="reportSchedulesTable">
             <thead>
               <tr>
-                <th style="width: 220px;">Group Name</th>
+                <th style="width: 220px;">
+                  <div class="sortable-header">
+                    <span>Group Name</span>
+                    <span class="sort-button-group">
+                      <button class="sort-icon-btn" id="sortNameAscBtn" type="button" onclick="setReportGroupSort('name', 'asc')" title="Sort by group name ascending" aria-label="Sort by group name ascending">▲</button>
+                      <button class="sort-icon-btn" id="sortNameDescBtn" type="button" onclick="setReportGroupSort('name', 'desc')" title="Sort by group name descending" aria-label="Sort by group name descending">▼</button>
+                    </span>
+                  </div>
+                </th>
                 <th style="width: 180px;">Tags</th>
                 <th>P&amp;Ls</th>
                 <th style="width: 220px;">Email Groups</th>
-                <th style="width: 170px;">Last Run</th>
+                <th style="width: 170px;">
+                  <div class="sortable-header">
+                    <span>Last Run</span>
+                    <span class="sort-button-group">
+                      <button class="sort-icon-btn" id="sortLastRunAscBtn" type="button" onclick="setReportGroupSort('last_run_at', 'asc')" title="Sort by last run oldest first" aria-label="Sort by last run oldest first">▲</button>
+                      <button class="sort-icon-btn" id="sortLastRunDescBtn" type="button" onclick="setReportGroupSort('last_run_at', 'desc')" title="Sort by last run newest first" aria-label="Sort by last run newest first">▼</button>
+                    </span>
+                  </div>
+                </th>
                 <th style="width: 160px; text-align: center;">Actions</th>
               </tr>
               <tr class="column-filter-row visible" id="reportGroupFilterRow">
@@ -2439,6 +2496,7 @@
     // Track unsaved changes
     let unsavedChanges = new Map(); // scheduleId -> changes object
     let filteredSchedules = []; // For filtering
+    let reportGroupSort = { key: null, direction: 'asc' };
 
     // ============================================
     // Initialization
@@ -3159,6 +3217,7 @@
         return true;
       });
 
+      filteredSchedules = sortReportGroups(filteredSchedules);
       renderReportSchedulesTable();
     }
 
@@ -3169,8 +3228,75 @@
         if (input) input.value = '';
       });
 
-      filteredSchedules = [...reportGroups];
+      filteredSchedules = sortReportGroups([...reportGroups]);
       renderReportSchedulesTable();
+    }
+
+    function setReportGroupSort(key, direction) {
+      reportGroupSort = { key, direction };
+      syncReportGroupSortButtons();
+      applyColumnFilters();
+    }
+
+    function syncReportGroupSortButtons() {
+      const buttonMap = [
+        { id: 'sortNameAscBtn', key: 'name', direction: 'asc' },
+        { id: 'sortNameDescBtn', key: 'name', direction: 'desc' },
+        { id: 'sortLastRunAscBtn', key: 'last_run_at', direction: 'asc' },
+        { id: 'sortLastRunDescBtn', key: 'last_run_at', direction: 'desc' },
+      ];
+
+      buttonMap.forEach(({ id, key, direction }) => {
+        const button = document.getElementById(id);
+        if (!button) return;
+
+        const isActive = reportGroupSort.key === key && reportGroupSort.direction === direction;
+        button.classList.toggle('active', isActive);
+        button.setAttribute('aria-pressed', String(isActive));
+      });
+    }
+
+    function sortReportGroups(groups) {
+      const list = Array.isArray(groups) ? [...groups] : [];
+      const { key, direction } = reportGroupSort || {};
+
+      if (!key) {
+        return list;
+      }
+
+      const sortMultiplier = direction === 'desc' ? -1 : 1;
+
+      list.sort((a, b) => {
+        if (key === 'name') {
+          const aName = String(a?.name || a?.template_name || '').trim();
+          const bName = String(b?.name || b?.template_name || '').trim();
+
+          if (!aName && !bName) return 0;
+          if (!aName) return 1;
+          if (!bName) return -1;
+
+          return aName.localeCompare(bName, undefined, { sensitivity: 'base', numeric: true }) * sortMultiplier;
+        }
+
+        if (key === 'last_run_at') {
+          const aTime = a?.last_run_at ? new Date(a.last_run_at).getTime() : null;
+          const bTime = b?.last_run_at ? new Date(b.last_run_at).getTime() : null;
+
+          const aValid = Number.isFinite(aTime);
+          const bValid = Number.isFinite(bTime);
+
+          if (!aValid && !bValid) return 0;
+          if (!aValid) return 1;
+          if (!bValid) return -1;
+
+          if (aTime === bTime) return 0;
+          return (aTime - bTime) * sortMultiplier;
+        }
+
+        return 0;
+      });
+
+      return list;
     }
 
     function toggleFilterRow() {
@@ -6138,7 +6264,8 @@
           ...group,
           template_name: group.name || group.template_name || ''
         }));
-        filteredSchedules = [...reportSchedules];
+        filteredSchedules = sortReportGroups([...reportGroups]);
+        syncReportGroupSortButtons();
         renderReportSchedulesTable();
       } catch (error) {
         console.error('Error loading report groups:', error);

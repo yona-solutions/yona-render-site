@@ -9,6 +9,7 @@
   "dependencies": {
     "@google-cloud/bigquery": "^7.0.0",
     "@google-cloud/storage": "^7.0.0",
+    "@sendgrid/mail": "^8.1.6",
     "pg": "^8.11.0"
   },
   "author": "Yona Solutions",

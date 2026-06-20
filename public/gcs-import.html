@@ -380,6 +380,26 @@
       return `${Math.floor(diff / 86400)}d ago`;
     }
 
+    function formatInitiatorLabel(initiatedByEmail, triggerType, source) {
+      if (initiatedByEmail) {
+        return initiatedByEmail;
+      }
+
+      if (triggerType === 'scheduled' || source === 'cloud_scheduler') {
+        return 'Scheduler';
+      }
+
+      if (triggerType === 'manual' || source === 'sphere_ui') {
+        return 'Manual / Unknown';
+      }
+
+      return 'Legacy / System';
+    }
+
+    function formatHistoryInitiator(log) {
+      return formatInitiatorLabel(log.initiated_by_email, log.trigger_type, log.source);
+    }
+
     function updateFreshnessCard(lastSyncedAt, running) {
       const timeEl = document.getElementById('freshness-time');
       const ageEl  = document.getElementById('freshness-age');
@@ -516,6 +536,7 @@
         <thead><tr>
           <th>Started (${tzAbbr})</th>
           <th>Completed (${tzAbbr})</th>
+          <th>Started By</th>
           <th>Status</th>
           <th>Duration</th>
           <th>Tables</th>
@@ -527,6 +548,7 @@
       for (const log of logs) {
         const started = log.started_at ? new Date(log.started_at).toLocaleString() : '-';
         const completed = log.completed_at ? new Date(log.completed_at).toLocaleString() : '-';
+        const initiator = escapeHtml(formatHistoryInitiator(log));
         const badge = `<span class="status-badge ${log.status}">${log.status}</span>`;
         const duration = log.duration_seconds != null ? `${log.duration_seconds}s` : '-';
         const tables = formatTablesCell(log.tables_loaded);
@@ -537,6 +559,7 @@
         html += `<tr>
           <td>${started}</td>
           <td>${completed}</td>
+          <td title="${initiator}">${initiator}</td>
           <td>${badge}</td>
           <td>${duration}</td>
           <td>${tables}</td>

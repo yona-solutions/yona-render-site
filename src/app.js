@@ -391,9 +391,33 @@ async function createApp() {
           tables_loaded JSONB,
           transformation_status VARCHAR(20),
           dimension_export_status VARCHAR(20),
+          initiated_by_email TEXT,
+          trigger_type TEXT,
+          source TEXT,
+          notification_result JSONB,
           error TEXT,
           created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )
+      `);
+
+      await emailConfigService.pool.query(`
+        ALTER TABLE gcs_import_logs
+        ADD COLUMN IF NOT EXISTS initiated_by_email TEXT
+      `);
+
+      await emailConfigService.pool.query(`
+        ALTER TABLE gcs_import_logs
+        ADD COLUMN IF NOT EXISTS trigger_type TEXT
+      `);
+
+      await emailConfigService.pool.query(`
+        ALTER TABLE gcs_import_logs
+        ADD COLUMN IF NOT EXISTS source TEXT
+      `);
+
+      await emailConfigService.pool.query(`
+        ALTER TABLE gcs_import_logs
+        ADD COLUMN IF NOT EXISTS notification_result JSONB
       `);
     } catch (error) {
       console.warn('⚠️  Could not ensure gcs_import_logs table:', error.message);
