@@ -29,8 +29,8 @@ RESPONSE=$(curl -s -X POST "https://api.render.com/v1/services/${SERVICE_ID}/dep
   -H "Content-Type: application/json" \
   -d '{"clearCache": "do_not_clear"}')
 
-DEPLOY_ID=$(echo $RESPONSE | python3 -c "import sys, json; print(json.load(sys.stdin).get('deploy', {}).get('id', ''))" 2>/dev/null)
-STATUS=$(echo $RESPONSE | python3 -c "import sys, json; print(json.load(sys.stdin).get('deploy', {}).get('status', 'unknown'))" 2>/dev/null)
+DEPLOY_ID=$(echo $RESPONSE | python3 -c "import sys, json; data=json.load(sys.stdin); deploy=data.get('deploy', data); print(deploy.get('id', ''))" 2>/dev/null)
+STATUS=$(echo $RESPONSE | python3 -c "import sys, json; data=json.load(sys.stdin); deploy=data.get('deploy', data); print(deploy.get('status', 'unknown'))" 2>/dev/null)
 
 if [ -z "$DEPLOY_ID" ]; then
   echo "❌ Failed to trigger deployment"
@@ -51,7 +51,7 @@ for i in {1..30}; do
   
   STATUS=$(curl -s "https://api.render.com/v1/services/${SERVICE_ID}/deploys/${DEPLOY_ID}" \
     -H "Authorization: Bearer $RENDER_API_KEY" | \
-    python3 -c "import sys, json; print(json.load(sys.stdin).get('deploy', {}).get('status', 'unknown'))" 2>/dev/null)
+    python3 -c "import sys, json; data=json.load(sys.stdin); deploy=data.get('deploy', data); print(deploy.get('status', 'unknown'))" 2>/dev/null)
   
   echo "[$(date +%H:%M:%S)] Status: $STATUS"
   
@@ -71,4 +71,3 @@ done
 echo ""
 echo "⏰ Deployment still in progress (taking longer than expected)"
 echo "📊 Check status at: https://dashboard.render.com/web/${SERVICE_ID}"
-
