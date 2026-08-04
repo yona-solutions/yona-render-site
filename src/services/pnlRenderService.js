@@ -128,6 +128,19 @@ function formatRegionHeaderTitle(entityName, customerTagFilterName) {
   return baseName.endsWith(expectedSuffix) ? baseName : `${baseName}${expectedSuffix}`;
 }
 
+function normalizeComparisonPeriod(period) {
+  return String(period || '').trim().toLowerCase() === 'qtd' ? 'qtd' : 'ytd';
+}
+
+function getComparisonPeriodLabels(meta = {}) {
+  const normalizedPeriod = normalizeComparisonPeriod(meta.comparisonPeriod);
+  return {
+    comparisonPeriod: normalizedPeriod,
+    shortLabel: normalizedPeriod === 'qtd' ? 'QTD' : 'YTD',
+    fullLabel: normalizedPeriod === 'qtd' ? 'Quarter-to-Date' : 'Year-to-Date'
+  };
+}
+
 /**
  * Generates the HTML header for a P&L report
  * Header varies based on entity type (Subsidiary, Region, District, Facility)
@@ -368,8 +381,8 @@ function generateHeader(meta) {
  * @param {Object} childrenMap - Map of parent label -> children labels
  * @param {Object} valMonthAct - Month actuals by account
  * @param {Object} valMonthBud - Month budget by account
- * @param {Object} valYtdAct - YTD actuals by account
- * @param {Object} valYtdBud - YTD budget by account
+ * @param {Object} valComparisonAct - Comparison-period actuals by account
+ * @param {Object} valComparisonBud - Comparison-period budget by account
  * @param {Object} incomeTotals - Income totals for percentage calculations
  * @param {boolean} isOperational - Whether this is operational P&L
  * @param {Set<string>} sectionAccounts - Top-level section accounts (for bolding)
@@ -382,8 +395,8 @@ function renderAccountRows(
   childrenMap,
   valMonthAct,
   valMonthBud,
-  valYtdAct,
-  valYtdBud,
+  valComparisonAct,
+  valComparisonBud,
   incomeTotals,
   isOperational,
   sectionAccounts
@@ -404,7 +417,7 @@ function renderAccountRows(
     kids.forEach(c => {
       html += renderAccountRows(
         c, level + 1, labelToConfig, childrenMap, valMonthAct, valMonthBud,
-        valYtdAct, valYtdBud, incomeTotals, isOperational, sectionAccounts
+        valComparisonAct, valComparisonBud, incomeTotals, isOperational, sectionAccounts
       );
     });
     return html;
@@ -412,20 +425,20 @@ function renderAccountRows(
   
   const act = valMonthAct[accountLabel] || 0;
   const bud = valMonthBud[accountLabel] || 0;
-  const ytdA = valYtdAct[accountLabel] || 0;
-  const ytdB = valYtdBud[accountLabel] || 0;
+  const comparisonAct = valComparisonAct[accountLabel] || 0;
+  const comparisonBud = valComparisonBud[accountLabel] || 0;
   
   // Render children first (they appear below parent)
   // Children are rendered even if parent has zero value
   kids.forEach(c => {
     html += renderAccountRows(
       c, level + 1, labelToConfig, childrenMap, valMonthAct, valMonthBud,
-      valYtdAct, valYtdBud, incomeTotals, isOperational, sectionAccounts
+      valComparisonAct, valComparisonBud, incomeTotals, isOperational, sectionAccounts
     );
   });
   
   // Skip rendering this account if it has no values
-  if (Math.abs(act + ytdA) < 0.0001) {
+  if (Math.abs(act + comparisonAct) < 0.0001) {
     return html;
   }
   
@@ -440,8 +453,8 @@ function renderAccountRows(
   // Calculate percentages relative to Income
   const pctMonthAct = incomeTotals.act ? (act / incomeTotals.act * 100) : null;
   const pctMonthBud = incomeTotals.bud ? (bud / incomeTotals.bud * 100) : null;
-  const pctYtdAct = incomeTotals.ytdAct ? (ytdA / incomeTotals.ytdAct * 100) : null;
-  const pctYtdBud = incomeTotals.ytdBud ? (ytdB / incomeTotals.ytdBud * 100) : null;
+  const pctComparisonAct = incomeTotals.comparisonAct ? (comparisonAct / incomeTotals.comparisonAct * 100) : null;
+  const pctComparisonBud = incomeTotals.comparisonBud ? (comparisonBud / incomeTotals.comparisonBud * 100) : null;
   
   html += `
     <tr style="font-weight:${shouldBold ? 600 : 400}">
@@ -452,11 +465,11 @@ function renderAccountRows(
       <td style="text-align:right; ${borderStyle}">${formatPercent(pctMonthBud)}</td>
       <td style="text-align:right; ${borderStyle}">${formatNumber(act - bud)}</td>
       <td></td>
-      <td style="text-align:right; ${borderStyle}">${formatNumber(ytdA)}</td>
-      <td style="text-align:right; ${borderStyle}">${formatPercent(pctYtdAct)}</td>
-      <td style="text-align:right; ${borderStyle}">${formatNumber(ytdB)}</td>
-      <td style="text-align:right; ${borderStyle}">${formatPercent(pctYtdBud)}</td>
-      <td style="text-align:right; ${borderStyle}">${formatNumber(ytdA - ytdB)}</td>
+      <td style="text-align:right; ${borderStyle}">${formatNumber(comparisonAct)}</td>
+      <td style="text-align:right; ${borderStyle}">${formatPercent(pctComparisonAct)}</td>
+      <td style="text-align:right; ${borderStyle}">${formatNumber(comparisonBud)}</td>
+      <td style="text-align:right; ${borderStyle}">${formatPercent(pctComparisonBud)}</td>
+      <td style="text-align:right; ${borderStyle}">${formatNumber(comparisonAct - comparisonBud)}</td>
     </tr>
   `;
   
@@ -467,15 +480,16 @@ function renderAccountRows(
  * Generates a complete P&L HTML report
  * 
  * @param {Object} monthData - BigQuery data for the month
- * @param {Object} ytdData - BigQuery data for YTD (can be null for now)
+ * @param {Object} comparisonData - BigQuery data for the selected comparison period (can be null for now)
  * @param {Object} meta - Metadata about the entity
  * @param {Object} accountConfig - Account configuration
  * @param {Object} childrenMap - Map of parent -> children
  * @param {Object} sectionConfig - Section configuration
  * @returns {Object} { noRevenue: boolean, html: string }
  */
-async function generatePNLReport(monthData, ytdData, meta, accountConfig, childrenMap, sectionConfig) {
+async function generatePNLReport(monthData, comparisonData, meta, accountConfig, childrenMap, sectionConfig) {
   const isOperational = meta.plType === 'Operational';
+  const { shortLabel: comparisonShortLabel } = getComparisonPeriodLabels(meta);
   
   // Build label-to-config map for efficient lookups
   const labelToConfig = {};
@@ -489,39 +503,39 @@ async function generatePNLReport(monthData, ytdData, meta, accountConfig, childr
   // Build totals by scenario
   const monthActuals = accountService.buildAccountTotals(monthData, 'Actuals');
   const monthBudget = accountService.buildAccountTotals(monthData, 'Budget');
-  const ytdActuals = ytdData ? accountService.buildAccountTotals(ytdData, 'Actuals') : {};
-  const ytdBudget = ytdData ? accountService.buildAccountTotals(ytdData, 'Budget') : {};
+  const comparisonActuals = comparisonData ? accountService.buildAccountTotals(comparisonData, 'Actuals') : {};
+  const comparisonBudget = comparisonData ? accountService.buildAccountTotals(comparisonData, 'Budget') : {};
 
   // Compute rollups (parent accounts aggregate children)
   const valMonthAct = accountService.computeRollups(monthActuals, accountConfig, childrenMap, isOperational);
   const valMonthBud = accountService.computeRollups(monthBudget, accountConfig, childrenMap, isOperational);
-  const valYtdAct = accountService.computeRollups(ytdActuals, accountConfig, childrenMap, isOperational);
-  const valYtdBud = accountService.computeRollups(ytdBudget, accountConfig, childrenMap, isOperational);
+  const valComparisonAct = accountService.computeRollups(comparisonActuals, accountConfig, childrenMap, isOperational);
+  const valComparisonBud = accountService.computeRollups(comparisonBudget, accountConfig, childrenMap, isOperational);
   
   // Get income totals for percentage calculations
   const incomeTotals = {
     act: valMonthAct['Income'] || 0,
     bud: valMonthBud['Income'] || 0,
-    ytdAct: valYtdAct['Income'] || 0,
-    ytdBud: valYtdBud['Income'] || 0
+    comparisonAct: valComparisonAct['Income'] || 0,
+    comparisonBud: valComparisonBud['Income'] || 0
   };
   
   const epsilon = 0.0001;
   const netIncomeMonth = valMonthAct['Net Income'] || 0;
-  const netIncomeYtd = valYtdAct['Net Income'] || 0;
+  const netIncomeComparison = valComparisonAct['Net Income'] || 0;
   const revenueMonth = valMonthAct['Income'] || 0;
-  const revenueYtd = valYtdAct['Income'] || 0;
+  const revenueComparison = valComparisonAct['Income'] || 0;
 
   // Facilities, districts, and regions are included only when they have non-zero net income.
   if (['Facility', 'District', 'District Tag', 'Customer Tag', 'Region'].includes(meta.typeLabel)) {
-    if (Math.abs(netIncomeMonth) < epsilon && Math.abs(netIncomeYtd) < epsilon) {
+    if (Math.abs(netIncomeMonth) < epsilon && Math.abs(netIncomeComparison) < epsilon) {
       return { noRevenue: true, html: '' };
     }
   }
 
   // Subsidiary summaries still use revenue to decide whether the overall page should render.
   if (['Subsidiary', 'Subsidiary Tag'].includes(meta.typeLabel)) {
-    if (Math.abs(revenueMonth) < epsilon && Math.abs(revenueYtd) < epsilon) {
+    if (Math.abs(revenueMonth) < epsilon && Math.abs(revenueComparison) < epsilon) {
       return { noRevenue: true, html: '' };
     }
   }
@@ -559,7 +573,7 @@ async function generatePNLReport(monthData, ytdData, meta, accountConfig, childr
     sortedAccounts.forEach(acct => {
       rowsHtml += renderAccountRows(
         acct, 1, labelToConfig, childrenMap, valMonthAct, valMonthBud,
-        valYtdAct, valYtdBud, incomeTotals, isOperational, sectionAccounts
+        valComparisonAct, valComparisonBud, incomeTotals, isOperational, sectionAccounts
       );
     });
   }
@@ -578,7 +592,7 @@ async function generatePNLReport(monthData, ytdData, meta, accountConfig, childr
             <th style="text-decoration:underline;">%</th>
             <th style="text-decoration:underline;">Act v Bud</th>
             <th></th>
-            <th style="text-decoration:underline;">YTD</th>
+            <th style="text-decoration:underline;">${comparisonShortLabel}</th>
             <th style="text-decoration:underline;">%</th>
             <th style="text-decoration:underline;">Budget</th>
             <th style="text-decoration:underline;">%</th>

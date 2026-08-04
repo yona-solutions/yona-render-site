@@ -99,7 +99,8 @@ class BigQueryService {
    * @param {number|Array<number>} params.subsidiaryId - Subsidiary internal ID (for subsidiary hierarchy, or optional district/region transaction filter)
    * @param {string} params.date - Date in YYYY-MM-DD format
    * @param {Object} params.accountConfig - Account configuration for label mapping
-   * @param {boolean} params.ytd - If true, query YTD (from start of year to date), otherwise just the month
+   * @param {boolean} params.ytd - If true, query the selected comparison period, otherwise just the month
+   * @param {string} params.comparisonPeriod - Comparison period for ytd queries: "ytd" or "qtd"
    * @returns {Promise<Object>} P&L data in array format
    * @throws {Error} If BigQuery is not initialized or query fails
    */
@@ -108,7 +109,16 @@ class BigQueryService {
       throw new Error('BigQuery not initialized');
     }
 
-    const { hierarchy, customerIds, regionId, subsidiaryId, date, accountConfig, ytd = false } = params;
+    const {
+      hierarchy,
+      customerIds,
+      regionId,
+      subsidiaryId,
+      date,
+      accountConfig,
+      ytd = false,
+      comparisonPeriod = 'ytd'
+    } = params;
 
     // Build the WHERE clause based on hierarchy type
     let whereClause = '';
@@ -164,12 +174,22 @@ class BigQueryService {
       throw new Error(`Invalid hierarchy parameters: ${hierarchy}`);
     }
 
-    // Build date filter based on YTD flag
-    // YTD (Year-to-Date): Sum all transactions from Jan 1 through the selected month
-    // Month: Only transactions for the selected month
-    const dateFilter = ytd 
-      ? 'time_date <= @date AND time_date >= DATE_TRUNC(@date, YEAR)'  // e.g., 2025-01-01 through 2025-08-01
-      : 'time_date = @date';  // e.g., only 2025-08-01
+    const normalizedComparisonPeriod = String(comparisonPeriod || '').trim().toLowerCase() === 'qtd'
+      ? 'qtd'
+      : 'ytd';
+
+    // Build date filter based on requested period.
+    // YTD (Year-to-Date): Sum all transactions from Jan 1 through the selected month.
+    // QTD (Quarter-to-Date): Sum all transactions from the quarter start through the selected month.
+    // Month: Only transactions for the selected month.
+    const dateFilter = ytd
+      ? (
+          normalizedComparisonPeriod === 'qtd'
+            ? 'time_date <= @date AND time_date >= DATE_TRUNC(@date, QUARTER)'
+            : 'time_date <= @date AND time_date >= DATE_TRUNC(@date, YEAR)'
+        )
+      : 'time_date = @date';
+    const periodLabel = ytd ? normalizedComparisonPeriod.toUpperCase() : 'Month';
 
     const query = `
       SELECT
@@ -194,12 +214,13 @@ class BigQueryService {
     `;
 
     // Log the query and parameters
-    console.log(`\n📊 BigQuery P&L Query (${ytd ? 'YTD' : 'Month'}):`);
+    console.log(`\n📊 BigQuery P&L Query (${periodLabel}):`);
     console.log('Query:', query);
     console.log('Parameters:', {
       ...queryParams,
       date: date,
-      ytd: ytd
+      ytd: ytd,
+      comparisonPeriod: normalizedComparisonPeriod
     });
 
     try {
@@ -212,7 +233,7 @@ class BigQueryService {
         }
       });
 
-      console.log(`✅ Retrieved ${rows.length} rows from BigQuery for ${hierarchy} (${ytd ? 'YTD' : 'Month'})`);
+      console.log(`✅ Retrieved ${rows.length} rows from BigQuery for ${hierarchy} (${periodLabel})`);
 
       // Transform to array format with account labels
       const result = this.transformToArrayFormat(rows, accountConfig);

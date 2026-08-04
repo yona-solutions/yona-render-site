@@ -399,7 +399,7 @@
               </div>
               <div class="step">
                 <div class="step-num">5</div>
-                <div>Exclude facilities where Net Income is zero in both Current Month and YTD, so output focuses on active locations.</div>
+                <div>Exclude facilities where Net Income is zero in both Current Month and the selected comparison period (YTD or QTD), so output focuses on active locations.</div>
               </div>
             </div>
             <div class="callout" style="margin-top: 12px;">
@@ -413,7 +413,7 @@
             <div class="grid">
               <div class="grid-item">
                 <h4>Subsidiary tab</h4>
-                <p>1) Run subsidiary summary using <strong>subsidiary_internal_id</strong> (Month + YTD). 2) Pull all customers in that subsidiary from <strong>dim_customers</strong> (optional region or district‑tag filter applies here). 3) Group customers into Regions and Districts. 4) For each Region, run a region summary using <strong>region_internal_id + subsidiary_internal_id</strong>. 5) Build District and Facility detail from the shared customer transaction set, with an optional checkbox to also apply the subsidiary filter to that detail.</p>
+                <p>1) Run subsidiary summary using <strong>subsidiary_internal_id</strong> (Month + selected comparison period: YTD or QTD). 2) Pull all customers in that subsidiary from <strong>dim_customers</strong> (optional region or district‑tag filter applies here). 3) Group customers into Regions and Districts. 4) For each Region, run a region summary using <strong>region_internal_id + subsidiary_internal_id</strong>. 5) Build District and Facility detail from the shared customer transaction set, with an optional checkbox to also apply the subsidiary filter to that detail.</p>
               </div>
               <div class="grid-item">
                 <h4>Region tab</h4>
@@ -421,11 +421,11 @@
               </div>
               <div class="grid-item">
                 <h4>District tab</h4>
-                <p>1) Pull all customers for the selected district (or district tag) from <strong>dim_customers</strong>. 2) Optionally narrow that report with a subsidiary filter. 3) Run the district summary using the matching customer transaction rows (Month + YTD). 4) Build Facility P&amp;Ls from that same filtered transaction set.</p>
+                <p>1) Pull all customers for the selected district (or district tag) from <strong>dim_customers</strong>. 2) Optionally narrow that report with a subsidiary filter. 3) Run the district summary using the matching customer transaction rows (Month + selected comparison period: YTD or QTD). 4) Build Facility P&amp;Ls from that same filtered transaction set.</p>
               </div>
               <div class="grid-item">
                 <h4>Facility detail</h4>
-                <p>Facility rows are built from customer‑level transactions only. If Net Income is zero for both Current Month and YTD, that facility is excluded from the output and counts.</p>
+                <p>Facility rows are built from customer‑level transactions only. If Net Income is zero for both Current Month and the selected comparison period, that facility is excluded from the output and counts.</p>
               </div>
             </div>
           </section>
@@ -455,9 +455,9 @@
           <section id="counts" class="section-card">
             <div class="section-title">How counts are calculated</div>
             <div class="list">
-              <div><strong>Region count (Subsidiary tab):</strong> Regions included after filtering, and only if the Region summary has non-zero Net Income (Current Month OR YTD).</div>
-              <div><strong>District count (Subsidiary/Region tabs):</strong> Districts included only if the District summary has non-zero Net Income (Current Month OR YTD), and only if that district is not marked “summary excluded.”</div>
-              <div><strong>Facility count (all tabs):</strong> Facilities included only if Net Income is non‑zero (Current Month OR YTD).</div>
+              <div><strong>Region count (Subsidiary tab):</strong> Regions included after filtering, and only if the Region summary has non-zero Net Income (Current Month OR selected comparison period).</div>
+              <div><strong>District count (Subsidiary/Region tabs):</strong> Districts included only if the District summary has non-zero Net Income (Current Month OR selected comparison period), and only if that district is not marked “summary excluded.”</div>
+              <div><strong>Facility count (all tabs):</strong> Facilities included only if Net Income is non‑zero (Current Month OR selected comparison period).</div>
             </div>
             <div class="callout" style="margin-top: 12px;">
               Counts are refreshed after detail is built, so headers reflect what you actually see in the output.

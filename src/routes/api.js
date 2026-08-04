@@ -144,10 +144,33 @@ function parseBooleanQuery(value) {
   return ['1', 'true', 'yes', 'on'].includes(String(rawValue).trim().toLowerCase());
 }
 
+function normalizeComparisonPeriod(value) {
+  const rawValue = Array.isArray(value) ? value[0] : value;
+  return String(rawValue || '').trim().toLowerCase() === 'qtd' ? 'qtd' : 'ytd';
+}
+
+function getComparisonPeriodLabel(comparisonPeriod) {
+  return normalizeComparisonPeriod(comparisonPeriod) === 'qtd'
+    ? 'Quarter-to-Date'
+    : 'Year-to-Date';
+}
+
+function getComparisonPeriodShortLabel(comparisonPeriod) {
+  return normalizeComparisonPeriod(comparisonPeriod) === 'qtd' ? 'QTD' : 'YTD';
+}
+
 function applyOrgLabel(meta, orgLabel) {
   if (orgLabel) {
     meta.orgLabel = orgLabel;
   }
+  return meta;
+}
+
+function applyComparisonPeriod(meta, comparisonPeriod) {
+  const normalizedComparisonPeriod = normalizeComparisonPeriod(comparisonPeriod);
+  meta.comparisonPeriod = normalizedComparisonPeriod;
+  meta.comparisonPeriodLabel = getComparisonPeriodLabel(normalizedComparisonPeriod);
+  meta.comparisonPeriodShortLabel = getComparisonPeriodShortLabel(normalizedComparisonPeriod);
   return meta;
 }
 
@@ -177,13 +200,15 @@ async function generateCustomerSummaryAndFacilityReport({
   customerIds,
   date,
   reportPlType,
+  comparisonPeriod = 'ytd',
   orgLabel,
   subsidiaryId = null,
   subsidiaryFilterName = null,
   summaryParentRegion = '',
   resolveFacilityContext
 }) {
-  console.log(`   Querying BigQuery for ${summaryTypeLabel.toLowerCase()} summary (Month + YTD)...`);
+  const comparisonShortLabel = getComparisonPeriodShortLabel(comparisonPeriod);
+  console.log(`   Querying BigQuery for ${summaryTypeLabel.toLowerCase()} summary (Month + ${comparisonShortLabel})...`);
   const monthData = await bigQueryService.getPLData({
     hierarchy: 'district',
     customerIds,
@@ -198,7 +223,8 @@ async function generateCustomerSummaryAndFacilityReport({
     subsidiaryId,
     date,
     accountConfig,
-    ytd: true
+    ytd: true,
+    comparisonPeriod
   });
 
   const summaryCensus = sumCensusForCustomers(censusRecords, customers, date);
@@ -214,6 +240,7 @@ async function generateCustomerSummaryAndFacilityReport({
     headcount: summaryCensus.headcount
   };
   applyOrgLabel(summaryMeta, orgLabel);
+  applyComparisonPeriod(summaryMeta, comparisonPeriod);
   if (subsidiaryFilterName) {
     summaryMeta.subsidiaryFilterName = subsidiaryFilterName;
   }
@@ -264,6 +291,7 @@ async function generateCustomerSummaryAndFacilityReport({
       startDateEst: customer.start_date_est
     };
     applyOrgLabel(facilityMeta, orgLabel);
+    applyComparisonPeriod(facilityMeta, comparisonPeriod);
     applyFacilityCustomerTag(facilityMeta, customer);
 
     const facilityResult = await pnlRenderService.generatePNLReport(
@@ -310,6 +338,7 @@ async function generateCustomerTagSummaryPacketReport({
   customerTagGroups,
   date,
   reportPlType,
+  comparisonPeriod = 'ytd',
   orgLabel,
   subsidiaryId = null,
   subsidiaryName = null,
@@ -331,6 +360,7 @@ async function generateCustomerTagSummaryPacketReport({
     accountCount: 0
   };
   applyOrgLabel(packetMeta, orgLabel);
+  applyComparisonPeriod(packetMeta, comparisonPeriod);
   if (subsidiaryName) {
     packetMeta.subsidiaryFilterName = subsidiaryName;
   }
@@ -363,7 +393,8 @@ async function generateCustomerTagSummaryPacketReport({
     subsidiaryId,
     date,
     accountConfig,
-    ytd: true
+    ytd: true,
+    comparisonPeriod
   });
 
   const summaryPages = [];
@@ -407,6 +438,7 @@ async function generateCustomerTagSummaryPacketReport({
       headcount: groupCensus.headcount
     };
     applyOrgLabel(groupMeta, orgLabel);
+    applyComparisonPeriod(groupMeta, comparisonPeriod);
     if (subsidiaryName) {
       groupMeta.subsidiaryFilterName = subsidiaryName;
     }
@@ -771,6 +803,7 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
     try {
       const { hierarchy, selectedId, date, plType } = req.query;
       const orgLabel = getOrgLabelFromQuery(req.query);
+      const comparisonPeriod = normalizeComparisonPeriod(req.query.comparisonPeriod);
       const applySubsidiaryFilterToDetail = parseBooleanQuery(req.query.applySubsidiaryFilterToDetail);
 
       // Validate required parameters
@@ -784,7 +817,9 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
       }
 
       const reportPlType = plType === 'operational' ? 'Operational' : 'Standard';
+      const comparisonShortLabel = getComparisonPeriodShortLabel(comparisonPeriod);
       console.log(`📊 [SSE] Generating P&L report: hierarchy=${hierarchy}, selectedId=${selectedId}, date=${date}`);
+      console.log(`   📆 Comparison Period: ${comparisonShortLabel}`);
 
       // Parse selectedId
       let actualId, selectedLabel;
@@ -920,8 +955,8 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
       );
       const subsidiaryYtdDataRaw = await bigQueryService.getPLData(
         hasServiceFilter
-          ? { hierarchy: 'district', customerIds: serviceCustomerIds, date, accountConfig, ytd: true }
-          : { hierarchy: 'subsidiary', subsidiaryId, date, accountConfig, ytd: true }
+          ? { hierarchy: 'district', customerIds: serviceCustomerIds, date, accountConfig, ytd: true, comparisonPeriod }
+          : { hierarchy: 'subsidiary', subsidiaryId, date, accountConfig, ytd: true, comparisonPeriod }
       );
       const subsidiaryMonthData = hasServiceFilter
         ? accountService.filterDataByCustomers(subsidiaryMonthDataRaw, serviceCustomerIds, null, subsidiaryId)
@@ -950,7 +985,8 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
         subsidiaryId: applySubsidiaryFilterToDetail ? subsidiaryId : null,
         date,
         accountConfig,
-        ytd: true
+        ytd: true,
+        comparisonPeriod
       });
 
       // Step 3: Generate subsidiary report
@@ -975,6 +1011,7 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
         headcount: subsidiaryCensus.headcount
       };
       applyOrgLabel(subsidiaryMeta, orgLabel);
+      applyComparisonPeriod(subsidiaryMeta, comparisonPeriod);
       subsidiaryMeta.detailSubsidiaryFilterApplied = applySubsidiaryFilterToDetail;
 
       const subsidiaryResultReport = await pnlRenderService.generatePNLReport(
@@ -1025,8 +1062,8 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
         );
         const regionYtdDataRaw = await bigQueryService.getPLData(
           hasServiceFilter
-            ? { hierarchy: 'district', customerIds: regionServiceCustomerIds, date, accountConfig, ytd: true }
-            : { hierarchy: 'region', regionId: region.regionInternalId, subsidiaryId: subsidiaryId, date, accountConfig, ytd: true }
+            ? { hierarchy: 'district', customerIds: regionServiceCustomerIds, date, accountConfig, ytd: true, comparisonPeriod }
+            : { hierarchy: 'region', regionId: region.regionInternalId, subsidiaryId: subsidiaryId, date, accountConfig, ytd: true, comparisonPeriod }
         );
         const regionMonthData = hasServiceFilter
           ? accountService.filterDataByCustomers(regionMonthDataRaw, regionServiceCustomerIds, region.regionInternalId, subsidiaryId)
@@ -1052,6 +1089,7 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
           headcount: regionCensus.headcount
         };
         applyOrgLabel(regionMeta, orgLabel);
+        applyComparisonPeriod(regionMeta, comparisonPeriod);
 
         const regionResult = await pnlRenderService.generatePNLReport(
           regionMonthData,
@@ -1096,6 +1134,7 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
           headcount: districtCensus.headcount
         };
         applyOrgLabel(districtMeta, orgLabel);
+        applyComparisonPeriod(districtMeta, comparisonPeriod);
 
           const districtResult = await pnlRenderService.generatePNLReport(
             districtMonthData,
@@ -1140,6 +1179,7 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
               parentRegion: district.districtRegion || region.regionLabel
             };
             applyOrgLabel(facilityMeta, orgLabel);
+            applyComparisonPeriod(facilityMeta, comparisonPeriod);
             applyFacilityCustomerTag(facilityMeta, customer);
 
             const facilityResult = await pnlRenderService.generatePNLReport(
@@ -1283,6 +1323,7 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
     try {
       const { hierarchy, selectedId, date, plType } = req.query;
       const orgLabel = getOrgLabelFromQuery(req.query);
+      const comparisonPeriod = normalizeComparisonPeriod(req.query.comparisonPeriod);
       const applySubsidiaryFilterToDetail = parseBooleanQuery(req.query.applySubsidiaryFilterToDetail);
 
       // Validate required parameters
@@ -1296,7 +1337,9 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
       
       // Get P&L Type (Standard or Operational), default to Standard
       const reportPlType = plType === 'operational' ? 'Operational' : 'Standard';
+      const comparisonShortLabel = getComparisonPeriodShortLabel(comparisonPeriod);
       console.log(`   📊 P&L Type: ${reportPlType}`);
+      console.log(`   📆 Comparison Period: ${comparisonShortLabel}`);
 
       // Validate hierarchy type
       if (!['district', 'region', 'subsidiary', 'customer_tag'].includes(hierarchy)) {
@@ -1767,6 +1810,7 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
           customerIds: queryParams.customerIds,
           date,
           reportPlType,
+          comparisonPeriod,
           orgLabel,
           subsidiaryId: queryParams.subsidiaryId || null,
           subsidiaryFilterName: queryParams.subsidiaryFilterName || null,
@@ -1801,6 +1845,7 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
           customerTagGroups: queryParams.customerTagGroups,
           date,
           reportPlType,
+          comparisonPeriod,
           orgLabel,
           subsidiaryId: queryParams.subsidiaryId || null,
           subsidiaryName: queryParams.subsidiaryFilterName || null,
@@ -1845,7 +1890,7 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
           : {};
 
         // 1. Generate region summary P&L
-        console.log('   Querying BigQuery for region summary (Month + YTD)...');
+        console.log(`   Querying BigQuery for region summary (Month + ${comparisonShortLabel})...`);
         const regionDataRaw = await bigQueryService.getPLData(
           hasCustomerSubsetFilter
             ? {
@@ -1873,7 +1918,8 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
                 subsidiaryId: queryParams.subsidiaryId || null,
                 date,
                 accountConfig,
-                ytd: true
+                ytd: true,
+                comparisonPeriod
               }
             : {
                 hierarchy: 'region',
@@ -1881,7 +1927,8 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
                 subsidiaryId: queryParams.subsidiaryId,
                 date,
                 accountConfig,
-                ytd: true
+                ytd: true,
+                comparisonPeriod
               }
         );
         const regionData = hasCustomerSubsetFilter
@@ -1919,6 +1966,7 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
           headcount: regionCensus.headcount
         };
         applyOrgLabel(regionMeta, orgLabel);
+        applyComparisonPeriod(regionMeta, comparisonPeriod);
         if (queryParams.subsidiaryFilterName) {
           regionMeta.subsidiaryFilterName = queryParams.subsidiaryFilterName;
         }
@@ -1946,7 +1994,7 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
         
         // 2. Query ALL customer data ONCE (all customers in region, all their transactions)
         // This includes transactions outside the region - customers' full P&L
-        console.log(`   Querying BigQuery for all ${queryParams.allowedCustomerIds.length} customers (Month + YTD)...`);
+        console.log(`   Querying BigQuery for all ${queryParams.allowedCustomerIds.length} customers (Month + ${comparisonShortLabel})...`);
         const allCustomerIds = queryParams.allowedCustomerIds;
         const allCustomersQueryParams = {
           hierarchy: 'district',
@@ -1957,7 +2005,7 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
         };
         
         const allCustomersData = await bigQueryService.getPLData({ ...allCustomersQueryParams, ytd: false });
-        const allCustomersYtdData = await bigQueryService.getPLData({ ...allCustomersQueryParams, ytd: true });
+        const allCustomersYtdData = await bigQueryService.getPLData({ ...allCustomersQueryParams, ytd: true, comparisonPeriod });
         
         console.log(`   ✅ Retrieved data for all customers. Now filtering in memory...`);
         
@@ -1993,6 +2041,7 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
             headcount: districtCensus.headcount
           };
           applyOrgLabel(districtMeta, orgLabel);
+          applyComparisonPeriod(districtMeta, comparisonPeriod);
           
           const districtResult = await pnlRenderService.generatePNLReport(
             districtData,
@@ -2038,6 +2087,7 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
                 startDateEst: customer.start_date_est
               };
               applyOrgLabel(facilityMeta, orgLabel);
+              applyComparisonPeriod(facilityMeta, comparisonPeriod);
               applyFacilityCustomerTag(facilityMeta, customer);
               
               const facilityResult = await pnlRenderService.generatePNLReport(
@@ -2176,8 +2226,8 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
         );
         const subsidiaryYtdDataRaw = await bigQueryService.getPLData(
           hasServiceFilter
-            ? { hierarchy: 'district', customerIds: serviceCustomerIds, date, accountConfig, ytd: true }
-            : { hierarchy: 'subsidiary', subsidiaryId, date, accountConfig, ytd: true }
+            ? { hierarchy: 'district', customerIds: serviceCustomerIds, date, accountConfig, ytd: true, comparisonPeriod }
+            : { hierarchy: 'subsidiary', subsidiaryId, date, accountConfig, ytd: true, comparisonPeriod }
         );
         const subsidiaryMonthData = hasServiceFilter
           ? accountService.filterDataByCustomers(subsidiaryMonthDataRaw, serviceCustomerIds, null, subsidiaryId)
@@ -2205,7 +2255,8 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
           subsidiaryId: queryParams.applySubsidiaryFilterToDetail ? subsidiaryId : null,
           date, 
           accountConfig, 
-          ytd: true 
+          ytd: true,
+          comparisonPeriod
         });
         
         console.log('   ✅ Query complete - processing results in memory...');
@@ -2243,6 +2294,7 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
           headcount: subsidiaryCensus.headcount
         };
         applyOrgLabel(subsidiaryMeta, orgLabel);
+        applyComparisonPeriod(subsidiaryMeta, comparisonPeriod);
         subsidiaryMeta.detailSubsidiaryFilterApplied = queryParams.applySubsidiaryFilterToDetail;
         
         const subsidiaryResult = await pnlRenderService.generatePNLReport(
@@ -2295,8 +2347,8 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
           );
           const regionYtdDataRaw = await bigQueryService.getPLData(
             hasServiceFilter
-              ? { hierarchy: 'district', customerIds: regionServiceCustomerIds, date, accountConfig, ytd: true }
-              : { hierarchy: 'region', regionId: region.regionInternalId, subsidiaryId: subsidiaryId, date, accountConfig, ytd: true }
+              ? { hierarchy: 'district', customerIds: regionServiceCustomerIds, date, accountConfig, ytd: true, comparisonPeriod }
+              : { hierarchy: 'region', regionId: region.regionInternalId, subsidiaryId: subsidiaryId, date, accountConfig, ytd: true, comparisonPeriod }
           );
           const regionMonthData = hasServiceFilter
             ? accountService.filterDataByCustomers(regionMonthDataRaw, regionServiceCustomerIds, region.regionInternalId, subsidiaryId)
@@ -2323,6 +2375,7 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
             headcount: regionCensus.headcount
           };
           applyOrgLabel(regionMeta, orgLabel);
+          applyComparisonPeriod(regionMeta, comparisonPeriod);
           
           const regionResult = await pnlRenderService.generatePNLReport(
             regionMonthData,
@@ -2373,6 +2426,7 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
               headcount: districtCensus.headcount
             };
             applyOrgLabel(districtMeta, orgLabel);
+            applyComparisonPeriod(districtMeta, comparisonPeriod);
             
           const districtResult = await pnlRenderService.generatePNLReport(
             districtMonthData,
@@ -2419,6 +2473,7 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
                 parentRegion: district.districtRegion || region.regionLabel
               };
               applyOrgLabel(facilityMeta, orgLabel);
+              applyComparisonPeriod(facilityMeta, comparisonPeriod);
               applyFacilityCustomerTag(facilityMeta, customer);
               
               const facilityResult = await pnlRenderService.generatePNLReport(

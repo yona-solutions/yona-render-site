@@ -1027,6 +1027,14 @@
           </div>
         </div>
 
+        <div class="control-group control-group-toggle">
+          <label class="control-label">Comparison</label>
+          <div class="toggle-group">
+            <button class="toggle-btn active" data-comparison="ytd">YTD</button>
+            <button class="toggle-btn" data-comparison="qtd">QTD</button>
+          </div>
+        </div>
+
         <div class="control-group control-group-narrow">
           <label class="control-label">Month</label>
           <div class="searchable-select" id="monthSelectWrapper">
@@ -1041,7 +1049,7 @@
         </div>
 
         <div class="control-group control-group-main">
-          <label class="control-label">District</label>
+          <label class="control-label" id="hierarchySelectLabel">District</label>
           <div class="searchable-select" id="districtSelectWrapper">
             <input 
               type="text" 
@@ -1376,6 +1384,11 @@
       return subsidiaryHeaderSelect?.selectedLabel?.trim() || '';
     }
 
+    function getSelectedComparisonPeriod() {
+      const comparisonBtn = document.querySelector('.toggle-btn.active[data-comparison]');
+      return comparisonBtn ? comparisonBtn.dataset.comparison : 'ytd';
+    }
+
     function getPreferredMonthValue() {
       const now = new Date();
       const previousMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
@@ -1626,7 +1639,7 @@
       currentHierarchyLabel = selectionLabel;
 
       // Update the dropdown label to match selected hierarchy
-      const hierarchyLabel = document.querySelector('.control-group:nth-child(3) .control-label');
+      const hierarchyLabel = document.getElementById('hierarchySelectLabel');
       hierarchyLabel.textContent = selectionLabel;
 
       // Update the dropdown placeholder
@@ -1732,7 +1745,11 @@
       btn.addEventListener('click', function() {
         this.parentElement.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active'));
         this.classList.add('active');
-        console.log('P&L Type changed to:', this.dataset.type);
+        if (this.dataset.type) {
+          console.log('P&L Type changed to:', this.dataset.type);
+        } else if (this.dataset.comparison) {
+          console.log('Comparison period changed to:', this.dataset.comparison);
+        }
       });
     });
 
@@ -1797,13 +1814,15 @@
       // Get P&L Type from toggle buttons
       const plTypeBtn = document.querySelector('.toggle-btn.active[data-type]');
       const plType = plTypeBtn ? plTypeBtn.dataset.type : 'standard';
+      const comparisonPeriod = getSelectedComparisonPeriod();
       
       console.log('Current selections:', {
         hierarchy,
         selectedId,
         selectedLabel,
         selectedDate,
-        plType
+        plType,
+        comparisonPeriod
       });
       
       // Validate selections
@@ -1879,7 +1898,7 @@
         `;
         
         // Build API URL
-        let url = `/api/pl/data?hierarchy=${hierarchy}&selectedId=${encodeURIComponent(selectedId)}&date=${selectedDate}&plType=${plType}`;
+        let url = `/api/pl/data?hierarchy=${hierarchy}&selectedId=${encodeURIComponent(selectedId)}&date=${selectedDate}&plType=${plType}&comparisonPeriod=${encodeURIComponent(comparisonPeriod)}`;
 
         const selectedHeaderLabel = getSelectedSubsidiaryHeaderLabel();
         if (selectedHeaderLabel) {
@@ -2044,7 +2063,7 @@
       
       // Update metadata
       document.getElementById('resultsMetadata').textContent = 
-        `${meta.typeLabel}: ${selectedLabel} | Date: ${date}`;
+        `${meta.typeLabel}: ${selectedLabel} | Date: ${date} | Comparison: ${meta.comparisonPeriodShortLabel || 'YTD'}`;
       
       // Display meta information
       const queryInfo = document.getElementById('queryInfo');
@@ -2052,6 +2071,7 @@
       metaInfoHtml += `<strong>Type:</strong> ${escapeHtml(meta.typeLabel)}<br>`;
       metaInfoHtml += `<strong>Entity:</strong> ${escapeHtml(selectedLabel)}<br>`;
       metaInfoHtml += `<strong>Period:</strong> ${escapeHtml(date)}<br>`;
+      metaInfoHtml += `<strong>Comparison:</strong> ${escapeHtml(meta.comparisonPeriodLabel || 'Year-to-Date')}<br>`;
       if (meta.orgLabel) {
         metaInfoHtml += `<strong>Header:</strong> ${escapeHtml(meta.orgLabel)}<br>`;
       }
@@ -2152,7 +2172,7 @@
     /**
      * Decide if a single report page has a valid, non-zero "Net Income" row
      * @param {Element} containerEl - Report container element
-     * @returns {boolean} True if has non-zero net income (Current Month Actuals OR YTD Actuals)
+     * @returns {boolean} True if has non-zero net income (Current Month Actuals OR comparison-period Actuals)
      */
     function hasNonZeroIncome(containerEl) {
       const table = containerEl.querySelector(".pnl-report-table");
@@ -2165,12 +2185,12 @@
         // first column text
         const label = (cells[0].textContent || "").trim();
         if (label === "Net Income") {
-          // Current Month Actuals = index 1, YTD Actuals = index 7
+          // Current Month Actuals = index 1, comparison-period Actuals = index 7
           const currentMonthCell = cells[1];
-          const ytdCell = cells[7];
+          const comparisonCell = cells[7];
           const monthValue = parseAccountingToNumber(currentMonthCell?.textContent || "");
-          const ytdValue = parseAccountingToNumber(ytdCell?.textContent || "");
-          return Math.abs(monthValue) > 0.0001 || Math.abs(ytdValue) > 0.0001;
+          const comparisonValue = parseAccountingToNumber(comparisonCell?.textContent || "");
+          return Math.abs(monthValue) > 0.0001 || Math.abs(comparisonValue) > 0.0001;
         }
       }
       // No "Net Income" row found
