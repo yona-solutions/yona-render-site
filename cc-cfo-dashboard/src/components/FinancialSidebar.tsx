@@ -3,8 +3,10 @@ import { LayoutDashboard, TrendingUp, Receipt, CircleDollarSign, FileText, Activ
 import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from "@/components/ui/sidebar";
 import { Badge } from "@/components/ui/badge";
 import { useQuickBooksConnectionStatus } from "@/hooks/useQuickBooksConnectionStatus";
-import { CheckCircle2, Link2Off } from "lucide-react";
+import { CheckCircle2, Link2Off, Mail } from "lucide-react";
 import cureCompanyLogo from "@/assets/cure-company-logo.png";
+
+const SUPPORT_EMAIL = "accounting@yonasolutions.com";
 const mainNavItems = [{
   title: "Overview",
   url: "/",
@@ -103,22 +105,38 @@ export function FinancialSidebar() {
 
       <SidebarFooter className="border-t border-sidebar-border px-4 py-4">
         {!collapsed ? (
-          <div className="rounded-xl border border-sidebar-border bg-card/70 p-3">
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">QuickBooks</div>
-                <div className="mt-1 truncate text-sm font-medium text-sidebar-foreground">{quickBooksAccountName}</div>
+          <div className="space-y-3">
+            <div className="rounded-xl border border-sidebar-border bg-card/70 p-3">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">QuickBooks</div>
+                  <div className="mt-1 truncate text-sm font-medium text-sidebar-foreground">{quickBooksAccountName}</div>
+                </div>
+                <Badge
+                  variant={isQuickBooksConnected ? "outline" : "secondary"}
+                  className={`${isQuickBooksConnected ? "border-emerald-200 bg-emerald-50 text-emerald-700" : ""} gap-1 px-2 py-0.5 text-[11px]`}
+                >
+                  {isQuickBooksConnected ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Link2Off className="h-3.5 w-3.5" />}
+                  {isQuickBooksConnected ? "Connected" : "Disconnected"}
+                </Badge>
               </div>
-              <Badge
-                variant={isQuickBooksConnected ? "outline" : "secondary"}
-                className={`${isQuickBooksConnected ? "border-emerald-200 bg-emerald-50 text-emerald-700" : ""} gap-1 px-2 py-0.5 text-[11px]`}
-              >
-                {isQuickBooksConnected ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Link2Off className="h-3.5 w-3.5" />}
-                {isQuickBooksConnected ? "Connected" : "Disconnected"}
-              </Badge>
+              <div className="mt-2 text-xs text-muted-foreground">
+                {quickBooksStatus?.connection.realmId ? `Realm ID: ${quickBooksStatus.connection.realmId}` : "Connect QuickBooks to use live accounting data."}
+              </div>
             </div>
-            <div className="mt-2 text-xs text-muted-foreground">
-              {quickBooksStatus?.connection.realmId ? `Realm ID: ${quickBooksStatus.connection.realmId}` : "Connect QuickBooks to use live accounting data."}
+
+            <div className="rounded-xl border border-sidebar-border bg-card/70 p-3">
+              <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Support</div>
+              <a
+                href={`mailto:${SUPPORT_EMAIL}`}
+                className="mt-2 inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
+              >
+                <Mail className="h-4 w-4" />
+                {SUPPORT_EMAIL}
+              </a>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Contact support directly from the app for account or integration help.
+              </p>
             </div>
           </div>
         ) : (
