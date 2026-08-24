@@ -18,6 +18,7 @@ const googleSheetsService = require('./services/googleSheetsService');
 const createApiRoutes = require('./routes/api');
 const { router: emailConfigApiRoutes, initializeEmailConfigRoutes } = require('./routes/emailConfigApi');
 const authApiRoutes = require('./routes/authApi');
+const createAdminUserRoutes = require('./routes/adminUsersApi');
 const createViewRoutes = require('./routes/views');
 const { createRequireAuth, initializeUserRolesTable } = require('./middleware/auth');
 
@@ -445,6 +446,9 @@ async function createApp() {
 
   // Apply auth middleware to all /api routes (except /api/auth which is already registered)
   app.use('/api', requireAuth);
+
+  // Admin-only user management routes
+  app.use('/api/admin', createAdminUserRoutes(emailConfigService.isAvailable() ? emailConfigService.pool : null));
 
   // Register routes
   app.use('/api', createApiRoutes(storageService, bigQueryService, emailConfigService.isAvailable() ? emailConfigService.pool : null));

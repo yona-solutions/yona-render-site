@@ -109,6 +109,15 @@ function createViewRoutes() {
     res.sendFile(path.join(publicPath, 'settings.html'));
   });
 
+  /**
+   * User Management page
+   *
+   * GET /user-management
+   */
+  router.get('/user-management', (req, res) => {
+    res.sendFile(path.join(publicPath, 'user-management.html'));
+  });
+
   return router;
 }
 

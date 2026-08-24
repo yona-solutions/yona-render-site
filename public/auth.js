@@ -14,6 +14,10 @@ if (!firebase.apps.length) {
   });
 }
 
+const ADMIN_ONLY_PATHS = new Set([
+  '/user-management'
+]);
+
 // Promise that resolves once we know the auth state for certain
 const _authReady = new Promise((resolve) => {
   const unsubscribe = firebase.auth().onAuthStateChanged((user) => {
@@ -93,13 +97,47 @@ async function getAuthToken() {
       throw new Error('Auth check failed');
     }
 
-    const { role } = await resp.json();
+    const { role, email } = await resp.json();
+    window.currentUserRole = role;
+    window.currentUserEmail = email || user.email;
+    enforcePageAccess(role);
+    insertAdminNavItem(role);
     applyRoleToNav(role);
-    addUserMenu(user, role);
+    addUserMenu({ email: email || user.email }, role);
+    window.dispatchEvent(new CustomEvent('sphere-auth-ready', {
+      detail: {
+        role,
+        email: email || user.email
+      }
+    }));
   } catch (error) {
     console.error('Auth state error:', error);
   }
 })();
+
+function enforcePageAccess(role) {
+  if (role === 'admin') {
+    return;
+  }
+
+  if (!ADMIN_ONLY_PATHS.has(window.location.pathname)) {
+    return;
+  }
+
+  window.sphereAccessDenied = true;
+  document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;background:#f8f9fa;color:#c53030;"><div style="max-width:420px;text-align:center;background:#fff;padding:32px;border:1px solid #e2e8f0;border-radius:8px;box-shadow:0 2px 12px rgba(0,0,0,0.08);"><h2 style="margin-bottom:12px;">Admin Access Required</h2><p style="margin-bottom:20px;color:#4a5568;">Only admin users can open User Management.</p><div style="display:flex;gap:12px;justify-content:center;"><button onclick="location.href=\'/\'" style="padding:10px 18px;cursor:pointer;border:1px solid #cbd5e0;background:#fff;border-radius:6px;">Back to SPHERE</button><button onclick="firebase.auth().signOut().then(()=>location.href=\'/login.html\')" style="padding:10px 18px;cursor:pointer;border:none;background:#4a7c9e;color:#fff;border-radius:6px;">Sign Out</button></div></div></div>';
+}
+
+function insertAdminNavItem(role) {
+  const adminLink = document.querySelector('[data-nav-user-management]');
+  if (!adminLink || role !== 'admin') {
+    return;
+  }
+
+  if (window.location.pathname === '/user-management') {
+    adminLink.classList.add('active');
+  }
+}
 
 /**
  * Hide admin-only nav items for viewers
@@ -107,7 +145,7 @@ async function getAuthToken() {
 function applyRoleToNav(role) {
   if (role !== 'viewer') return;
 
-  const adminPages = ['Dimension Config', 'Email Config', 'Email Templates', 'Run Log', 'Storage Browser', 'NetSuite Sync'];
+  const adminPages = ['Dimension Config', 'Email Config', 'Email Templates', 'Run Log', 'Storage Browser', 'NetSuite Sync', 'User Management'];
   document.querySelectorAll('.nav-item').forEach(item => {
     const text = item.textContent.trim();
     if (adminPages.includes(text)) {
