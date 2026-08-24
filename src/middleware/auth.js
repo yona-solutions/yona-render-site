@@ -7,6 +7,10 @@
 
 const admin = require('firebase-admin');
 
+function normalizeEmail(email) {
+  return String(email || '').trim().toLowerCase();
+}
+
 // Initialize Firebase Admin SDK with service account credentials
 if (!admin.apps.length) {
   const projectId = process.env.GOOGLE_CLOUD_PROJECT || 'yona-solutions-poc';
@@ -53,15 +57,17 @@ const VIEWER_ALLOWED_PATTERNS = [
  * Returns cached result if available and fresh.
  */
 async function getUserRole(email, pool) {
+  const normalizedEmail = normalizeEmail(email);
+
   // Check cache
-  const cached = roleCache.get(email);
+  const cached = roleCache.get(normalizedEmail);
   if (cached && (Date.now() - cached.timestamp) < ROLE_CACHE_TTL) {
     return cached.role;
   }
 
   const result = await pool.query(
-    'SELECT role FROM user_roles WHERE email = $1',
-    [email]
+    'SELECT role FROM user_roles WHERE LOWER(email) = LOWER($1)',
+    [normalizedEmail]
   );
 
   if (result.rows.length === 0) {
@@ -69,8 +75,17 @@ async function getUserRole(email, pool) {
   }
 
   const role = result.rows[0].role;
-  roleCache.set(email, { role, timestamp: Date.now() });
+  roleCache.set(normalizedEmail, { role, timestamp: Date.now() });
   return role;
+}
+
+function invalidateRoleCache(email) {
+  const normalizedEmail = normalizeEmail(email);
+  if (!normalizedEmail) {
+    return;
+  }
+
+  roleCache.delete(normalizedEmail);
 }
 
 /**
@@ -141,7 +156,7 @@ function createRequireAuth(pool) {
 
     try {
       const decoded = await admin.auth().verifyIdToken(token);
-      const email = decoded.email;
+      const email = normalizeEmail(decoded.email);
 
       if (!email) {
         return res.status(401).json({ error: 'No email in token' });
@@ -171,4 +186,8 @@ function createRequireAuth(pool) {
   };
 }
 
-module.exports = { createRequireAuth, initializeUserRolesTable };
+module.exports = {
+  createRequireAuth,
+  initializeUserRolesTable,
+  invalidateRoleCache
+};
