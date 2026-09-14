@@ -853,6 +853,8 @@ exports.gcsToBigQuery = async (req, res) => {
   const bigquery  = new BigQuery({ projectId: PROJECT_ID });
   const storage   = new Storage({ projectId: PROJECT_ID });
   const bucket    = storage.bucket(BUCKET_NAME);
+  let responseStatus = 200;
+  let responseBody = null;
 
   // Status-check endpoint (?status=1)
   if (req.query?.status === '1' || req.query?.status === 'true') {
@@ -1087,7 +1089,7 @@ exports.gcsToBigQuery = async (req, res) => {
     await saveSyncTimestamp(dataAsOf);
     status.stage  = 'done';
     status.result = response;
-    res.status(200).json(response);
+    responseBody = response;
 
   } catch (error) {
     console.error('PIPELINE ERROR:', error.message);
@@ -1101,11 +1103,21 @@ exports.gcsToBigQuery = async (req, res) => {
       source,
       error: error.message,
     };
-    res.status(500).json(status.result);
+    responseStatus = 500;
+    responseBody = status.result;
 
   } finally {
     status.running     = false;
     status.completedAt = new Date().toISOString();
+
+    // Persist the terminal state before slower notification/logging work. Cloud
+    // Run has request-based CPU allocation, so no required work may remain after
+    // the HTTP response is sent.
+    try {
+      await writeStatus(bucket, status);
+    } catch (statusWriteError) {
+      console.error(`Failed to write terminal GCS status for ${runId}: ${statusWriteError.message}`);
+    }
 
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
     const finalStatus = status.stage === 'done' ? 'success' : 'failed';
@@ -1164,21 +1176,31 @@ exports.gcsToBigQuery = async (req, res) => {
       notification: notificationResult,
     };
 
-    await logRunToDatabase({
-      startedAt:             status.startedAt,
-      completedAt:           status.completedAt,
-      status:                finalStatus,
-      durationSeconds:       parseFloat(elapsed),
-      tablesLoaded:          status.result?.tables || null,
-      transformationStatus,
-      dimensionExportStatus,
-      initiatedByEmail,
-      triggerType,
-      source,
-      notificationResult,
-      error:                 notificationError,
-    });
+    try {
+      await logRunToDatabase({
+        startedAt:             status.startedAt,
+        completedAt:           status.completedAt,
+        status:                finalStatus,
+        durationSeconds:       parseFloat(elapsed),
+        tablesLoaded:          status.result?.tables || null,
+        transformationStatus,
+        dimensionExportStatus,
+        initiatedByEmail,
+        triggerType,
+        source,
+        notificationResult,
+        error:                 notificationError,
+      });
+    } catch (databaseLogError) {
+      console.error(`Run log finalization failed for ${runId}: ${databaseLogError.message}`);
+    }
 
-    await writeStatus(bucket, status);
+    try {
+      await writeStatus(bucket, status);
+    } catch (statusWriteError) {
+      console.error(`Failed to enrich terminal GCS status for ${runId}: ${statusWriteError.message}`);
+    }
   }
+
+  return res.status(responseStatus).json(responseBody);
 };
