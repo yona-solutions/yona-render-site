@@ -77,20 +77,28 @@ class EmailConfigService {
         // Connection pool settings
         max: 20, // Maximum number of clients
         idleTimeoutMillis: 30000,
-        connectionTimeoutMillis: 2000,
+        // Render Postgres can take a few seconds to accept connections after a deploy.
+        connectionTimeoutMillis: 15000,
       };
 
       this.pool = new Pool(connectionConfig);
 
       // Test connection
       const client = await this.pool.connect();
-      await client.query('SELECT NOW()');
-      client.release();
+      try {
+        await client.query('SELECT NOW()');
+      } finally {
+        client.release();
+      }
 
       this.isInitialized = true;
       console.log('✅ Email Config Database initialized successfully');
     } catch (error) {
       console.error('❌ Failed to initialize Email Config Database:', error);
+      if (this.pool) {
+        await this.pool.end().catch(() => {});
+        this.pool = null;
+      }
       throw error;
     }
   }

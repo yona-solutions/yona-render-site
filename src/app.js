@@ -49,16 +49,31 @@ async function createApp() {
   // Initialize Google Sheets service
   googleSheetsService.initialize();
 
-  // Initialize email config service (PostgreSQL)
-  // Only initialize if DATABASE_URL is provided
+  // Initialize email config service (PostgreSQL). A transient connection
+  // timeout must not replace real production report groups with mock data.
   if (process.env.DATABASE_URL) {
-    try {
-      await emailConfigService.initialize();
-    } catch (error) {
-      console.warn('⚠️  Email config database not available:', error.message);
-      console.warn('   Email configuration features will be disabled');
+    let databaseError;
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      try {
+        await emailConfigService.initialize();
+        databaseError = null;
+        break;
+      } catch (error) {
+        databaseError = error;
+        console.warn(`⚠️  Email config database connection attempt ${attempt}/3 failed:`, error.message);
+        if (attempt < 3) {
+          await new Promise(resolve => setTimeout(resolve, attempt * 2000));
+        }
+      }
+    }
+    if (databaseError) {
+      if (process.env.NODE_ENV === 'production') throw databaseError;
+      console.warn('   Email configuration features will use sample data');
     }
   } else {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('DATABASE_URL must be configured in production');
+    }
     console.warn('⚠️  DATABASE_URL not set - email configuration features disabled');
   }
 
