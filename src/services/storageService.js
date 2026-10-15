@@ -1117,6 +1117,7 @@ class StorageService {
           group.customers.push({
             ...customer,
             label: customerConfig.label || customer.label,
+            start_date_est: customer.start_date_est || customerConfig.start_date_est || null,
             configId: customerConfig.configId,
             ...buildCustomerTagMeta(customerConfig),
             parentDistrictId,
@@ -1313,6 +1314,7 @@ class StorageService {
             group.customers.push({
               ...customer,
               label: customerConfigEntry.label || customer.label,
+              start_date_est: customer.start_date_est || customerConfigEntry.start_date_est || null,
               configId: customerConfigEntry.configId,
               ...buildCustomerTagMeta(customerConfigEntry),
               parentDistrictId,

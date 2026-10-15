@@ -1,3 +1,7 @@
+function getDateValue(value) {
+  return value && typeof value === 'object' ? value.value || null : value || null;
+}
+
 /**
  * BigQuery Service
  * 
@@ -28,6 +32,30 @@ class BigQueryService {
    */
   isAvailable() {
     return this.bigquery !== null && this.bigquery !== undefined;
+  }
+
+  /** Get the canonical start dates for a set of customer IDs in one query. */
+  async getCustomerStartDatesByIds(customerIds) {
+    if (!this.isAvailable()) {
+      throw new Error('BigQuery not initialized');
+    }
+
+    const ids = [...new Set(customerIds.map(Number).filter(Number.isInteger))];
+    if (ids.length === 0) {
+      return new Map();
+    }
+
+    const [rows] = await this.bigquery.query({
+      query: `
+        SELECT customer_id, start_date_est
+        FROM \`${this.dataset}.dim_customers\`
+        WHERE customer_id IN UNNEST(@customerIds)
+      `,
+      location: 'US',
+      params: { customerIds: ids }
+    });
+
+    return new Map(rows.map(row => [String(row.customer_id), getDateValue(row.start_date_est)]));
   }
 
   /**
@@ -358,7 +386,7 @@ class BigQueryService {
         customer_internal_id: row.customer_id,
         customer_code: row.customer_code,
         label: row.display_name,
-        start_date_est: row.start_date_est ? row.start_date_est.value : null,
+        start_date_est: getDateValue(row.start_date_est),
         region_internal_id: row.region_internal_id,
         subsidiary_internal_id: row.subsidiary_internal_id
       }));
@@ -436,7 +464,7 @@ class BigQueryService {
         customer_internal_id: row.customer_id,
         customer_code: row.customer_code,
         label: row.display_name,
-        start_date_est: row.start_date_est ? row.start_date_est.value : null,
+        start_date_est: getDateValue(row.start_date_est),
         region_internal_id: row.region_internal_id,
         subsidiary_internal_id: row.subsidiary_internal_id
       }));

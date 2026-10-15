@@ -1460,6 +1460,19 @@ function createApiRoutes(storageService, bigQueryService, pgPool) {
           queryParams.subsidiaryFilterName = subsidiaryResult.subsidiaryName;
         }
 
+        // Region and subsidiary reports already load their customer dates from
+        // dim_customers. Use the same source for district reports, falling back
+        // to the stored configuration only when BigQuery has no date.
+        const startDatesByCustomerId = await bigQueryService.getCustomerStartDatesByIds(
+          customers.map(customer => customer.customer_internal_id)
+        );
+        customers = customers.map(customer => ({
+          ...customer,
+          start_date_est: startDatesByCustomerId.get(String(customer.customer_internal_id))
+            || customer.start_date_est
+            || null
+        }));
+
         // Update selectedLabel to use the district display name
         selectedLabel = districtName;
 

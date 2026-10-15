@@ -799,12 +799,12 @@ if (census.actual || census.budget) {
 
 ### Start Date Display
 
-**Source**: `start_date_est` field in customer configuration
+**Source**: `start_date_est` in BigQuery `dim_customers`, with the customer configuration value used when BigQuery has no date. District reports look up the selected customers in one batch; Region and Subsidiary reports receive the dates with their customer queries.
 
 **Display**:
 - Only shown on individual facility P&Ls
 - Format: "Start Date: 01/15/2023" (MM/DD/YYYY)
-- Pulled from BigQuery dim_customers table
+- Uses the same date source for District, Region, and Subsidiary P&Ls
 
 ### Revenue Check
 
